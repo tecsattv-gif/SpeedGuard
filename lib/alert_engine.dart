@@ -9,11 +9,24 @@ class AlertState {
   final double? distance; // metros
   final bool overLimit;
   final String? speak; // frase nova a falar agora (null = nada)
-  const AlertState({this.radar, this.distance, this.overLimit = false, this.speak});
+  /// Bipes a tocar agora: 1 = 500 m, 2 = 300 m, 3 = 100 m,
+  /// 4 = acima do limite, 0 = nada.
+  final int beeps;
+  const AlertState(
+      {this.radar,
+      this.distance,
+      this.overLimit = false,
+      this.speak,
+      this.beeps = 0});
 }
 
 /// Decide quando avisar sobre um radar à frente.
 class AlertEngine {
+  /// Distâncias dos avisos, em metros: o 1º a 500 m, depois 300 m e 100 m.
+  static const stages = [500, 300, 100];
+
+  /// Último aviso dado para cada radar (1, 2 ou 3).
+  final Map<String, int> _stage = {};
   final Set<String> _announced = {};
   final Set<String> _warnedSpeed = {};
   DateTime _lastZoneAlert = DateTime.fromMillisecondsSinceEpoch(0);
@@ -34,10 +47,8 @@ class AlertEngine {
     final speedKmh = speedMs * 3.6;
     final headingOk = speedMs > 2.5 && pos.heading >= 0;
 
-    // Distância de aviso: ~25 s antes, entre 300 m e 1,2 km.
-    final alertDist = mode == RadarMode.dangerZone
-        ? 4000.0
-        : (speedMs * 25).clamp(300.0, 1200.0);
+    // Radar aparece na tela a partir de 600 m; avisos a 500, 300 e 100 m.
+    final alertDist = mode == RadarMode.dangerZone ? 4000.0 : 600.0;
 
     Radar? best;
     double bestDist = double.infinity;
@@ -48,6 +59,7 @@ class AlertEngine {
 
       // Saiu da área: libera para avisar de novo numa próxima passagem.
       if (d > alertDist + 400) {
+        _stage.remove(r.id);
         _announced.remove(r.id);
         _warnedSpeed.remove(r.id);
         continue;
@@ -88,20 +100,33 @@ class AlertEngine {
       return AlertState(radar: best, distance: null, speak: speak);
     }
 
-    if (!_announced.contains(best.id)) {
-      _announced.add(best.id);
-      final m = bestDist >= 1000
-          ? '1 quilômetro'
-          : '${(bestDist / 50).round() * 50} metros';
-      speak = best.maxSpeed != null
-          ? '${best.typeLabel} a $m. Limite ${best.maxSpeed}.'
-          : '${best.typeLabel} a $m.';
+    // Em qual aviso estamos: 1 (≤500 m), 2 (≤300 m) ou 3 (≤100 m).
+    var stage = 0;
+    for (var i = 0; i < stages.length; i++) {
+      if (bestDist <= stages[i] + 15) stage = i + 1;
+    }
+    var beeps = 0;
+    final done = _stage[best.id] ?? 0;
+    if (stage > done) {
+      // Se já chegou perto (ex.: radar apareceu a 250 m), só dá o aviso atual.
+      _stage[best.id] = stage;
+      beeps = stage;
+      final m = '${stages[stage - 1]} metros';
+      final limit = best.maxSpeed != null ? ' Limite ${best.maxSpeed}.' : '';
+      speak = stage == 1 || done == 0
+          ? '${best.typeLabel} a $m.$limit'
+          : 'Radar a $m.$limit';
     } else if (over && !_warnedSpeed.contains(best.id) && bestDist < 400) {
       _warnedSpeed.add(best.id);
       speak = 'Reduza a velocidade.';
+      beeps = 4;
     }
 
     return AlertState(
-        radar: best, distance: bestDist, overLimit: over, speak: speak);
+        radar: best,
+        distance: bestDist,
+        overLimit: over,
+        speak: speak,
+        beeps: beeps);
   }
 }

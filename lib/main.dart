@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -88,6 +89,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   /// Tela cheia: true = mapa, false = tela de alerta (setas grandes).
   bool _mapView = true;
   bool _voice = true;
+  /// Tipo de aviso sonoro: 'voice' (fala a distância) ou 'beep' (bipes).
+  String _sound = 'voice';
+  /// Mostra o card "N radares carregados" só alguns segundos após atualizar.
+  bool _showCount = false;
+  Timer? _countTimer;
+  final _player = AudioPlayer();
   bool _discreet = false;
   bool _bubble = false;
   double _bubbleScale = 1.0; // tamanho do painel flutuante
@@ -137,6 +144,17 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   Future<void> _init() async {
     final p = await SharedPreferences.getInstance();
     _voice = p.getBool('voice') ?? true;
+    _sound = p.getString('sound') ?? 'voice';
+    try {
+      // Bipes abaixam a música/navegação por um instante, sem pausar.
+      await _player.setAudioContext(AudioContext(
+        android: const AudioContextAndroid(
+          contentType: AndroidContentType.sonification,
+          usageType: AndroidUsageType.assistanceNavigationGuidance,
+          audioFocus: AndroidAudioFocus.gainTransientMayDuck,
+        ),
+      ));
+    } catch (_) {}
     _discreet = p.getBool('discreet') ?? false;
     _bubble = p.getBool('bubble') ?? false;
     _bubbleScale = p.getDouble('bubbleScale') ?? 1.0;
@@ -158,6 +176,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     _askTimer?.cancel();
     _sub?.cancel();
     _tts.stop();
+    _player.dispose();
+    _countTimer?.cancel();
     WakelockPlus.disable();
     super.dispose();
   }
@@ -277,9 +297,25 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     });
   }
 
+  /// Fala avisos gerais (só no modo voz).
+  void _say(String text) {
+    if (_voice && _sound == 'voice') _tts.speak(text);
+  }
+
+  /// Bipes: 1 = 500 m, 2 = 300 m, 3 = 100 m, 4 = acima do limite.
+  Future<void> _beep(int n) async {
+    final file = n >= 4 ? 'beep_fast' : 'beep$n';
+    try {
+      await _player.stop();
+      await _player.play(AssetSource('sounds/$file.wav'));
+    } catch (_) {}
+  }
+
   Future<void> _stop() async {
     await _sub?.cancel();
     _sub = null;
+    // Parou o monitoramento: o painel flutuante sai da tela.
+    await _closeBubble();
     await WakelockPlus.disable();
     setState(() {
       _running = false;
@@ -304,12 +340,20 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     }
     final st = _engine.update(
         pos: pos, radars: _allRadars, mode: _rule.mode);
-    if (st.speak != null) {
+    if (st.speak != null || st.beeps > 0) {
       HapticFeedback.heavyImpact();
       if (_voice) {
-        _tts.speak(_discreet
-            ? (st.speak!.startsWith('Reduza') ? 'Reduza.' : 'Radar.')
-            : st.speak!);
+        if (_sound == 'beep' && st.beeps > 0) {
+          _beep(st.beeps);
+        } else if (st.speak != null) {
+          _tts.speak(!_discreet
+              ? st.speak!
+              : st.beeps == 4
+                  ? 'Reduza.'
+                  : st.beeps > 0
+                      ? '${AlertEngine.stages[st.beeps - 1]} metros.'
+                      : 'Radar.');
+        }
       }
     }
     if (!mounted) return;
@@ -336,7 +380,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       if (d > 150) continue;
       _asked.add(r.id);
       HapticFeedback.heavyImpact();
-      if (_voice) _tts.speak('O radar móvel ainda está aí? Responda na tela.');
+      _say('O radar móvel ainda está aí? Responda na tela.');
       setState(() => _ask = r);
       _askTimer?.cancel();
       _askTimer = Timer(const Duration(seconds: 40), () {
@@ -381,7 +425,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     }
     final notice = _rule.notice;
     if (notice != null && _noticeShown.add(code) && mounted) {
-      if (_voice) _tts.speak('Você entrou em ${_rule.name}.');
+      _say('Você entrou em ${_rule.name}.');
       showDialog(
         context: context,
         builder: (_) => AlertDialog(
@@ -401,7 +445,14 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     setState(() => _loading = true);
     final n = await _service.refresh(pos.latitude, pos.longitude);
     if (!mounted) return;
-    setState(() => _loading = false);
+    setState(() {
+      _loading = false;
+      _showCount = true;
+    });
+    _countTimer?.cancel();
+    _countTimer = Timer(const Duration(seconds: 4), () {
+      if (mounted) setState(() => _showCount = false);
+    });
     if (n == null) {
       _snack('Sem conexão para baixar radares. Usando os já salvos.');
     }
@@ -452,7 +503,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     final pos = _pos;
     if (pos == null) {
       if (fromBubble) {
-        if (_voice) _tts.speak('Sem sinal de GPS. Radar não salvo.');
+        _say('Sem sinal de GPS. Radar não salvo.');
       } else {
         _snack('Aguarde o sinal do GPS para reportar.');
       }
@@ -469,7 +520,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         if (!mounted) return;
         setState(() {});
         if (fromBubble) {
-          if (_voice) _tts.speak('Radar já reportado. Confirmado, obrigado!');
+          _say('Radar já reportado. Confirmado, obrigado!');
         } else {
           _snack('Esse radar já estava reportado. Confirmado, obrigado!');
         }
@@ -491,7 +542,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     if (!mounted) return;
     setState(() {});
     if (fromBubble) {
-      if (_voice) _tts.speak('Radar reportado. Obrigado!');
+      _say('Radar reportado. Obrigado!');
       return;
     }
     if (shared) {
@@ -548,7 +599,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             mainAxisSize: MainAxisSize.min,
             children: [
               SwitchListTile(
-                title: const Text('Alertas por voz'),
+                title: const Text('Alertas sonoros'),
+                subtitle: const Text('Avisos a 500 m, 300 m e 100 m do radar'),
                 value: _voice,
                 onChanged: (v) async {
                   final p = await SharedPreferences.getInstance();
@@ -557,9 +609,38 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   setState(() {});
                 },
               ),
+              if (_voice)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                  child: SegmentedButton<String>(
+                    showSelectedIcon: false,
+                    segments: const [
+                      ButtonSegment(
+                          value: 'voice',
+                          icon: Icon(Icons.record_voice_over),
+                          label: Text('Voz')),
+                      ButtonSegment(
+                          value: 'beep',
+                          icon: Icon(Icons.notifications_active),
+                          label: Text('Bipe')),
+                    ],
+                    selected: {_sound},
+                    onSelectionChanged: (v) async {
+                      final p = await SharedPreferences.getInstance();
+                      await p.setString('sound', v.first);
+                      setSheet(() => _sound = v.first);
+                      // Amostra de como vai soar.
+                      if (v.first == 'beep') {
+                        _beep(1);
+                      } else {
+                        _tts.speak('Radar fixo a 500 metros. Limite 80.');
+                      }
+                    },
+                  ),
+                ),
               SwitchListTile(
                 title: const Text('Modo discreto'),
-                subtitle: const Text('Só vibra e diz "Radar", sem detalhes'),
+                subtitle: const Text('Na voz, fala só a distância ("500 metros")'),
                 value: _discreet,
                 onChanged: (v) async {
                   final p = await SharedPreferences.getInstance();
@@ -697,7 +778,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               ),
               const ListTile(
                 leading: Icon(Icons.info_outline),
-                title: Text('SpeedGuard 1.8.1'),
+                title: Text('SpeedGuard 1.9.0'),
                 subtitle: Text('Dados de radares: © colaboradores do '
                     'OpenStreetMap. Respeite sempre os limites de velocidade.'),
               ),
@@ -839,15 +920,25 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                     children: [
                       _SpeedBox(speed: speed, over: a.overLimit),
                       const SizedBox(width: 10),
-                      Expanded(child: _alertCard(a)),
+                      Expanded(
+                        // Card só aparece com radar à frente, parado, sem GPS
+                        // ou logo após atualizar; atualizando: só o símbolo.
+                        child: a.radar != null ||
+                                !_running ||
+                                _pos == null ||
+                                _rule.mode == RadarMode.disabled ||
+                                (_showCount && !_loading)
+                            ? _alertCard(a)
+                            : Align(
+                                alignment: Alignment.centerRight,
+                                child: _loading
+                                    ? const _UpdatingBadge()
+                                    : const SizedBox.shrink(),
+                              ),
+                      ),
                     ],
                   ),
                   if (_ask != null) _askCard(),
-                  if (_loading)
-                    const Padding(
-                      padding: EdgeInsets.only(top: 8),
-                      child: LinearProgressIndicator(),
-                    ),
                 ],
               ),
             ),
@@ -1018,6 +1109,47 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                     fontSize: 22, fontWeight: FontWeight.bold)),
             Text(subtitle, maxLines: 2, overflow: TextOverflow.ellipsis),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Símbolo girando enquanto os radares da região são atualizados.
+class _UpdatingBadge extends StatefulWidget {
+  const _UpdatingBadge();
+  @override
+  State<_UpdatingBadge> createState() => _UpdatingBadgeState();
+}
+
+class _UpdatingBadgeState extends State<_UpdatingBadge>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _spin = AnimationController(
+      vsync: this, duration: const Duration(milliseconds: 900))
+    ..repeat();
+
+  @override
+  void dispose() {
+    _spin.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: 'Atualizando radares',
+      child: Container(
+        width: 52,
+        height: 52,
+        decoration: BoxDecoration(
+          color: SG.card.withValues(alpha: 0.94),
+          shape: BoxShape.circle,
+          border: Border.all(color: SG.violet, width: 1.5),
+          boxShadow: SG.glow(SG.violet, 10),
+        ),
+        child: RotationTransition(
+          turns: _spin,
+          child: Icon(Icons.sync, color: SG.accent, size: 30),
         ),
       ),
     );

@@ -241,6 +241,28 @@ class _OverlayBubbleState extends State<OverlayBubble> {
         ),
       ),
     );
+    // ✕ no canto: fecha o painel com um toque.
+    final speedWithClose = Stack(children: [
+      Positioned.fill(child: speed),
+      Positioned(
+        top: 0,
+        right: 0,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: _closeSelf,
+          child: Container(
+            width: 20,
+            height: 20,
+            alignment: Alignment.center,
+            decoration: const BoxDecoration(
+              color: Color(0xCC14081F),
+              borderRadius: BorderRadius.only(bottomLeft: Radius.circular(8)),
+            ),
+            child: const Icon(Icons.close, color: SG.violetLight, size: 14),
+          ),
+        ),
+      ),
+    ]);
     final middle = Padding(
       padding: const EdgeInsets.all(4),
       child: FittedBox(fit: BoxFit.scaleDown, child: _middle()),
@@ -267,7 +289,7 @@ class _OverlayBubbleState extends State<OverlayBubble> {
       child: _land
           // Horizontal: velocidade | alerta | +
           ? Row(children: [
-              Expanded(flex: 4, child: speed),
+              Expanded(flex: 4, child: speedWithClose),
               const VerticalDivider(width: 1, thickness: 1, color: line),
               Expanded(flex: 5, child: middle),
               const VerticalDivider(width: 1, thickness: 1, color: line),
@@ -275,7 +297,7 @@ class _OverlayBubbleState extends State<OverlayBubble> {
             ])
           // Vertical: velocidade / alerta / +
           : Column(children: [
-              Expanded(flex: 5, child: speed),
+              Expanded(flex: 5, child: speedWithClose),
               const Divider(height: 1, thickness: 1, color: line),
               Expanded(flex: 7, child: middle),
               const Divider(height: 1, thickness: 1, color: line),

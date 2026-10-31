@@ -4,29 +4,34 @@ App Android de alerta de radares para o mundo todo, feito em Flutter. Avisa por 
 
 Autor: Luiz Alberto Cardoso
 
-## Funções (versão 1.8.1)
+## Funções (versão 1.9.0)
 
 - **Visual neon** com as cores da tela de abertura: fundo roxo escuro, velocímetro com borda violeta brilhante, botão INICIAR em degradê vermelho→rosa, cartões e botões roxos; o painel flutuante e a janela de reportar seguem a mesma paleta
 - **Tela de abertura** (2,5 s) com a arte do SpeedGuard (velocímetro e rastro de luz) e os créditos do autor
 - **Ícone próprio** com o velocímetro (inclui ícone adaptativo do Android 8+)
 - **Mapa** (OpenStreetMap) com sua posição e os radares da região
+- **Card de status limpo**: enquanto os radares da região são baixados aparece só um símbolo girando ao lado da velocidade; ao terminar, o card "N radares carregados" aparece por 4 segundos e some. Com radar à frente o card volta mostrando a distância
 - **Aparência** em Configurações: **Auto** (segue o modo claro/escuro do celular), **Claro** ou **Escuro**. No modo escuro o mapa também fica escurecido para não ofuscar à noite. A tela de abertura e o painel flutuante continuam sempre escuros
 - **Duas telas no app aberto**, como no CamSam: o botão ao lado de Configurações alterna entre o **Mapa** e a **Tela de alerta** (sem mapa). Na tela de alerta aparecem três setas verdes grandes com o caminho livre e, quando há radar à frente, a placa do limite, a distância em laranja e o tipo do radar; acima do limite fica vermelho com "REDUZA A VELOCIDADE". O app lembra a última tela escolhida
 - **Base mundial de radares** baixada automaticamente do OpenStreetMap num raio de 50 km, atualizada a cada 24 h ou a cada 30 km rodados, e guardada para uso offline
-- **Alerta por voz e vibração** cerca de 25 segundos antes do radar (entre 300 m e 1,2 km), dizendo o tipo, a distância e o limite
+- **Avisos a 500 m, 300 m e 100 m** do radar, com vibração. Em Configurações → **Alertas sonoros** dá para escolher:
+  - **Voz**: "Radar fixo a 500 metros. Limite 80.", depois "Radar a 300 metros…" e "Radar a 100 metros…"
+  - **Bipe**: 1 bipe a 500 m, 2 bipes a 300 m, 3 bipes rápidos a 100 m e uma sequência rápida se estiver acima do limite. Os bipes só abaixam a música/navegação por um instante
+  - Se o radar aparecer já perto (ex.: a 250 m), só o aviso daquela distância é dado
+  - **Modo discreto** (voz): fala só a distância ("500 metros")
 - **Aviso "Reduza a velocidade"** quando você passa do limite perto do radar
 - Só avisa radares **à frente** e, quando o sentido do radar é conhecido, só para quem vai naquele sentido
 - **Velocímetro** grande, que fica vermelho acima do limite
 - **Funciona com a tela apagada ou em segundo plano** (notificação "SpeedGuard ativo")
 - **Reportar radar** (móvel ou fixo) na sua posição atual: abre uma janela com as placas de limite prontas (30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130 ou "?") e **um toque já salva**, sem digitar. O radar vai para o Firebase e **todos os usuários veem**. **Sem duplicados**: se já houver um radar compartilhado a menos de 150 m, no mesmo sentido, o app não cria outro; o reporte conta como confirmação (radar móvel ganha mais 48 h) e aparece "Esse radar já estava reportado"
 - **Confirmação de radares móveis**: eles não somem sozinhos. Depois de 48 h, quem passar a menos de 150 m recebe a pergunta "O radar móvel ainda está aqui?" na tela e na bolha flutuante. **Sim** mantém por mais 48 h; **Não** apaga o radar
-- **Painel flutuante** por cima do Google Maps / Waze, no estilo do CamSam (ativar em Configurações; pede a permissão "Sobrepor a outros apps"). Aparece no canto superior esquerdo, pode ser arrastado e não bloqueia o resto do mapa. Em **Configurações**, logo abaixo de "Bolha flutuante", dá para escolher:
+- **Painel flutuante** (some ao tocar em **PARAR**) por cima do Google Maps / Waze, no estilo do CamSam (ativar em Configurações; pede a permissão "Sobrepor a outros apps"). Aparece no canto superior esquerdo, pode ser arrastado e não bloqueia o resto do mapa. Em **Configurações**, logo abaixo de "Bolha flutuante", dá para escolher:
   - **Tamanho**: Pequeno, Médio (igual ao CamSam, 64 × 250 dp) ou Grande
   - **Formato**: Vertical (retrato) ou Horizontal (paisagem, 240 × 72 dp no Médio), com uma miniatura mostrando como fica
   - O tamanho é convertido para pixels e conferido pelo próprio painel ao abrir, para ficar certo em qualquer tela
 
   - **Toque duplo no painel**: abre o SpeedGuard direto em tela cheia (o painel some e volta quando você sair do app). Desde a 1.6.4 não aparece mais a janela "Completar ação usando" pedindo para escolher outro app
-  - **Fechar o painel**: segure o dedo parado sobre ele por meio segundo (vibra e fecha na hora, mesmo com o app em segundo plano). O monitoramento e a voz continuam; o painel volta da próxima vez que você sair do SpeedGuard
+  - **Fechar o painel**: toque no **✕** no canto de cima, ou segure o dedo parado sobre ele por meio segundo (vibra e fecha na hora, mesmo com o app em segundo plano). O monitoramento e a voz continuam; o painel volta da próxima vez que você sair do SpeedGuard
 
   Conteúdo do painel:
   - em cima: velocidade atual (vermelha acima do limite)
@@ -58,6 +63,7 @@ Autor: Luiz Alberto Cardoso
 | `lib/firebase_config.dart` | ID do projeto e chave do Firebase |
 | `lib/alert_view.dart` | Tela de alerta (setas, placa e distância) |
 | `lib/overlay.dart` | Painel flutuante sobre outros apps |
+| `assets/sounds/` | Bipes dos avisos (500, 300, 100 m e acima do limite) |
 | `lib/theme.dart` | Paleta de cores e tema do app |
 | `lib/splash_screen.dart` | Tela de abertura com créditos (2,5 s) |
 | `assets/splash.png`, `assets/icon.png` | Arte da abertura e do ícone (criação original) |
