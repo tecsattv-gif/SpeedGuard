@@ -23,8 +23,15 @@ import 'splash_screen.dart';
 import 'theme.dart';
 import 'speed_picker.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Tema escolhido em Configurações (padrão: automático, segue o celular).
+  try {
+    final p = await SharedPreferences.getInstance();
+    SG.mode.value = ThemeMode.values.firstWhere(
+        (m) => m.name == p.getString('themeMode'),
+        orElse: () => ThemeMode.system);
+  } catch (_) {}
   runApp(const SpeedGuardApp());
 }
 
@@ -43,11 +50,20 @@ class SpeedGuardApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'SpeedGuard',
-      debugShowCheckedModeBanner: false,
-      theme: SG.theme(),
-      home: const SplashScreen(next: HomePage()),
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: SG.mode,
+      builder: (context, mode, _) => MaterialApp(
+        title: 'SpeedGuard',
+        debugShowCheckedModeBanner: false,
+        theme: SG.lightTheme(),
+        darkTheme: SG.theme(),
+        themeMode: mode,
+        builder: (context, child) {
+          SG.dark = Theme.of(context).brightness == Brightness.dark;
+          return child!;
+        },
+        home: const SplashScreen(next: HomePage()),
+      ),
     );
   }
 }
@@ -416,7 +432,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                     ? 'Todos verão este radar. Radares móveis são confirmados a cada 48 h por quem passar.'
                     : 'O radar fica salvo só neste aparelho.',
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.white70, fontSize: 12),
+                style: TextStyle(color: SG.textSoft, fontSize: 12),
               ),
             ],
           ),
@@ -610,6 +626,43 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 ),
                 const SizedBox(height: 8),
               ],
+              const Padding(
+                padding: EdgeInsets.fromLTRB(16, 12, 16, 6),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text('Aparência'),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: ValueListenableBuilder<ThemeMode>(
+                  valueListenable: SG.mode,
+                  builder: (_, mode, __) => SegmentedButton<ThemeMode>(
+                    showSelectedIcon: false,
+                    segments: const [
+                      ButtonSegment(
+                          value: ThemeMode.system,
+                          icon: Icon(Icons.brightness_auto),
+                          label: Text('Auto')),
+                      ButtonSegment(
+                          value: ThemeMode.light,
+                          icon: Icon(Icons.light_mode),
+                          label: Text('Claro')),
+                      ButtonSegment(
+                          value: ThemeMode.dark,
+                          icon: Icon(Icons.dark_mode),
+                          label: Text('Escuro')),
+                    ],
+                    selected: {mode},
+                    onSelectionChanged: (v) async {
+                      SG.mode.value = v.first;
+                      final p = await SharedPreferences.getInstance();
+                      await p.setString('themeMode', v.first.name);
+                    },
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
               ListTile(
                 leading: const Icon(Icons.refresh),
                 title: const Text('Atualizar radares agora'),
@@ -628,7 +681,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               ),
               const ListTile(
                 leading: Icon(Icons.info_outline),
-                title: Text('SpeedGuard 1.2'),
+                title: Text('SpeedGuard 1.8.0'),
                 subtitle: Text('Dados de radares: © colaboradores do '
                     'OpenStreetMap. Respeite sempre os limites de velocidade.'),
               ),
@@ -686,6 +739,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
+    // Reconstrói a tela quando o tema (claro/escuro) muda.
+    Theme.of(context);
     final pos = _pos;
     final speed = pos == null ? 0 : (pos.speed.clamp(0, 400) * 3.6).round();
     final showRadars = _rule.mode == RadarMode.full;
@@ -707,6 +762,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               TileLayer(
                 urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                 userAgentPackageName: 'com.tecsattv.speedguard',
+                // Modo escuro: mapa escurecido para não ofuscar à noite.
+                tileBuilder: SG.dark ? darkModeTileBuilder : null,
               ),
               if (showRadars)
                 MarkerLayer(
@@ -807,9 +864,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               child: const Icon(Icons.my_location),
             ),
       bottomNavigationBar: Container(
-        decoration: const BoxDecoration(
-          color: SG.bg,
-          border: Border(top: BorderSide(color: Color(0x558C50FF))),
+        decoration: BoxDecoration(
+          color: SG.page,
+          border: const Border(top: BorderSide(color: Color(0x558C50FF))),
         ),
         child: SafeArea(
           child: Padding(
@@ -928,7 +985,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 (a.overLimit ? SG.pink : SG.red).withValues(alpha: 0.85),
               ])
             : null,
-        color: hasAlert ? null : SG.surface.withValues(alpha: 0.94),
+        color: hasAlert ? null : SG.card.withValues(alpha: 0.94),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: accent.withValues(alpha: 0.8), width: 1.5),
         boxShadow: SG.glow(accent, hasAlert ? 18 : 10),
@@ -1042,7 +1099,7 @@ class _MainButton extends StatelessWidget {
       height: 54,
       decoration: BoxDecoration(
         gradient: running ? null : SG.hot,
-        color: running ? SG.surfaceHigh : null,
+        color: running ? SG.cardHigh : null,
         borderRadius: BorderRadius.circular(27),
         border: Border.all(
             color: running ? SG.violet : Colors.transparent, width: 1.5),
@@ -1063,8 +1120,8 @@ class _MainButton extends StatelessWidget {
                 child: FittedBox(
                   fit: BoxFit.scaleDown,
                   child: Text(running ? 'PARAR' : 'INICIAR',
-                      style: const TextStyle(
-                          color: Colors.white,
+                      style: TextStyle(
+                          color: running ? SG.text : Colors.white,
                           fontSize: 19,
                           fontWeight: FontWeight.w800,
                           fontStyle: FontStyle.italic,
@@ -1092,7 +1149,7 @@ class _RoundAction extends StatelessWidget {
     return Tooltip(
       message: tooltip,
       child: Material(
-        color: SG.surfaceHigh,
+        color: SG.cardHigh,
         shape: const CircleBorder(
             side: BorderSide(color: Color(0x998C50FF), width: 1.5)),
         child: InkWell(
@@ -1101,7 +1158,7 @@ class _RoundAction extends StatelessWidget {
           child: SizedBox(
             width: 52,
             height: 52,
-            child: Icon(icon, color: SG.violetLight, size: 26),
+            child: Icon(icon, color: SG.accent, size: 26),
           ),
         ),
       ),

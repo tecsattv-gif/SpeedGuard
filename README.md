@@ -4,12 +4,13 @@ App Android de alerta de radares para o mundo todo, feito em Flutter. Avisa por 
 
 Autor: Luiz Alberto Cardoso
 
-## Funções (versão 1.7.0)
+## Funções (versão 1.8.0)
 
 - **Visual neon** com as cores da tela de abertura: fundo roxo escuro, velocímetro com borda violeta brilhante, botão INICIAR em degradê vermelho→rosa, cartões e botões roxos; o painel flutuante e a janela de reportar seguem a mesma paleta
 - **Tela de abertura** (2,5 s) com a arte do SpeedGuard (velocímetro e rastro de luz) e os créditos do autor
 - **Ícone próprio** com o velocímetro (inclui ícone adaptativo do Android 8+)
 - **Mapa** (OpenStreetMap) com sua posição e os radares da região
+- **Aparência** em Configurações: **Auto** (segue o modo claro/escuro do celular), **Claro** ou **Escuro**. No modo escuro o mapa também fica escurecido para não ofuscar à noite. A tela de abertura e o painel flutuante continuam sempre escuros
 - **Duas telas no app aberto**, como no CamSam: o botão ao lado de Configurações alterna entre o **Mapa** e a **Tela de alerta** (sem mapa). Na tela de alerta aparecem três setas verdes grandes com o caminho livre e, quando há radar à frente, a placa do limite, a distância em laranja e o tipo do radar; acima do limite fica vermelho com "REDUZA A VELOCIDADE". O app lembra a última tela escolhida
 - **Base mundial de radares** baixada automaticamente do OpenStreetMap num raio de 50 km, atualizada a cada 24 h ou a cada 30 km rodados, e guardada para uso offline
 - **Alerta por voz e vibração** cerca de 25 segundos antes do radar (entre 300 m e 1,2 km), dizendo o tipo, a distância e o limite

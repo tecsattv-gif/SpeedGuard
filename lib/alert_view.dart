@@ -23,9 +23,11 @@ class AlertView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [Color(0xFF2A1046), SG.bg],
+          colors: SG.dark
+              ? const [Color(0xFF2A1046), SG.bg]
+              : const [Color(0xFFE9DEFA), Color(0xFFF5F0FC)],
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
         ),
@@ -43,16 +45,17 @@ class AlertView extends StatelessWidget {
   Widget _content() {
     if (!running) {
       return Column(mainAxisSize: MainAxisSize.min, children: [
-        const _Chevrons(color: Color(0x668C50FF)),
+        _Chevrons(color: SG.accent.withValues(alpha: 0.4)),
         const SizedBox(height: 24),
         Text(status,
             textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 18, color: SG.violetLight)),
+            style: TextStyle(fontSize: 18, color: SG.accent)),
       ]);
     }
     final r = alert.radar;
     if (r == null) {
-      return const _Chevrons(color: Color(0xFF4ED636));
+      return _Chevrons(
+          color: SG.dark ? const Color(0xFF4ED636) : const Color(0xFF2EAA1E));
     }
     final color = alert.overLimit ? SG.red : SG.orange;
     if (mode == RadarMode.dangerZone) {
