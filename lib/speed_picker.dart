@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'theme.dart';
+
 /// Limites prontos para reportar um radar (km/h).
 const List<int> kPresetSpeeds = [30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130];
 
@@ -39,9 +41,11 @@ class _SpeedPickerState extends State<SpeedPicker> {
           margin: const EdgeInsets.symmetric(horizontal: 4),
           padding: const EdgeInsets.symmetric(vertical: 8),
           decoration: BoxDecoration(
-            color: sel ? const Color(0xFF00695C) : Colors.white12,
+            gradient: sel ? SG.hot : null,
+            color: sel ? null : SG.surfaceHigh,
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: sel ? Colors.white70 : Colors.white24),
+            border: Border.all(
+                color: sel ? Colors.white70 : const Color(0x998C50FF)),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -63,10 +67,14 @@ class _SpeedPickerState extends State<SpeedPicker> {
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 4, 12, 14),
       decoration: BoxDecoration(
-        color: const Color(0xF2202124),
+        gradient: const LinearGradient(
+          colors: [Color(0xF5341258), Color(0xF514081F)],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        ),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.white38, width: 1.5),
-        boxShadow: const [BoxShadow(blurRadius: 10, color: Colors.black54)],
+        border: Border.all(color: SG.violet, width: 1.5),
+        boxShadow: SG.glow(SG.violet, 16),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -131,7 +139,7 @@ class SpeedSign extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white,
           shape: BoxShape.circle,
-          border: Border.all(color: const Color(0xFFD32F2F), width: size / 10),
+          border: Border.all(color: SG.red, width: size / 10),
         ),
         alignment: Alignment.center,
         child: Text(label,

@@ -4,8 +4,9 @@ App Android de alerta de radares para o mundo todo, feito em Flutter. Avisa por 
 
 Autor: Luiz Alberto Cardoso
 
-## Funções (versão 1.4.1)
+## Funções (versão 1.5)
 
+- **Visual neon** com as cores da tela de abertura: fundo roxo escuro, velocímetro com borda violeta brilhante, botão INICIAR em degradê vermelho→rosa, cartões e botões roxos; o painel flutuante e a janela de reportar seguem a mesma paleta
 - **Tela de abertura** (2,5 s) com a arte do SpeedGuard (velocímetro e rastro de luz) e os créditos do autor
 - **Ícone próprio** com o velocímetro (inclui ícone adaptativo do Android 8+)
 - **Mapa** (OpenStreetMap) com sua posição e os radares da região
@@ -23,7 +24,7 @@ Autor: Luiz Alberto Cardoso
   - embaixo: botão **+** que abre a janela de reportar radar com as velocidades prontas, sem sair do Maps. Fecha sozinha em 20 s se nada for escolhido; o app confirma por voz "Radar reportado"
   - como usar: ative **Configurações → Bolha flutuante**, permita "Sobrepor a outros apps", toque em **INICIAR** e abra o Maps/Waze. O painel abre no instante em que você sai do SpeedGuard (exigência do Android 15+) e some quando você volta para ele. Se faltar a permissão, o app avisa ao voltar
 - **Modo discreto**: só vibra e diz "Radar", sem detalhes
-- Cores no mapa: vermelho = fixo, amarelo = semáforo, roxo = reportado por usuários, laranja = seu reporte local
+- Cores no mapa: vermelho = fixo, amarelo = semáforo, violeta = reportado por usuários, laranja = seu reporte local; sua posição é a seta rosa
 - **Regras por país**, detectado pelo GPS:
 
 | País | Comportamento |
@@ -46,6 +47,7 @@ Autor: Luiz Alberto Cardoso
 | `lib/community_service.dart` | Radares compartilhados entre usuários (Firestore via REST) |
 | `lib/firebase_config.dart` | ID do projeto e chave do Firebase |
 | `lib/overlay.dart` | Painel flutuante sobre outros apps |
+| `lib/theme.dart` | Paleta de cores e tema do app |
 | `lib/splash_screen.dart` | Tela de abertura com créditos (2,5 s) |
 | `assets/splash.png`, `assets/icon.png` | Arte da abertura e do ícone (criação original) |
 | `android/app/src/main/res/` | Ícones do app e fundo escuro de abertura |

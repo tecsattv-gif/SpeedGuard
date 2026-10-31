@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_overlay_window/flutter_overlay_window.dart';
 
 import 'speed_picker.dart';
+import 'theme.dart';
 
 /// Tamanhos da janela flutuante (em dp, como o plugin espera).
 const int kPanelW = 88;
@@ -114,18 +115,22 @@ class _OverlayBubbleState extends State<OverlayBubble> {
   Widget _panel() {
     final alert = _dist != null;
     final border = _over
-        ? Colors.red
+        ? SG.red
         : alert
-            ? Colors.orange
-            : Colors.white;
+            ? SG.orange
+            : SG.violet;
     return Container(
       width: kPanelW.toDouble(),
       height: kPanelH.toDouble(),
       decoration: BoxDecoration(
-        color: const Color(0xF22B2D31),
-        borderRadius: BorderRadius.circular(6),
+        gradient: const LinearGradient(
+          colors: [Color(0xF23C1460), Color(0xF214081F)],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        ),
+        borderRadius: BorderRadius.circular(10),
         border: Border.all(color: border, width: 3),
-        boxShadow: const [BoxShadow(blurRadius: 8, color: Colors.black45)],
+        boxShadow: SG.glow(border, 10),
       ),
       child: Column(
         children: [
@@ -137,22 +142,22 @@ class _OverlayBubbleState extends State<OverlayBubble> {
               children: [
                 Text('$_speed',
                     style: TextStyle(
-                        color: _over ? Colors.redAccent : Colors.white,
+                        color: _over ? SG.red : Colors.white,
                         fontSize: 32,
                         fontWeight: FontWeight.bold,
                         height: 1)),
                 const Text('Km/h',
                     style: TextStyle(
-                        color: Colors.white,
+                        color: SG.violetLight,
                         fontSize: 13,
                         fontWeight: FontWeight.bold)),
               ],
             ),
           ),
-          const Divider(height: 1, thickness: 1, color: Colors.black54),
+          const Divider(height: 1, thickness: 1, color: Color(0x558C50FF)),
           // Alerta / pergunta / confirmação de envio
           Expanded(flex: 7, child: _middle()),
-          const Divider(height: 1, thickness: 1, color: Colors.black54),
+          const Divider(height: 1, thickness: 1, color: Color(0x558C50FF)),
           // Botão reportar radar
           Expanded(
             flex: 4,
@@ -160,7 +165,7 @@ class _OverlayBubbleState extends State<OverlayBubble> {
               onTap: _openPicker,
               child: const Center(
                 child: Icon(Icons.add_circle_outline,
-                    color: Colors.white60, size: 44),
+                    color: SG.violetLight, size: 44),
               ),
             ),
           ),
@@ -184,9 +189,9 @@ class _OverlayBubbleState extends State<OverlayBubble> {
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              _round(Icons.check, Colors.green.shade700, () => _reply(true)),
+              _round(Icons.check, const Color(0xFF1FAA6B), () => _reply(true)),
               const SizedBox(width: 6),
-              _round(Icons.close, Colors.red.shade700, () => _reply(false)),
+              _round(Icons.close, SG.red, () => _reply(false)),
             ],
           ),
         ],
@@ -213,7 +218,7 @@ class _OverlayBubbleState extends State<OverlayBubble> {
             color: Colors.lightGreenAccent, size: 64),
       );
     }
-    final color = _over ? Colors.redAccent : Colors.orangeAccent;
+    final color = _over ? SG.red : SG.orange;
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [

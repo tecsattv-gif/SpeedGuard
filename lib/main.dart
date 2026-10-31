@@ -19,6 +19,7 @@ import 'models.dart';
 import 'overlay.dart';
 import 'radar_service.dart';
 import 'splash_screen.dart';
+import 'theme.dart';
 import 'speed_picker.dart';
 
 void main() {
@@ -44,11 +45,7 @@ class SpeedGuardApp extends StatelessWidget {
     return MaterialApp(
       title: 'SpeedGuard',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-            seedColor: const Color(0xFFE53935), brightness: Brightness.dark),
-        useMaterial3: true,
-      ),
+      theme: SG.theme(),
       home: const SplashScreen(next: HomePage()),
     );
   }
@@ -588,12 +585,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   Widget _radarIcon(Radar r) {
     final color = r.type == 'usuario'
-        ? Colors.orange
+        ? SG.orange
         : (r.type == 'movel' || r.type == 'comunidade')
-            ? Colors.purple
+            ? SG.violet
         : r.type == 'semaforo'
             ? Colors.amber.shade700
-            : Colors.red;
+            : SG.red;
     return GestureDetector(
       onTap: () => _showRadar(r),
       child: Container(
@@ -661,7 +658,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                           3.14159265 /
                           180,
                       child: const Icon(Icons.navigation,
-                          color: Colors.blueAccent, size: 36),
+                          color: SG.pink,
+                          size: 36,
+                          shadows: [
+                            Shadow(color: Colors.black54, blurRadius: 6)
+                          ]),
                     ),
                   ),
                 ]),
@@ -721,36 +722,36 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               },
               child: const Icon(Icons.my_location),
             ),
-      bottomNavigationBar: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-          child: Row(
-            children: [
-              IconButton.filledTonal(
-                tooltip: 'Configurações',
-                onPressed: _settings,
-                icon: const Icon(Icons.settings),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: FilledButton.icon(
-                  style: FilledButton.styleFrom(
-                    minimumSize: const Size.fromHeight(52),
-                    backgroundColor: _running ? Colors.grey.shade700 : null,
-                  ),
-                  onPressed: _running ? _stop : _start,
-                  icon: Icon(_running ? Icons.stop : Icons.play_arrow),
-                  label: Text(_running ? 'PARAR' : 'INICIAR',
-                      style: const TextStyle(fontSize: 18)),
+      bottomNavigationBar: Container(
+        decoration: const BoxDecoration(
+          color: SG.bg,
+          border: Border(top: BorderSide(color: Color(0x558C50FF))),
+        ),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+            child: Row(
+              children: [
+                _RoundAction(
+                  tooltip: 'Configurações',
+                  icon: Icons.settings,
+                  onTap: _settings,
                 ),
-              ),
-              const SizedBox(width: 8),
-              IconButton.filledTonal(
-                tooltip: 'Reportar radar aqui',
-                onPressed: _report,
-                icon: const Icon(Icons.add_location_alt),
-              ),
-            ],
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _MainButton(
+                    running: _running,
+                    onTap: _running ? _stop : _start,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                _RoundAction(
+                  tooltip: 'Reportar radar aqui',
+                  icon: Icons.add_location_alt,
+                  onTap: _report,
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -759,7 +760,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   Widget _askCard() {
     return Card(
-      color: Colors.purple.shade700,
+      color: const Color(0xFF4A1F8C),
       margin: const EdgeInsets.only(top: 8),
       child: Padding(
         padding: const EdgeInsets.all(12),
@@ -773,7 +774,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 Expanded(
                   child: FilledButton.icon(
                     style: FilledButton.styleFrom(
-                        backgroundColor: Colors.green.shade700,
+                        backgroundColor: const Color(0xFF1FAA6B),
                         minimumSize: const Size.fromHeight(48)),
                     onPressed: () => _answer(true),
                     icon: const Icon(Icons.check),
@@ -784,7 +785,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 Expanded(
                   child: FilledButton.icon(
                     style: FilledButton.styleFrom(
-                        backgroundColor: Colors.red.shade700,
+                        backgroundColor: SG.red,
                         minimumSize: const Size.fromHeight(48)),
                     onPressed: () => _answer(false),
                     icon: const Icon(Icons.close),
@@ -818,10 +819,24 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           ? '${a.radar!.typeLabel} • limite ${a.radar!.maxSpeed}'
           : a.radar!.typeLabel;
     }
-    return Card(
-      color: hasAlert
-          ? (a.overLimit ? Colors.red.shade700 : Colors.orange.shade800)
-          : Theme.of(context).colorScheme.surfaceContainerHigh,
+    final accent = !hasAlert
+        ? SG.violet
+        : a.overLimit
+            ? SG.red
+            : SG.orange;
+    return Container(
+      decoration: BoxDecoration(
+        gradient: hasAlert
+            ? LinearGradient(colors: [
+                accent.withValues(alpha: 0.95),
+                (a.overLimit ? SG.pink : SG.red).withValues(alpha: 0.85),
+              ])
+            : null,
+        color: hasAlert ? null : SG.surface.withValues(alpha: 0.94),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: accent.withValues(alpha: 0.8), width: 1.5),
+        boxShadow: SG.glow(accent, hasAlert ? 18 : 10),
+      ),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         child: Column(
@@ -851,9 +866,15 @@ class _SpeedBox extends StatelessWidget {
       width: 88,
       height: 88,
       decoration: BoxDecoration(
-        color: over ? Colors.red : Colors.black87,
+        gradient: over
+            ? const LinearGradient(
+                colors: [SG.red, SG.pink],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter)
+            : SG.deep,
         shape: BoxShape.circle,
-        border: Border.all(color: Colors.white24, width: 2),
+        border: Border.all(color: over ? Colors.white : SG.violet, width: 3),
+        boxShadow: SG.glow(over ? SG.red : SG.violet, 16),
       ),
       alignment: Alignment.center,
       child: Column(
@@ -865,8 +886,82 @@ class _SpeedBox extends StatelessWidget {
                   fontWeight: FontWeight.bold,
                   color: Colors.white)),
           const Text('km/h',
-              style: TextStyle(fontSize: 12, color: Colors.white70)),
+              style: TextStyle(fontSize: 12, color: SG.violetLight)),
         ],
+      ),
+    );
+  }
+}
+
+/// Botão principal: INICIAR em degradê vermelho→rosa; PARAR em roxo escuro.
+class _MainButton extends StatelessWidget {
+  final bool running;
+  final VoidCallback onTap;
+  const _MainButton({required this.running, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 54,
+      decoration: BoxDecoration(
+        gradient: running ? null : SG.hot,
+        color: running ? SG.surfaceHigh : null,
+        borderRadius: BorderRadius.circular(27),
+        border: Border.all(
+            color: running ? SG.violet : Colors.transparent, width: 1.5),
+        boxShadow: SG.glow(running ? SG.violet : SG.red, running ? 10 : 18),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(27),
+          onTap: onTap,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(running ? Icons.stop_rounded : Icons.play_arrow_rounded,
+                  color: Colors.white, size: 28),
+              const SizedBox(width: 6),
+              Text(running ? 'PARAR' : 'INICIAR',
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 19,
+                      fontWeight: FontWeight.w800,
+                      fontStyle: FontStyle.italic,
+                      letterSpacing: 1.2)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Botão redondo secundário (configurações, reportar).
+class _RoundAction extends StatelessWidget {
+  final String tooltip;
+  final IconData icon;
+  final VoidCallback onTap;
+  const _RoundAction(
+      {required this.tooltip, required this.icon, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: SG.surfaceHigh,
+        shape: const CircleBorder(
+            side: BorderSide(color: Color(0x998C50FF), width: 1.5)),
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: onTap,
+          child: SizedBox(
+            width: 52,
+            height: 52,
+            child: Icon(icon, color: SG.violetLight, size: 26),
+          ),
+        ),
       ),
     );
   }
