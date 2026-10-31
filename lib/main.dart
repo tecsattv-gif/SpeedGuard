@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:flutter_overlay_window/flutter_overlay_window.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
@@ -10,13 +12,26 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 import 'alert_engine.dart';
+import 'community_service.dart';
 import 'country_rules.dart';
+import 'firebase_config.dart';
 import 'models.dart';
+import 'overlay.dart';
 import 'radar_service.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
   runApp(const SpeedGuardApp());
+}
+
+/// Ponto de entrada da bolha flutuante (roda separado do app).
+@pragma('vm:entry-point')
+void overlayMain() {
+  WidgetsFlutterBinding.ensureInitialized();
+  runApp(const MaterialApp(
+    debugShowCheckedModeBanner: false,
+    home: OverlayBubble(),
+  ));
 }
 
 class SpeedGuardApp extends StatelessWidget {
@@ -43,17 +58,21 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
+class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   final _map = MapController();
   final _service = RadarService();
   final _engine = AlertEngine();
   final _tts = FlutterTts();
+  final _community = CommunityService();
 
   StreamSubscription<Position>? _sub;
   Position? _pos;
   bool _running = false;
   bool _follow = true;
   bool _voice = true;
+  bool _discreet = false;
+  bool _bubble = false;
+  bool _overlayShown = false;
   bool _loading = false;
   String? _country;
   double? _countryLat, _countryLon;
@@ -63,15 +82,20 @@ class _HomePageState extends State<HomePage> {
 
   CountryRule get _rule => ruleFor(_country);
 
+  List<Radar> get _allRadars => [..._service.all, ..._community.radars];
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _init();
   }
 
   Future<void> _init() async {
     final p = await SharedPreferences.getInstance();
     _voice = p.getBool('voice') ?? true;
+    _discreet = p.getBool('discreet') ?? false;
+    _bubble = p.getBool('bubble') ?? false;
     _country = p.getString('country');
     await _service.load();
     await _tts.setLanguage('pt-BR');
@@ -82,10 +106,61 @@ class _HomePageState extends State<HomePage> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _closeBubble();
     _sub?.cancel();
     _tts.stop();
     WakelockPlus.disable();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden) {
+      if (_running && _bubble) _showBubble();
+    } else if (state == AppLifecycleState.resumed) {
+      _closeBubble();
+    }
+  }
+
+  Future<void> _showBubble() async {
+    if (_overlayShown) return;
+    try {
+      if (!await FlutterOverlayWindow.isPermissionGranted()) return;
+      await FlutterOverlayWindow.showOverlay(
+        height: 380,
+        width: 380,
+        alignment: OverlayAlignment.centerRight,
+        enableDrag: true,
+        positionGravity: PositionGravity.auto,
+        overlayTitle: 'SpeedGuard',
+        overlayContent: 'Bolha de radares ativa',
+      );
+      _overlayShown = true;
+      _sendBubble();
+    } catch (_) {}
+  }
+
+  Future<void> _closeBubble() async {
+    if (!_overlayShown) return;
+    _overlayShown = false;
+    try {
+      await FlutterOverlayWindow.closeOverlay();
+    } catch (_) {}
+  }
+
+  void _sendBubble() {
+    if (!_overlayShown) return;
+    final pos = _pos;
+    final a = _alert;
+    final show = a.radar != null;
+    FlutterOverlayWindow.shareData(jsonEncode({
+      'speed': pos == null ? 0 : (pos.speed.clamp(0, 400) * 3.6).round(),
+      'dist': show ? a.distance : null,
+      'limit': show ? a.radar!.maxSpeed : null,
+      'over': a.overLimit,
+    })).catchError((_) => false);
   }
 
   Future<bool> _ensurePermission() async {
@@ -148,11 +223,20 @@ class _HomePageState extends State<HomePage> {
     if (!_loading && _service.needsRefresh(pos.latitude, pos.longitude)) {
       _refresh(pos);
     }
+    if (_community.needsRefresh(pos.latitude, pos.longitude)) {
+      _community.refresh(pos.latitude, pos.longitude).then((_) {
+        if (mounted) setState(() {});
+      });
+    }
     final st = _engine.update(
-        pos: pos, radars: _service.all, mode: _rule.mode);
+        pos: pos, radars: _allRadars, mode: _rule.mode);
     if (st.speak != null) {
       HapticFeedback.heavyImpact();
-      if (_voice) _tts.speak(st.speak!);
+      if (_voice) {
+        _tts.speak(_discreet
+            ? (st.speak!.startsWith('Reduza') ? 'Reduza.' : 'Radar.')
+            : st.speak!);
+      }
     }
     if (!mounted) return;
     setState(() {
@@ -160,9 +244,10 @@ class _HomePageState extends State<HomePage> {
       if (_rule.mode == RadarMode.disabled) {
         _status = 'Alertas desligados neste país';
       } else if (st.radar == null) {
-        _status = '${_service.all.length} radares carregados na região';
+        _status = '${_allRadars.length} radares carregados na região';
       }
     });
+    _sendBubble();
   }
 
   Future<void> _checkCountry(Position pos) async {
@@ -216,16 +301,41 @@ class _HomePageState extends State<HomePage> {
       return;
     }
     final ctrl = TextEditingController();
+    var mobile = true;
     final ok = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (_) => StatefulBuilder(
+        builder: (ctx, setDlg) => AlertDialog(
         title: const Text('Reportar radar aqui'),
-        content: TextField(
-          controller: ctrl,
-          keyboardType: TextInputType.number,
-          decoration: const InputDecoration(
-              labelText: 'Limite de velocidade (opcional)',
-              suffixText: 'km/h'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SegmentedButton<bool>(
+              segments: const [
+                ButtonSegment(value: true, label: Text('Móvel')),
+                ButtonSegment(value: false, label: Text('Fixo')),
+              ],
+              selected: {mobile},
+              onSelectionChanged: (v) => setDlg(() => mobile = v.first),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: ctrl,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                  labelText: 'Limite de velocidade (opcional)',
+                  suffixText: 'km/h'),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              communityEnabled
+                  ? (mobile
+                      ? 'Todos os usuários verão este radar por 3 horas.'
+                      : 'Todos os usuários verão este radar.')
+                  : 'O radar fica salvo só neste aparelho.',
+              style: Theme.of(ctx).textTheme.bodySmall,
+            ),
+          ],
         ),
         actions: [
           TextButton(
@@ -236,16 +346,29 @@ class _HomePageState extends State<HomePage> {
               child: const Text('Salvar')),
         ],
       ),
+      ),
     );
     if (ok != true) return;
-    await _service.addUserRadar(
-      pos.latitude,
-      pos.longitude,
-      int.tryParse(ctrl.text.trim()),
-      pos.speed > 2.5 ? pos.heading : null,
-    );
+    final limit = int.tryParse(ctrl.text.trim());
+    final dir = pos.speed > 2.5 ? pos.heading : null;
+    if (communityEnabled) {
+      final sent = await _community.report(
+        lat: pos.latitude,
+        lon: pos.longitude,
+        mobile: mobile,
+        maxSpeed: limit,
+        direction: dir,
+      );
+      if (sent) {
+        setState(() {});
+        _snack('Radar compartilhado com todos. Obrigado!');
+        return;
+      }
+      _snack('Sem conexão: radar salvo só neste aparelho.');
+    }
+    await _service.addUserRadar(pos.latitude, pos.longitude, limit, dir);
     setState(() {});
-    _snack('Radar salvo neste aparelho.');
+    if (!communityEnabled) _snack('Radar salvo neste aparelho.');
   }
 
   void _showRadar(Radar r) {
@@ -301,12 +424,40 @@ class _HomePageState extends State<HomePage> {
                   setState(() {});
                 },
               ),
+              SwitchListTile(
+                title: const Text('Modo discreto'),
+                subtitle: const Text('Só vibra e diz "Radar", sem detalhes'),
+                value: _discreet,
+                onChanged: (v) async {
+                  final p = await SharedPreferences.getInstance();
+                  await p.setBool('discreet', v);
+                  setSheet(() => _discreet = v);
+                },
+              ),
+              SwitchListTile(
+                title: const Text('Bolha flutuante'),
+                subtitle: const Text(
+                    'Mostra velocidade e radar por cima do Maps/Waze'),
+                value: _bubble,
+                onChanged: (v) async {
+                  if (v && !await FlutterOverlayWindow.isPermissionGranted()) {
+                    final ok = await FlutterOverlayWindow.requestPermission();
+                    if (ok != true) return;
+                  }
+                  final p = await SharedPreferences.getInstance();
+                  await p.setBool('bubble', v);
+                  setSheet(() => _bubble = v);
+                },
+              ),
               ListTile(
                 leading: const Icon(Icons.refresh),
                 title: const Text('Atualizar radares agora'),
                 onTap: () {
                   Navigator.pop(ctx);
-                  if (_pos != null) _refresh(_pos!);
+                  if (_pos != null) {
+                    _refresh(_pos!);
+                    _community.refresh(_pos!.latitude, _pos!.longitude);
+                  }
                 },
               ),
               ListTile(
@@ -316,7 +467,7 @@ class _HomePageState extends State<HomePage> {
               ),
               const ListTile(
                 leading: Icon(Icons.info_outline),
-                title: Text('SpeedGuard 1.0'),
+                title: Text('SpeedGuard 1.1'),
                 subtitle: Text('Dados de radares: © colaboradores do '
                     'OpenStreetMap. Respeite sempre os limites de velocidade.'),
               ),
@@ -347,6 +498,8 @@ class _HomePageState extends State<HomePage> {
   Widget _radarIcon(Radar r) {
     final color = r.type == 'usuario'
         ? Colors.orange
+        : (r.type == 'movel' || r.type == 'comunidade')
+            ? Colors.purple
         : r.type == 'semaforo'
             ? Colors.amber.shade700
             : Colors.red;
@@ -397,7 +550,7 @@ class _HomePageState extends State<HomePage> {
               if (showRadars)
                 MarkerLayer(
                   markers: [
-                    for (final r in _service.all)
+                    for (final r in _allRadars)
                       Marker(
                         point: LatLng(r.lat, r.lon),
                         width: 34,
