@@ -119,25 +119,34 @@ class _OverlayBubbleState extends State<OverlayBubble> {
   }
 
   /// Abre o SpeedGuard em tela cheia (o app fecha o painel ao voltar).
+  /// Usa a tela exata (MainActivity): só com o pacote, o Android não
+  /// confirmava o destino e abria a janela "Completar ação usando".
   Future<void> _openApp() async {
     HapticFeedback.lightImpact();
     try {
       await const AndroidIntent(
         action: 'android.intent.action.MAIN',
-        category: 'android.intent.category.LAUNCHER',
         package: 'com.tecsattv.speedguard',
-        flags: [Flag.FLAG_ACTIVITY_NEW_TASK],
+        componentName: 'com.tecsattv.speedguard.MainActivity',
+        flags: [
+          Flag.FLAG_ACTIVITY_NEW_TASK,
+          Flag.FLAG_ACTIVITY_REORDER_TO_FRONT,
+        ],
       ).launch();
     } catch (_) {}
   }
 
   /// Fecha o painel (o monitoramento continua no app).
+  /// Fecha primeiro e avisa o app depois, sem esperar resposta: com o app
+  /// em segundo plano a resposta pode não chegar e o painel ficava aberto.
   Future<void> _closeSelf() async {
     HapticFeedback.heavyImpact();
+    unawaited(FlutterOverlayWindow.shareData(jsonEncode({'closed': true}))
+        .timeout(const Duration(seconds: 1), onTimeout: () => null)
+        .catchError((_) => null));
     try {
-      await FlutterOverlayWindow.shareData(jsonEncode({'closed': true}));
+      await FlutterOverlayWindow.closeOverlay();
     } catch (_) {}
-    await FlutterOverlayWindow.closeOverlay();
   }
 
   Future<void> _openPicker() async {
