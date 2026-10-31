@@ -21,6 +21,7 @@ import 'models.dart';
 import 'overlay.dart';
 import 'radar_service.dart';
 import 'splash_screen.dart';
+import 'layers.dart';
 import 'theme.dart';
 import 'vehicle_icon.dart';
 import 'speed_picker.dart';
@@ -91,6 +92,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   bool _mapView = true;
   /// Ícone da sua posição no mapa (seta, carro, caminhão ou moto).
   VehicleIcon _vehicle = VehicleIcon.arrow;
+  /// Camadas ligadas no painel "Opções do mapa".
+  Set<Layer> _layers = Layer.values.toSet();
   bool _voice = true;
   /// Tipo de aviso sonoro: 'voice' (fala a distância) ou 'beep' (bipes).
   String _sound = 'voice';
@@ -124,7 +127,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   CountryRule get _rule => ruleFor(_country);
 
-  List<Radar> get _allRadars => [..._service.all, ..._community.radars];
+  /// Radares e avisos das camadas ligadas (mapa e alertas usam esta lista).
+  List<Radar> get _allRadars => [
+        for (final r in [..._service.all, ..._community.radars])
+          if (_layers.contains(Layer.of(r))) r
+      ];
 
   @override
   void initState() {
@@ -169,6 +176,13 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     _bubbleLand = p.getBool('bubbleLand') ?? false;
     _mapView = p.getBool('mapView') ?? true;
     _vehicle = VehicleIcon.fromName(p.getString('vehicle'));
+    final saved = p.getStringList('layers');
+    if (saved != null) {
+      _layers = {
+        for (final l in Layer.values)
+          if (saved.contains(l.name)) l
+      };
+    }
     _country = p.getString('country');
     await _service.load();
     await _tts.setLanguage('pt-BR');
@@ -505,12 +519,130 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     }
   }
 
+  /// Painel "Opções do mapa", como no CamSam: liga/desliga cada camada.
+  Future<void> _mapOptions() async {
+    Future<void> save() async {
+      final p = await SharedPreferences.getInstance();
+      await p.setStringList('layers', [for (final l in _layers) l.name]);
+    }
+
+    Widget item(Layer l, StateSetter setSheet) => SwitchListTile(
+          secondary: Container(
+            width: 18,
+            height: 18,
+            decoration: BoxDecoration(
+              color: l.color,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(color: l.color.withValues(alpha: 0.6), blurRadius: 6)
+              ],
+            ),
+          ),
+          title: Text(l.label,
+              style: const TextStyle(fontWeight: FontWeight.w600)),
+          subtitle: Text(l.isEvent
+              ? '${l.subtitle} · some após 6 h'
+              : l.subtitle),
+          value: _layers.contains(l),
+          onChanged: (v) {
+            setSheet(() => v ? _layers.add(l) : _layers.remove(l));
+            setState(() {});
+            save();
+          },
+        );
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => StatefulBuilder(
+        builder: (ctx, setSheet) => SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
+                  child: Text('Opções do mapa',
+                      style:
+                          TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                ),
+                for (final l in Layer.values.where((l) => !l.isEvent))
+                  item(l, setSheet),
+                const Divider(indent: 16, endIndent: 16),
+                for (final l in Layer.events) item(l, setSheet),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                  child: Text('MAIS',
+                      style: TextStyle(
+                          color: SG.textSoft, fontWeight: FontWeight.w600)),
+                ),
+                SwitchListTile(
+                  secondary: Icon(Icons.my_location, color: SG.accent),
+                  title: const Text('O mapa segue você',
+                      style: TextStyle(fontWeight: FontWeight.w600)),
+                  subtitle: const Text('Desloca o mapa com a sua posição'),
+                  value: _follow,
+                  onChanged: (v) {
+                    setSheet(() {});
+                    setState(() => _follow = v);
+                    final pos = _pos;
+                    if (v && pos != null) {
+                      _map.move(LatLng(pos.latitude, pos.longitude), 16);
+                    }
+                  },
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Reporta fila, obra, perigo ou polícia aqui (some após 6 h).
+  Future<void> _submitEvent(Layer l) async {
+    final pos = _pos;
+    if (pos == null) {
+      _snack('Aguarde o sinal do GPS para reportar.');
+      return;
+    }
+    if (!communityEnabled) {
+      _snack('Avisos precisam do Firebase configurado.');
+      return;
+    }
+    final dir = pos.speed > 2.5 ? pos.heading : null;
+    await _community.refresh(pos.latitude, pos.longitude);
+    final dup =
+        _community.nearby(pos.latitude, pos.longitude, dir, type: l.name);
+    if (dup != null) {
+      await _community.confirm(dup, true);
+      if (!mounted) return;
+      setState(() {});
+      _snack('${l.label}: já reportado aqui. Confirmado por mais 6 h.');
+      return;
+    }
+    final ok = await _community.report(
+      lat: pos.latitude,
+      lon: pos.longitude,
+      mobile: false,
+      direction: dir,
+      event: l.name,
+    );
+    if (!mounted) return;
+    setState(() {});
+    _snack(ok
+        ? '${l.label} reportado para todos. Some em 6 h.'
+        : 'Sem conexão: não foi possível reportar.');
+  }
+
   Future<void> _report() async {
     if (_pos == null) {
       _snack('Aguarde o sinal do GPS para reportar.');
       return;
     }
-    final choice = await showDialog<SpeedChoice>(
+    final choice = await showDialog<Object>(
       context: context,
       builder: (ctx) => Dialog(
         backgroundColor: Colors.transparent,
@@ -520,6 +652,41 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              // Avisos de trânsito: um toque já reporta (somem em 6 h).
+              Container(
+                padding: const EdgeInsets.all(10),
+                margin: const EdgeInsets.only(bottom: 8),
+                decoration: BoxDecoration(
+                  color: const Color(0xF5341258),
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: const Color(0x998C50FF)),
+                ),
+                child: Row(
+                  children: [
+                    for (final l in Layer.events)
+                      Expanded(
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(12),
+                          onTap: () => Navigator.pop(ctx, l),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 6),
+                            child: Column(children: [
+                              CircleAvatar(
+                                radius: 20,
+                                backgroundColor: l.color,
+                                child: Icon(l.icon, color: Colors.white),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(l.label,
+                                  style: const TextStyle(
+                                      color: Colors.white, fontSize: 12)),
+                            ]),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
               SpeedPicker(
                 onSelected: (c) => Navigator.pop(ctx, c),
                 onCancel: () => Navigator.pop(ctx),
@@ -537,8 +704,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         ),
       ),
     );
-    if (choice == null) return;
-    await _submitReport(mobile: choice.mobile, limit: choice.limit);
+    if (choice is Layer) {
+      await _submitEvent(choice);
+    } else if (choice is SpeedChoice) {
+      await _submitReport(mobile: choice.mobile, limit: choice.limit);
+    }
   }
 
   /// Salva um radar reportado aqui (pelo app ou pelo botão + da bolha).
@@ -854,7 +1024,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               ),
               const ListTile(
                 leading: Icon(Icons.info_outline),
-                title: Text('SpeedGuard 1.13.0'),
+                title: Text('SpeedGuard 1.14.0'),
                 subtitle: Text('Dados de radares: © colaboradores do '
                     'OpenStreetMap. Respeite sempre os limites de velocidade.'),
               ),
@@ -883,6 +1053,22 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   }
 
   Widget _radarIcon(Radar r) {
+    if (r.isEvent) {
+      // Fila, obra, perigo ou polícia: bolinha colorida com o símbolo.
+      final l = Layer.of(r);
+      return GestureDetector(
+        onTap: () => _showRadar(r),
+        child: Container(
+          decoration: BoxDecoration(
+            color: l.color,
+            shape: BoxShape.circle,
+            border: Border.all(color: Colors.white, width: 2),
+            boxShadow: const [BoxShadow(color: Colors.black45, blurRadius: 4)],
+          ),
+          child: Icon(l.icon, color: Colors.white, size: 18),
+        ),
+      );
+    }
     final color = r.type == 'usuario'
         ? SG.orange
         : (r.type == 'movel' || r.type == 'comunidade')
@@ -947,7 +1133,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               if (showRadars)
                 MarkerLayer(
                   markers: [
-                    for (final r in [..._allRadars, ..._service.area])
+                    for (final r in [
+                      ..._allRadars,
+                      for (final r in _service.area)
+                        if (_layers.contains(Layer.of(r))) r
+                    ])
                       Marker(
                         point: LatLng(r.lat, r.lon),
                         width: 34,
@@ -1017,6 +1207,34 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   ),
                   if (_ask != null) _askCard(),
                 ],
+              ),
+            ),
+          ),
+
+          // Botão "Opções": o que aparece no mapa e gera aviso.
+          Positioned(
+            left: 12,
+            bottom: 12,
+            child: Material(
+              color: SG.cardHigh,
+              shape: const StadiumBorder(
+                  side: BorderSide(color: Color(0x998C50FF), width: 1.5)),
+              child: InkWell(
+                customBorder: const StadiumBorder(),
+                onTap: _mapOptions,
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    Icon(Icons.tune, color: SG.accent, size: 20),
+                    const SizedBox(width: 8),
+                    Text('Opções',
+                        style: TextStyle(
+                            color: SG.text,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600)),
+                  ]),
+                ),
               ),
             ),
           ),

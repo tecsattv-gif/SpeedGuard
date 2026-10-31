@@ -4,7 +4,8 @@ class Radar {
   final double lat;
   final double lon;
   final int? maxSpeed; // km/h
-  final String type; // fixo, semaforo, movel, usuario
+  final String type; // fixo, semaforo, movel, usuario, comunidade,
+  // fila, obra, perigo, policia (os 4 últimos somem após 6 h)
   final double? direction; // graus (0 = norte), se conhecido
   final int? checkAfter; // ms; após essa data, pergunta se o radar móvel ainda está lá
 
@@ -18,6 +19,9 @@ class Radar {
     this.checkAfter,
   });
 
+  /// Aviso de trânsito (fila, obra, perigo, polícia), não radar.
+  bool get isEvent => const {'fila', 'obra', 'perigo', 'policia'}.contains(type);
+
   String get typeLabel {
     switch (type) {
       case 'semaforo':
@@ -28,6 +32,14 @@ class Radar {
         return 'Reportado por você';
       case 'comunidade':
         return 'Radar reportado';
+      case 'fila':
+        return 'Fila';
+      case 'obra':
+        return 'Obras';
+      case 'perigo':
+        return 'Perigo';
+      case 'policia':
+        return 'Polícia';
       default:
         return 'Radar fixo';
     }

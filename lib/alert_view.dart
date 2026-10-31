@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'alert_engine.dart';
 import 'country_rules.dart';
+import 'layers.dart';
 import 'theme.dart';
 
 /// Tela de alerta (sem mapa), no estilo do CamSam: setas verdes grandes com
@@ -77,7 +78,18 @@ class AlertView extends StatelessWidget {
       FittedBox(
         fit: BoxFit.scaleDown,
         child: Row(mainAxisSize: MainAxisSize.min, children: [
-          _LimitSign(limit: r.maxSpeed, glow: color, size: 96),
+          r.isEvent
+              ? Container(
+                  width: 96,
+                  height: 96,
+                  decoration: BoxDecoration(
+                    color: Layer.of(r).color,
+                    shape: BoxShape.circle,
+                    boxShadow: SG.glow(Layer.of(r).color, 24),
+                  ),
+                  child: Icon(Layer.of(r).icon, color: Colors.white, size: 56),
+                )
+              : _LimitSign(limit: r.maxSpeed, glow: color, size: 96),
           const SizedBox(width: 18),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,

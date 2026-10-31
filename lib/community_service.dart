@@ -12,11 +12,19 @@ import 'models.dart';
 class CommunityService {
   static const checkInterval = Duration(hours: 48);
 
+  /// Filas, obras, perigos e polícia somem sozinhos depois de 6 h.
+  static const eventLife = Duration(hours: 6);
+
   List<Radar> _radars = [];
   DateTime? _lastFetch;
   double? _lastLat, _lastLon;
 
-  List<Radar> get radars => List.unmodifiable(_radars);
+  List<Radar> get radars {
+    // Tira os avisos que expiraram desde o último download.
+    final now = DateTime.now().millisecondsSinceEpoch;
+    return List.unmodifiable(_radars.where(
+        (r) => !r.isEvent || (r.checkAfter ?? 0) > now));
+  }
 
   /// Radar móvel que já passou do prazo e precisa de confirmação.
   static bool needsCheck(Radar r) =>
@@ -31,8 +39,9 @@ class CommunityService {
     final url = '$_base/radars/$docId';
     try {
       if (stillThere) {
-        final next =
-            DateTime.now().add(checkInterval).millisecondsSinceEpoch;
+        final next = DateTime.now()
+            .add(r.isEvent ? eventLife : checkInterval)
+            .millisecondsSinceEpoch;
         final res = await http
             .patch(
                 Uri.parse('$url?updateMask.fieldPaths=checkAfter'
@@ -153,10 +162,13 @@ class CommunityService {
 
   /// Radar compartilhado já existente a menos de 150 m, no mesmo sentido
   /// (se os dois tiverem sentido conhecido). Serve para não duplicar.
-  Radar? nearby(double lat, double lon, double? direction) {
+  /// Com [type] de aviso (fila, obra…), só compara com avisos do mesmo tipo;
+  /// sem ele, só com radares.
+  Radar? nearby(double lat, double lon, double? direction, {String? type}) {
     Radar? best;
     var bestD = sameRadarMeters;
     for (final r in _radars) {
+      if (type != null ? r.type != type : r.isEvent) continue;
       final d = _meters(lat, lon, r.lat, r.lon);
       if (d > bestD) continue;
       if (direction != null && r.direction != null) {
@@ -175,16 +187,21 @@ class CommunityService {
     required bool mobile,
     int? maxSpeed,
     double? direction,
+    String? event,
   }) async {
     if (!communityEnabled) return false;
     final now = DateTime.now();
-    final checkAfter =
-        mobile ? now.add(checkInterval).millisecondsSinceEpoch : 0;
+    // Radar móvel: data da próxima confirmação. Aviso: quando ele some.
+    final checkAfter = event != null
+        ? now.add(eventLife).millisecondsSinceEpoch
+        : mobile
+            ? now.add(checkInterval).millisecondsSinceEpoch
+            : 0;
     final fields = <String, dynamic>{
       'lat': {'doubleValue': lat},
       'lon': {'doubleValue': lon},
       'cell': {'stringValue': cellOf(lat, lon)},
-      'type': {'stringValue': mobile ? 'movel' : 'comunidade'},
+      'type': {'stringValue': event ?? (mobile ? 'movel' : 'comunidade')},
       'createdAt': {'integerValue': '${now.millisecondsSinceEpoch}'},
       'checkAfter': {'integerValue': '$checkAfter'},
       if (maxSpeed != null) 'maxSpeed': {'integerValue': '$maxSpeed'},
@@ -220,12 +237,20 @@ class CommunityService {
     if (lat == null || lon == null) return null;
     final check = n('checkAfter')?.toInt() ?? 0;
     final name = doc['name']?.toString() ?? '';
+    final type =
+        (f['type'] as Map?)?['stringValue']?.toString() ?? 'comunidade';
+    // Aviso de trânsito com mais de 6 h: já expirou, não mostra.
+    const events = {'fila', 'obra', 'perigo', 'policia'};
+    if (events.contains(type) &&
+        check < DateTime.now().millisecondsSinceEpoch) {
+      return null;
+    }
     return Radar(
       id: 'cm_${name.split('/').last}',
       lat: lat.toDouble(),
       lon: lon.toDouble(),
       maxSpeed: n('maxSpeed')?.toInt(),
-      type: (f['type'] as Map?)?['stringValue']?.toString() ?? 'comunidade',
+      type: type,
       direction: n('direction')?.toDouble(),
       checkAfter: check == 0 ? null : check,
     );

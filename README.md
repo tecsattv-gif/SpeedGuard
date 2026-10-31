@@ -4,12 +4,17 @@ App Android de alerta de radares para o mundo todo, feito em Flutter. Avisa por 
 
 Autor: Luiz Alberto Cardoso
 
-## Funções (versão 1.13.0)
+## Funções (versão 1.14.0)
 
 - **Visual neon** com as cores da tela de abertura: fundo roxo escuro, velocímetro com borda violeta brilhante, botão INICIAR em degradê vermelho→rosa, cartões e botões roxos; o painel flutuante e a janela de reportar seguem a mesma paleta
 - **Tela de abertura** (2,5 s) com a arte do SpeedGuard (velocímetro e rastro de luz) e os créditos do autor
 - **Ícone próprio** com o velocímetro (inclui ícone adaptativo do Android 8+)
 - **Mapa** (OpenStreetMap) com sua posição e os radares da região
+- **Opções do mapa** (botão **Opções** no canto de baixo à esquerda), como no CamSam: liga e desliga cada camada, com bolinha colorida. O que fica desligado some do mapa e não gera aviso:
+  - 🔴 Radares fixos (inclui os reportados) · 🟠 Radares de semáforo · 🟣 Radares móveis
+  - 🟠 Filas · 🟠 Obras · 🟠 Perigos (acidente, obstáculo, avaria, pista escorregadia) · 🔵 Polícia
+  - Mais: **O mapa segue você**
+- **Avisos de trânsito reportados pelos motoristas**: no botão de reportar aparecem **Fila, Obras, Perigo e Polícia** acima das placas de velocidade; um toque já reporta para todos. Cada aviso **some sozinho depois de 6 horas**; se alguém reportar o mesmo aviso no mesmo lugar (até 150 m), ele não duplica e ganha mais 6 h. Os avisos usam os mesmos alertas de 500 a 100 m dos radares
 - **Ícone no mapa** (Configurações → Ícone no mapa): **Seta**, **Carro**, **Caminhão** (cavalo com carreta) ou **Moto**, desenhados vistos de cima e girando conforme a direção
 - **Card de status limpo**: enquanto os radares da região são baixados aparece só um símbolo girando ao lado da velocidade; ao terminar, o card "N radares carregados" aparece por 4 segundos e some. Com radar à frente o card volta mostrando a distância
 - **Aparência** em Configurações: **Auto** (segue o modo claro/escuro do celular), **Claro** ou **Escuro**. No modo escuro o mapa também fica escurecido para não ofuscar à noite. A tela de abertura e o painel flutuante continuam sempre escuros
@@ -62,6 +67,7 @@ Autor: Luiz Alberto Cardoso
 | `lib/radar_service.dart` | Baixa radares (Overpass/OSM), cache, radares do usuário, detecção do país |
 | `lib/community_service.dart` | Radares compartilhados entre usuários (Firestore via REST) |
 | `lib/firebase_config.dart` | ID do projeto e chave do Firebase |
+| `lib/layers.dart` | Camadas do painel Opções (radares e avisos de trânsito) |
 | `lib/vehicle_icon.dart` | Ícones da sua posição (seta, carro, caminhão, moto) |
 | `lib/alert_view.dart` | Tela de alerta (5 faixas, placa e distância) |
 | `lib/overlay.dart` | Painel flutuante sobre outros apps |
