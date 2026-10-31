@@ -4,7 +4,7 @@ App Android de alerta de radares para o mundo todo, feito em Flutter. Avisa por 
 
 Autor: Luiz Alberto Cardoso
 
-## Funções (versão 1.15.0)
+## Funções (versão 1.16.0)
 
 - **Visual neon** com as cores da tela de abertura: fundo roxo escuro, velocímetro com borda violeta brilhante, botão INICIAR em degradê vermelho→rosa, cartões e botões roxos; o painel flutuante e a janela de reportar seguem a mesma paleta
 - **Tela de abertura** (2,5 s) com a arte do SpeedGuard (velocímetro e rastro de luz) e os créditos do autor
@@ -18,6 +18,7 @@ Autor: Luiz Alberto Cardoso
 - **Avisos de trânsito reportados pelos motoristas**: no botão de reportar aparecem **Fila, Obras, Perigo e Polícia** acima das placas de velocidade; um toque já reporta para todos. Cada aviso **some sozinho depois de 6 horas**; se alguém reportar o mesmo aviso no mesmo lugar (até 150 m), ele não duplica e ganha mais 6 h. Os avisos usam os mesmos alertas de 500 a 100 m dos radares
 - **Ícone no mapa** (Configurações → Ícone no mapa): **Seta**, **Carro**, **Caminhão** (cavalo com carreta) ou **Moto**, desenhados vistos de cima e girando conforme a direção
 - **Card de status limpo**: enquanto os radares da região são baixados aparece só um símbolo girando ao lado da velocidade; ao terminar, o card "N radares carregados" aparece por 4 segundos e some. Com radar à frente o card volta mostrando a distância
+- **Cores do app** em Configurações: **Roxo** (padrão), **Azul**, **Verde**, **Laranja**, **Vermelho** ou **Grafite**. Troca na hora o app inteiro (fundos, bordas, botões, velocímetro e o painel flutuante); as cores de alerta (vermelho e laranja dos radares) continuam as mesmas para não confundir
 - **Aparência** em Configurações: **Auto** (segue o modo claro/escuro do celular), **Claro** ou **Escuro**. No modo escuro o mapa também fica escurecido para não ofuscar à noite. A tela de abertura e o painel flutuante continuam sempre escuros
 - **Duas telas no app aberto**, como no CamSam: o botão ao lado de Configurações alterna entre o **Mapa** e a **Tela de alerta** (sem mapa). A tela de alerta mostra **5 faixas verdes** (setas para cima) com o caminho livre. Com radar à frente aparecem a placa do limite, a distância e o tipo do radar, e **a cada 100 m uma faixa fica vermelha, de baixo para cima** (500 m = 1 faixa … 100 m = as 5), junto com o aviso sonoro. Acima do limite aparece "REDUZA A VELOCIDADE". O app lembra a última tela escolhida
 - **Base mundial de radares** baixada automaticamente do OpenStreetMap num raio de 50 km, atualizada a cada 24 h ou a cada 30 km rodados, e guardada para uso offline

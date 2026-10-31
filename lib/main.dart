@@ -36,14 +36,20 @@ Future<void> main() async {
     SG.mode.value = ThemeMode.values.firstWhere(
         (m) => m.name == p.getString('themeMode'),
         orElse: () => ThemeMode.system);
+    SG.palette.value = AppPalette.byName(p.getString('palette'));
   } catch (_) {}
   runApp(const SpeedGuardApp());
 }
 
 /// Ponto de entrada da bolha flutuante (roda separado do app).
 @pragma('vm:entry-point')
-void overlayMain() {
+Future<void> overlayMain() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Mesmas cores do app (a paleta também chega pelos dados do painel).
+  try {
+    final p = await SharedPreferences.getInstance();
+    SG.palette.value = AppPalette.byName(p.getString('palette'));
+  } catch (_) {}
   runApp(const MaterialApp(
     debugShowCheckedModeBanner: false,
     home: OverlayBubble(),
@@ -55,14 +61,15 @@ class SpeedGuardApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<ThemeMode>(
-      valueListenable: SG.mode,
-      builder: (context, mode, _) => MaterialApp(
+    // Reconstrói o app quando muda o modo (claro/escuro) ou a paleta.
+    return ListenableBuilder(
+      listenable: Listenable.merge([SG.mode, SG.palette]),
+      builder: (context, _) => MaterialApp(
         title: 'SpeedGuard',
         debugShowCheckedModeBanner: false,
         theme: SG.lightTheme(),
         darkTheme: SG.theme(),
-        themeMode: mode,
+        themeMode: SG.mode.value,
         builder: (context, child) {
           SG.dark = Theme.of(context).brightness == Brightness.dark;
           return child!;
@@ -280,6 +287,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       'ask': _ask != null,
       'scale': _bubbleScale,
       'land': _bubbleLand,
+      'palette': SG.palette.value.name,
     })).catchError((_) => false);
   }
 
@@ -523,8 +531,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   Widget _pill(IconData icon, String label, VoidCallback onTap) => Material(
         color: SG.cardHigh,
-        shape: const StadiumBorder(
-            side: BorderSide(color: Color(0x998C50FF), width: 1.5)),
+        shape: StadiumBorder(side: BorderSide(color: SG.outline, width: 1.5)),
         child: InkWell(
           customBorder: const StadiumBorder(),
           onTap: onTap,
@@ -780,9 +787,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 padding: const EdgeInsets.all(10),
                 margin: const EdgeInsets.only(bottom: 8),
                 decoration: BoxDecoration(
-                  color: const Color(0xF5341258),
+                  color: SG.surfaceHigh.withValues(alpha: 0.96),
                   borderRadius: BorderRadius.circular(18),
-                  border: Border.all(color: const Color(0x998C50FF)),
+                  border: Border.all(color: SG.outline),
                 ),
                 child: Row(
                   children: [
@@ -1096,6 +1103,63 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 padding: EdgeInsets.fromLTRB(16, 12, 16, 6),
                 child: Align(
                   alignment: Alignment.centerLeft,
+                  child: Text('Cores do app'),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: ValueListenableBuilder<AppPalette>(
+                  valueListenable: SG.palette,
+                  builder: (_, cur, __) => Wrap(
+                    spacing: 14,
+                    runSpacing: 10,
+                    children: [
+                      for (final pal in AppPalette.all)
+                        GestureDetector(
+                          onTap: () async {
+                            SG.palette.value = pal;
+                            setSheet(() {});
+                            _sendBubble();
+                            final p = await SharedPreferences.getInstance();
+                            await p.setString('palette', pal.name);
+                          },
+                          child: Column(mainAxisSize: MainAxisSize.min, children: [
+                            Container(
+                              width: 44,
+                              height: 44,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                gradient: LinearGradient(
+                                  colors: [pal.main, pal.bg],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                ),
+                                border: Border.all(
+                                    color: cur == pal
+                                        ? SG.text
+                                        : Colors.transparent,
+                                    width: 3),
+                                boxShadow: cur == pal
+                                    ? SG.glow(pal.main, 10)
+                                    : null,
+                              ),
+                              child: cur == pal
+                                  ? const Icon(Icons.check,
+                                      color: Colors.white, size: 22)
+                                  : null,
+                            ),
+                            const SizedBox(height: 4),
+                            Text(pal.name, style: const TextStyle(fontSize: 12)),
+                          ]),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+              const Padding(
+                padding: EdgeInsets.fromLTRB(16, 12, 16, 6),
+                child: Align(
+                  alignment: Alignment.centerLeft,
                   child: Text('Aparência'),
                 ),
               ),
@@ -1147,7 +1211,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               ),
               const ListTile(
                 leading: Icon(Icons.info_outline),
-                title: Text('SpeedGuard 1.15.0'),
+                title: Text('SpeedGuard 1.16.0'),
                 subtitle: Text('Dados de radares: © colaboradores do '
                     'OpenStreetMap. Respeite sempre os limites de velocidade.'),
               ),
@@ -1382,7 +1446,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           color: SG.page,
-          border: const Border(top: BorderSide(color: Color(0x558C50FF))),
+          border: Border(top: BorderSide(color: SG.line)),
         ),
         child: SafeArea(
           child: Padding(
@@ -1595,7 +1659,7 @@ class _SpeedBox extends StatelessWidget {
                   fontSize: 32,
                   fontWeight: FontWeight.bold,
                   color: Colors.white)),
-          const Text('km/h',
+          Text('km/h',
               style: TextStyle(fontSize: 12, color: SG.violetLight)),
         ],
       ),
@@ -1622,7 +1686,7 @@ class _PanelPreview extends StatelessWidget {
         child: Icon(Icons.keyboard_double_arrow_up,
             color: Colors.lightGreenAccent),
       ),
-      const FittedBox(
+      FittedBox(
         child: Icon(Icons.add_circle_outline, color: SG.violetLight),
       ),
     ];
@@ -1707,8 +1771,7 @@ class _RoundAction extends StatelessWidget {
       message: tooltip,
       child: Material(
         color: SG.cardHigh,
-        shape: const CircleBorder(
-            side: BorderSide(color: Color(0x998C50FF), width: 1.5)),
+        shape: CircleBorder(side: BorderSide(color: SG.outline, width: 1.5)),
         child: InkWell(
           customBorder: const CircleBorder(),
           onTap: onTap,

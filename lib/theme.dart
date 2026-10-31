@@ -1,15 +1,106 @@
 import 'package:flutter/material.dart';
 
-/// Paleta do SpeedGuard (mesmas cores da tela de abertura).
+/// Uma paleta de cores do app (escolhida em Configurações → Cores).
+class AppPalette {
+  final String name;
+  final Color main; // anel do velocímetro, bordas, destaques
+  final Color light; // ícones e textos de destaque no escuro
+  final Color bg; // fundo escuro
+  final Color surface; // cartões no escuro
+  final Color surfaceHigh; // botões secundários no escuro
+  final Color deepTop; // topo dos degradês escuros
+  final Color lightAccent; // destaque no modo claro
+  final Color lightBg; // fundo no modo claro
+
+  const AppPalette(this.name,
+      {required this.main,
+      required this.light,
+      required this.bg,
+      required this.surface,
+      required this.surfaceHigh,
+      required this.deepTop,
+      required this.lightAccent,
+      required this.lightBg});
+
+  static const all = [
+    AppPalette('Roxo',
+        main: Color(0xFF8C50FF),
+        light: Color(0xFFB794FF),
+        bg: Color(0xFF14081F),
+        surface: Color(0xFF221236),
+        surfaceHigh: Color(0xFF2E1850),
+        deepTop: Color(0xFF3C1460),
+        lightAccent: Color(0xFF6A35D9),
+        lightBg: Color(0xFFF5F0FC)),
+    AppPalette('Azul',
+        main: Color(0xFF3D7BFF),
+        light: Color(0xFF8DB3FF),
+        bg: Color(0xFF07101F),
+        surface: Color(0xFF102036),
+        surfaceHigh: Color(0xFF172C50),
+        deepTop: Color(0xFF14305F),
+        lightAccent: Color(0xFF1D5BD8),
+        lightBg: Color(0xFFEEF3FC)),
+    AppPalette('Verde',
+        main: Color(0xFF22C55E),
+        light: Color(0xFF86EFAC),
+        bg: Color(0xFF06140C),
+        surface: Color(0xFF0E2418),
+        surfaceHigh: Color(0xFF153522),
+        deepTop: Color(0xFF154A2A),
+        lightAccent: Color(0xFF15803D),
+        lightBg: Color(0xFFEEF8F1)),
+    AppPalette('Laranja',
+        main: Color(0xFFFF8A1F),
+        light: Color(0xFFFFC078),
+        bg: Color(0xFF170D05),
+        surface: Color(0xFF2A180A),
+        surfaceHigh: Color(0xFF3D230F),
+        deepTop: Color(0xFF5A3010),
+        lightAccent: Color(0xFFC2410C),
+        lightBg: Color(0xFFFCF3EB)),
+    AppPalette('Vermelho',
+        main: Color(0xFFE53950),
+        light: Color(0xFFFF8A9A),
+        bg: Color(0xFF180609),
+        surface: Color(0xFF2C0E14),
+        surfaceHigh: Color(0xFF40141D),
+        deepTop: Color(0xFF5C1424),
+        lightAccent: Color(0xFFBE123C),
+        lightBg: Color(0xFFFCEEF0)),
+    AppPalette('Grafite',
+        main: Color(0xFF9CA3AF),
+        light: Color(0xFFD1D5DB),
+        bg: Color(0xFF0E0F12),
+        surface: Color(0xFF1C1E23),
+        surfaceHigh: Color(0xFF2A2D34),
+        deepTop: Color(0xFF33363E),
+        lightAccent: Color(0xFF4B5563),
+        lightBg: Color(0xFFF2F3F5)),
+  ];
+
+  static AppPalette byName(String? n) =>
+      all.firstWhere((p) => p.name == n, orElse: () => all.first);
+}
+
+/// Cores do SpeedGuard. As de alerta (vermelho, rosa, laranja) são fixas;
+/// as demais seguem a paleta escolhida.
 class SG {
-  static const bg = Color(0xFF14081F); // roxo quase preto
-  static const surface = Color(0xFF221236); // cartões
-  static const surfaceHigh = Color(0xFF2E1850); // botões secundários
-  static const violet = Color(0xFF8C50FF); // anel do velocímetro
-  static const violetLight = Color(0xFFB794FF);
   static const pink = Color(0xFFFF46A0);
   static const red = Color(0xFFFF2846);
   static const orange = Color(0xFFFF7A2F);
+
+  /// Paleta escolhida em Configurações (padrão: Roxo).
+  static final palette = ValueNotifier<AppPalette>(AppPalette.all.first);
+  static AppPalette get _p => palette.value;
+
+  static Color get bg => _p.bg;
+  static Color get surface => _p.surface;
+  static Color get surfaceHigh => _p.surfaceHigh;
+  static Color get violet => _p.main;
+  static Color get violetLight => _p.light;
+  static Color get outline => _p.main.withValues(alpha: 0.6);
+  static Color get line => _p.main.withValues(alpha: 0.33);
 
   /// Escolha do usuário em Configurações (Automático, Claro ou Escuro).
   static final mode = ValueNotifier<ThemeMode>(ThemeMode.system);
@@ -17,12 +108,14 @@ class SG {
   /// Tema em uso agora (atualizado pelo MaterialApp a cada mudança).
   static bool dark = true;
 
-  // Cores que mudam com o tema (o painel flutuante e a abertura ficam
-  // sempre escuros e usam as constantes acima).
-  static Color get page => dark ? bg : const Color(0xFFF5F0FC);
+  // Cores que mudam com o tema claro/escuro (o painel flutuante e a
+  // abertura ficam sempre escuros).
+  static Color get page => dark ? bg : _p.lightBg;
   static Color get card => dark ? surface : Colors.white;
-  static Color get cardHigh => dark ? surfaceHigh : const Color(0xFFECE2FB);
-  static Color get accent => dark ? violetLight : const Color(0xFF6A35D9);
+  static Color get cardHigh => dark
+      ? surfaceHigh
+      : Color.alphaBlend(_p.lightAccent.withValues(alpha: 0.13), Colors.white);
+  static Color get accent => dark ? violetLight : _p.lightAccent;
   static Color get text => dark ? Colors.white : const Color(0xFF1E1230);
   static Color get textSoft =>
       dark ? Colors.white70 : const Color(0xFF5B4C70);
@@ -35,17 +128,17 @@ class SG {
   );
 
   /// Degradê escuro (velocímetro, painel).
-  static const deep = LinearGradient(
-    colors: [Color(0xFF3C1460), bg],
-    begin: Alignment.topCenter,
-    end: Alignment.bottomCenter,
-  );
+  static LinearGradient get deep => LinearGradient(
+        colors: [_p.deepTop, bg],
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+      );
 
   static List<BoxShadow> glow(Color c, [double r = 14]) =>
       [BoxShadow(color: c.withValues(alpha: 0.55), blurRadius: r)];
 
   static ThemeData theme() {
-    const scheme = ColorScheme(
+    final scheme = ColorScheme(
       brightness: Brightness.dark,
       primary: red,
       onPrimary: Colors.white,
@@ -58,16 +151,16 @@ class SG {
       surface: surface,
       onSurface: Colors.white,
       surfaceContainerLowest: bg,
-      surfaceContainerLow: Color(0xFF1A0C2A),
+      surfaceContainerLow: Color.lerp(bg, surface, 0.5)!,
       surfaceContainer: surface,
       surfaceContainerHigh: surfaceHigh,
-      surfaceContainerHighest: Color(0xFF3A2063),
+      surfaceContainerHighest: Color.lerp(surfaceHigh, violet, 0.15)!,
       secondaryContainer: surfaceHigh,
       onSecondaryContainer: violetLight,
-      primaryContainer: Color(0xFF5A0E2A),
+      primaryContainer: const Color(0xFF5A0E2A),
       onPrimaryContainer: Colors.white,
-      outline: Color(0x668C50FF),
-      outlineVariant: Color(0x338C50FF),
+      outline: violet.withValues(alpha: 0.4),
+      outlineVariant: violet.withValues(alpha: 0.2),
     );
     return ThemeData(
       useMaterial3: true,
@@ -79,17 +172,17 @@ class SG {
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
-          side: const BorderSide(color: Color(0x668C50FF)),
+          side: BorderSide(color: violet.withValues(alpha: 0.4)),
         ),
       ),
-      dialogTheme: const DialogThemeData(backgroundColor: surface),
-      bottomSheetTheme: const BottomSheetThemeData(
+      dialogTheme: DialogThemeData(backgroundColor: surface),
+      bottomSheetTheme: BottomSheetThemeData(
         backgroundColor: surface,
         showDragHandle: true,
       ),
-      snackBarTheme: const SnackBarThemeData(
+      snackBarTheme: SnackBarThemeData(
         backgroundColor: surfaceHigh,
-        contentTextStyle: TextStyle(color: Colors.white),
+        contentTextStyle: const TextStyle(color: Colors.white),
         behavior: SnackBarBehavior.floating,
       ),
       switchTheme: SwitchThemeData(
@@ -98,40 +191,44 @@ class SG {
         trackColor: WidgetStateProperty.resolveWith(
             (s) => s.contains(WidgetState.selected) ? violet : null),
       ),
-      progressIndicatorTheme:
-          const ProgressIndicatorThemeData(color: pink, linearTrackColor: surfaceHigh),
-      floatingActionButtonTheme: const FloatingActionButtonThemeData(
+      progressIndicatorTheme: ProgressIndicatorThemeData(
+          color: pink, linearTrackColor: surfaceHigh),
+      floatingActionButtonTheme: FloatingActionButtonThemeData(
         backgroundColor: violet,
         foregroundColor: Colors.white,
       ),
     );
   }
+
   static ThemeData lightTheme() {
-    const pageL = Color(0xFFF5F0FC);
-    const highL = Color(0xFFECE2FB);
-    const scheme = ColorScheme(
+    final acc = _p.lightAccent;
+    final pageL = _p.lightBg;
+    final highL = Color.alphaBlend(acc.withValues(alpha: 0.13), Colors.white);
+    final scheme = ColorScheme(
       brightness: Brightness.light,
-      primary: Color(0xFFE0103A),
+      primary: const Color(0xFFE0103A),
       onPrimary: Colors.white,
-      secondary: Color(0xFF6A35D9),
+      secondary: acc,
       onSecondary: Colors.white,
       tertiary: pink,
       onTertiary: Colors.white,
       error: red,
       onError: Colors.white,
       surface: Colors.white,
-      onSurface: Color(0xFF1E1230),
+      onSurface: const Color(0xFF1E1230),
       surfaceContainerLowest: pageL,
-      surfaceContainerLow: Color(0xFFFAF7FE),
+      surfaceContainerLow:
+          Color.alphaBlend(acc.withValues(alpha: 0.03), Colors.white),
       surfaceContainer: Colors.white,
       surfaceContainerHigh: highL,
-      surfaceContainerHighest: Color(0xFFE2D4F8),
+      surfaceContainerHighest:
+          Color.alphaBlend(acc.withValues(alpha: 0.2), Colors.white),
       secondaryContainer: highL,
-      onSecondaryContainer: Color(0xFF4A1F8C),
-      primaryContainer: Color(0xFFFFD9E0),
-      onPrimaryContainer: Color(0xFF5A0E2A),
-      outline: Color(0x996A35D9),
-      outlineVariant: Color(0x446A35D9),
+      onSecondaryContainer: Color.lerp(acc, Colors.black, 0.35)!,
+      primaryContainer: const Color(0xFFFFD9E0),
+      onPrimaryContainer: const Color(0xFF5A0E2A),
+      outline: acc.withValues(alpha: 0.6),
+      outlineVariant: acc.withValues(alpha: 0.27),
     );
     return ThemeData(
       useMaterial3: true,
@@ -143,7 +240,7 @@ class SG {
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
-          side: const BorderSide(color: Color(0x666A35D9)),
+          side: BorderSide(color: acc.withValues(alpha: 0.4)),
         ),
       ),
       dialogTheme: const DialogThemeData(backgroundColor: Colors.white),
@@ -151,9 +248,9 @@ class SG {
         backgroundColor: Colors.white,
         showDragHandle: true,
       ),
-      snackBarTheme: const SnackBarThemeData(
-        backgroundColor: Color(0xFF2E1850),
-        contentTextStyle: TextStyle(color: Colors.white),
+      snackBarTheme: SnackBarThemeData(
+        backgroundColor: _p.surfaceHigh,
+        contentTextStyle: const TextStyle(color: Colors.white),
         behavior: SnackBarBehavior.floating,
       ),
       switchTheme: SwitchThemeData(
@@ -163,8 +260,8 @@ class SG {
             (s) => s.contains(WidgetState.selected) ? violet : null),
       ),
       progressIndicatorTheme:
-          const ProgressIndicatorThemeData(color: pink, linearTrackColor: highL),
-      floatingActionButtonTheme: const FloatingActionButtonThemeData(
+          ProgressIndicatorThemeData(color: pink, linearTrackColor: highL),
+      floatingActionButtonTheme: FloatingActionButtonThemeData(
         backgroundColor: violet,
         foregroundColor: Colors.white,
       ),

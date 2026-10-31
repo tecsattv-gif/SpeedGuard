@@ -79,6 +79,9 @@ class _OverlayBubbleState extends State<OverlayBubble> {
           _ask = m['ask'] == true;
           if (m['scale'] is num) _scale = (m['scale'] as num).toDouble();
           if (m['land'] is bool) _land = m['land'] as bool;
+          if (m['palette'] is String) {
+            SG.palette.value = AppPalette.byName(m['palette'] as String);
+          }
           _gotConfig = true;
         });
       } catch (_) {}
@@ -219,7 +222,7 @@ class _OverlayBubbleState extends State<OverlayBubble> {
         : alert
             ? SG.orange
             : SG.violet;
-    const line = Color(0x558C50FF);
+    final line = SG.line;
     final speed = Padding(
       padding: const EdgeInsets.all(4),
       child: FittedBox(
@@ -233,7 +236,7 @@ class _OverlayBubbleState extends State<OverlayBubble> {
                     fontSize: 32,
                     fontWeight: FontWeight.bold,
                     height: 1)),
-            const Text('Km/h',
+            Text('Km/h',
                 style: TextStyle(
                     color: SG.violetLight,
                     fontSize: 13,
@@ -255,11 +258,11 @@ class _OverlayBubbleState extends State<OverlayBubble> {
             width: 20,
             height: 20,
             alignment: Alignment.center,
-            decoration: const BoxDecoration(
-              color: Color(0xCC14081F),
+            decoration: BoxDecoration(
+              color: SG.bg.withValues(alpha: 0.8),
               borderRadius: BorderRadius.only(bottomLeft: Radius.circular(8)),
             ),
-            child: const Icon(Icons.close, color: SG.violetLight, size: 14),
+            child: Icon(Icons.close, color: SG.violetLight, size: 14),
           ),
         ),
       ),
@@ -270,7 +273,7 @@ class _OverlayBubbleState extends State<OverlayBubble> {
     );
     final plus = InkWell(
       onTap: _openPicker,
-      child: const Center(
+      child: Center(
         child: Icon(Icons.add_circle_outline, color: SG.violetLight, size: 40),
       ),
     );
@@ -279,7 +282,10 @@ class _OverlayBubbleState extends State<OverlayBubble> {
       height: _land ? kLandH : kBaseH,
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: const [Color(0xF23C1460), Color(0xF214081F)],
+          colors: [
+            SG.palette.value.deepTop.withValues(alpha: 0.95),
+            SG.bg.withValues(alpha: 0.95)
+          ],
           begin: _land ? Alignment.centerLeft : Alignment.topCenter,
           end: _land ? Alignment.centerRight : Alignment.bottomCenter,
         ),
@@ -291,17 +297,17 @@ class _OverlayBubbleState extends State<OverlayBubble> {
           // Horizontal: velocidade | alerta | +
           ? Row(children: [
               Expanded(flex: 4, child: speedWithClose),
-              const VerticalDivider(width: 1, thickness: 1, color: line),
+              VerticalDivider(width: 1, thickness: 1, color: line),
               Expanded(flex: 5, child: middle),
-              const VerticalDivider(width: 1, thickness: 1, color: line),
+              VerticalDivider(width: 1, thickness: 1, color: line),
               Expanded(flex: 3, child: plus),
             ])
           // Vertical: velocidade / alerta / +
           : Column(children: [
               Expanded(flex: 5, child: speedWithClose),
-              const Divider(height: 1, thickness: 1, color: line),
+              Divider(height: 1, thickness: 1, color: line),
               Expanded(flex: 7, child: middle),
-              const Divider(height: 1, thickness: 1, color: line),
+              Divider(height: 1, thickness: 1, color: line),
               Expanded(flex: 4, child: plus),
             ]),
     );

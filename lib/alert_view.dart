@@ -27,7 +27,7 @@ class AlertView extends StatelessWidget {
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: SG.dark
-              ? const [Color(0xFF2A1046), SG.bg]
+              ? [Color.lerp(SG.palette.value.deepTop, SG.bg, 0.3)!, SG.bg]
               : const [Color(0xFFE9DEFA), Color(0xFFF5F0FC)],
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,

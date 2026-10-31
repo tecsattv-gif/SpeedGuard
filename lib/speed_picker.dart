@@ -45,7 +45,7 @@ class _SpeedPickerState extends State<SpeedPicker> {
             color: sel ? null : SG.surfaceHigh,
             borderRadius: BorderRadius.circular(10),
             border: Border.all(
-                color: sel ? Colors.white70 : const Color(0x998C50FF)),
+                color: sel ? Colors.white70 : SG.outline),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -67,8 +67,12 @@ class _SpeedPickerState extends State<SpeedPicker> {
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 4, 12, 14),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xF5341258), Color(0xF514081F)],
+        gradient: LinearGradient(
+          colors: [
+            Color.lerp(SG.palette.value.deepTop, SG.surfaceHigh, 0.5)!
+                .withValues(alpha: 0.96),
+            SG.bg.withValues(alpha: 0.96)
+          ],
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
         ),
