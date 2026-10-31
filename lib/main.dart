@@ -12,6 +12,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 import 'alert_engine.dart';
+import 'alert_view.dart';
 import 'community_service.dart';
 import 'country_rules.dart';
 import 'firebase_config.dart';
@@ -68,6 +69,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   Position? _pos;
   bool _running = false;
   bool _follow = true;
+  /// Tela cheia: true = mapa, false = tela de alerta (setas grandes).
+  bool _mapView = true;
   bool _voice = true;
   bool _discreet = false;
   bool _bubble = false;
@@ -122,6 +125,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     _bubble = p.getBool('bubble') ?? false;
     _bubbleScale = p.getDouble('bubbleScale') ?? 1.0;
     _bubbleLand = p.getBool('bubbleLand') ?? false;
+    _mapView = p.getBool('mapView') ?? true;
     _country = p.getString('country');
     await _service.load();
     await _tts.setLanguage('pt-BR');
@@ -741,6 +745,17 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             ],
           ),
 
+          // Tela de alerta por cima do mapa (o mapa continua carregado).
+          if (!_mapView)
+            Positioned.fill(
+              child: AlertView(
+                alert: a,
+                mode: _rule.mode,
+                running: _running,
+                status: _status,
+              ),
+            ),
+
           // Painel superior: velocidade e alerta
           SafeArea(
             child: Padding(
@@ -780,7 +795,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             ),
         ],
       ),
-      floatingActionButton: _follow
+      floatingActionButton: _follow || !_mapView
           ? null
           : FloatingActionButton.small(
               onPressed: () {
@@ -807,6 +822,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   onTap: _settings,
                 ),
                 const SizedBox(width: 10),
+                _RoundAction(
+                  tooltip: _mapView ? 'Tela de alerta' : 'Mapa',
+                  icon: _mapView ? Icons.keyboard_double_arrow_up : Icons.map,
+                  onTap: _toggleView,
+                ),
+                const SizedBox(width: 10),
                 Expanded(
                   child: _MainButton(
                     running: _running,
@@ -825,6 +846,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         ),
       ),
     );
+  }
+
+  Future<void> _toggleView() async {
+    setState(() => _mapView = !_mapView);
+    final p = await SharedPreferences.getInstance();
+    await p.setBool('mapView', _mapView);
   }
 
   Widget _askCard() {
@@ -1032,13 +1059,18 @@ class _MainButton extends StatelessWidget {
               Icon(running ? Icons.stop_rounded : Icons.play_arrow_rounded,
                   color: Colors.white, size: 28),
               const SizedBox(width: 6),
-              Text(running ? 'PARAR' : 'INICIAR',
-                  style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 19,
-                      fontWeight: FontWeight.w800,
-                      fontStyle: FontStyle.italic,
-                      letterSpacing: 1.2)),
+              Flexible(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(running ? 'PARAR' : 'INICIAR',
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 19,
+                          fontWeight: FontWeight.w800,
+                          fontStyle: FontStyle.italic,
+                          letterSpacing: 1.2)),
+                ),
+              ),
             ],
           ),
         ),

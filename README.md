@@ -4,12 +4,13 @@ App Android de alerta de radares para o mundo todo, feito em Flutter. Avisa por 
 
 Autor: Luiz Alberto Cardoso
 
-## Funções (versão 1.6.4)
+## Funções (versão 1.7.0)
 
 - **Visual neon** com as cores da tela de abertura: fundo roxo escuro, velocímetro com borda violeta brilhante, botão INICIAR em degradê vermelho→rosa, cartões e botões roxos; o painel flutuante e a janela de reportar seguem a mesma paleta
 - **Tela de abertura** (2,5 s) com a arte do SpeedGuard (velocímetro e rastro de luz) e os créditos do autor
 - **Ícone próprio** com o velocímetro (inclui ícone adaptativo do Android 8+)
 - **Mapa** (OpenStreetMap) com sua posição e os radares da região
+- **Duas telas no app aberto**, como no CamSam: o botão ao lado de Configurações alterna entre o **Mapa** e a **Tela de alerta** (sem mapa). Na tela de alerta aparecem três setas verdes grandes com o caminho livre e, quando há radar à frente, a placa do limite, a distância em laranja e o tipo do radar; acima do limite fica vermelho com "REDUZA A VELOCIDADE". O app lembra a última tela escolhida
 - **Base mundial de radares** baixada automaticamente do OpenStreetMap num raio de 50 km, atualizada a cada 24 h ou a cada 30 km rodados, e guardada para uso offline
 - **Alerta por voz e vibração** cerca de 25 segundos antes do radar (entre 300 m e 1,2 km), dizendo o tipo, a distância e o limite
 - **Aviso "Reduza a velocidade"** quando você passa do limite perto do radar
@@ -54,6 +55,7 @@ Autor: Luiz Alberto Cardoso
 | `lib/radar_service.dart` | Baixa radares (Overpass/OSM), cache, radares do usuário, detecção do país |
 | `lib/community_service.dart` | Radares compartilhados entre usuários (Firestore via REST) |
 | `lib/firebase_config.dart` | ID do projeto e chave do Firebase |
+| `lib/alert_view.dart` | Tela de alerta (setas, placa e distância) |
 | `lib/overlay.dart` | Painel flutuante sobre outros apps |
 | `lib/theme.dart` | Paleta de cores e tema do app |
 | `lib/splash_screen.dart` | Tela de abertura com créditos (2,5 s) |
