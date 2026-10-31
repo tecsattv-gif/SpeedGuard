@@ -4,7 +4,7 @@ App Android de alerta de radares para o mundo todo, feito em Flutter. Avisa por 
 
 Autor: Luiz Alberto Cardoso
 
-## Funções (versão 1.6.1)
+## Funções (versão 1.6.2)
 
 - **Visual neon** com as cores da tela de abertura: fundo roxo escuro, velocímetro com borda violeta brilhante, botão INICIAR em degradê vermelho→rosa, cartões e botões roxos; o painel flutuante e a janela de reportar seguem a mesma paleta
 - **Tela de abertura** (2,5 s) com a arte do SpeedGuard (velocímetro e rastro de luz) e os créditos do autor
@@ -23,6 +23,7 @@ Autor: Luiz Alberto Cardoso
   - **Formato**: Vertical (retrato) ou Horizontal (paisagem, 240 × 72 dp no Médio), com uma miniatura mostrando como fica
   - O tamanho é convertido para pixels e conferido pelo próprio painel ao abrir, para ficar certo em qualquer tela
 
+  - **Toque duplo no painel**: abre o SpeedGuard em tela cheia (o painel some e volta quando você sair do app)
   - **Fechar o painel**: segure o dedo sobre ele (vibra e fecha). O monitoramento e a voz continuam; o painel volta da próxima vez que você sair do SpeedGuard
 
   Conteúdo do painel:

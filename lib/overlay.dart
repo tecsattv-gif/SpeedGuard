@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:android_intent_plus/android_intent.dart';
+import 'package:android_intent_plus/flag.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_overlay_window/flutter_overlay_window.dart';
@@ -116,6 +118,19 @@ class _OverlayBubbleState extends State<OverlayBubble> {
         true);
   }
 
+  /// Abre o SpeedGuard em tela cheia (o app fecha o painel ao voltar).
+  Future<void> _openApp() async {
+    HapticFeedback.lightImpact();
+    try {
+      await const AndroidIntent(
+        action: 'android.intent.action.MAIN',
+        category: 'android.intent.category.LAUNCHER',
+        package: 'com.tecsattv.speedguard',
+        flags: [Flag.FLAG_ACTIVITY_NEW_TASK],
+      ).launch();
+    } catch (_) {}
+  }
+
   /// Fecha o painel (o monitoramento continua no app).
   Future<void> _closeSelf() async {
     HapticFeedback.heavyImpact();
@@ -176,8 +191,9 @@ class _OverlayBubbleState extends State<OverlayBubble> {
               alignment: Alignment.topLeft,
               child: SizedBox.fromSize(
                 size: panelDp(_land, _scale),
-                // Segurar o dedo no painel fecha a janela.
+                // Toque duplo abre o app; segurar o dedo fecha a janela.
                 child: GestureDetector(
+                  onDoubleTap: _openApp,
                   onLongPress: _closeSelf,
                   child: FittedBox(child: _panel()),
                 ),
