@@ -71,6 +71,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   bool _voice = true;
   bool _discreet = false;
   bool _bubble = false;
+  double _bubbleScale = 1.0; // tamanho do painel flutuante
+  bool _bubbleLand = false; // formato horizontal (paisagem)
   bool _overlayShown = false;
   bool _opening = false;
   bool _inFront = true;
@@ -116,6 +118,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     _voice = p.getBool('voice') ?? true;
     _discreet = p.getBool('discreet') ?? false;
     _bubble = p.getBool('bubble') ?? false;
+    _bubbleScale = p.getDouble('bubbleScale') ?? 1.0;
+    _bubbleLand = p.getBool('bubbleLand') ?? false;
     _country = p.getString('country');
     await _service.load();
     await _tts.setLanguage('pt-BR');
@@ -166,8 +170,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         return;
       }
       await FlutterOverlayWindow.showOverlay(
-        height: overlayUnits(kPanelH),
-        width: overlayUnits(kPanelW),
+        height: overlayUnits(panelDp(_bubbleLand, _bubbleScale).height),
+        width: overlayUnits(panelDp(_bubbleLand, _bubbleScale).width),
         alignment: OverlayAlignment.topLeft,
         enableDrag: true,
         positionGravity: PositionGravity.none,
@@ -206,6 +210,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       'limit': show ? a.radar!.maxSpeed : null,
       'over': a.overLimit,
       'ask': _ask != null,
+      'scale': _bubbleScale,
+      'land': _bubbleLand,
     })).catchError((_) => false);
   }
 
@@ -496,8 +502,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   Future<void> _settings() async {
     await showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       builder: (_) => StatefulBuilder(
-        builder: (ctx, setSheet) => Padding(
+        builder: (ctx, setSheet) => SingleChildScrollView(
           padding: const EdgeInsets.all(16),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -537,6 +544,66 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   setSheet(() => _bubble = v);
                 },
               ),
+              if (_bubble) ...[
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(16, 4, 16, 6),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text('Tamanho do painel'),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: SegmentedButton<double>(
+                    showSelectedIcon: false,
+                    segments: [
+                      for (final e in kPanelScales.entries)
+                        ButtonSegment(value: e.value, label: Text(e.key)),
+                    ],
+                    selected: {_bubbleScale},
+                    onSelectionChanged: (v) async {
+                      final p = await SharedPreferences.getInstance();
+                      await p.setDouble('bubbleScale', v.first);
+                      setSheet(() => _bubbleScale = v.first);
+                    },
+                  ),
+                ),
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(16, 12, 16, 6),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text('Formato do painel'),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: SegmentedButton<bool>(
+                    showSelectedIcon: false,
+                    segments: const [
+                      ButtonSegment(
+                          value: false,
+                          icon: Icon(Icons.crop_portrait),
+                          label: Text('Vertical')),
+                      ButtonSegment(
+                          value: true,
+                          icon: Icon(Icons.crop_landscape),
+                          label: Text('Horizontal')),
+                    ],
+                    selected: {_bubbleLand},
+                    onSelectionChanged: (v) async {
+                      final p = await SharedPreferences.getInstance();
+                      await p.setBool('bubbleLand', v.first);
+                      setSheet(() => _bubbleLand = v.first);
+                    },
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Center(
+                  child: _PanelPreview(
+                      landscape: _bubbleLand, scale: _bubbleScale),
+                ),
+                const SizedBox(height: 8),
+              ],
               ListTile(
                 leading: const Icon(Icons.refresh),
                 title: const Text('Atualizar radares agora'),
@@ -889,6 +956,47 @@ class _SpeedBox extends StatelessWidget {
               style: TextStyle(fontSize: 12, color: SG.violetLight)),
         ],
       ),
+    );
+  }
+}
+
+/// Miniatura do painel flutuante nas Configurações (proporção real).
+class _PanelPreview extends StatelessWidget {
+  final bool landscape;
+  final double scale;
+  const _PanelPreview({required this.landscape, required this.scale});
+
+  @override
+  Widget build(BuildContext context) {
+    final size = panelDp(landscape, scale) * 0.6;
+    final parts = [
+      const FittedBox(
+        child: Text('0\nKm/h',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontWeight: FontWeight.bold, height: 1.1)),
+      ),
+      const FittedBox(
+        child: Icon(Icons.keyboard_double_arrow_up,
+            color: Colors.lightGreenAccent),
+      ),
+      const FittedBox(
+        child: Icon(Icons.add_circle_outline, color: SG.violetLight),
+      ),
+    ];
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      width: size.width,
+      height: size.height,
+      padding: const EdgeInsets.all(6),
+      decoration: BoxDecoration(
+        gradient: SG.deep,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: SG.violet, width: 2),
+        boxShadow: SG.glow(SG.violet, 8),
+      ),
+      child: landscape
+          ? Row(children: [for (final w in parts) Expanded(child: w)])
+          : Column(children: [for (final w in parts) Expanded(child: w)]),
     );
   }
 }
