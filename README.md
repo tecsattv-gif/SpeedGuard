@@ -4,8 +4,10 @@ App Android de alerta de radares para o mundo todo, feito em Flutter. Avisa por 
 
 Autor: Luiz Alberto Cardoso
 
-## Funções (versão 1.3)
+## Funções (versão 1.4)
 
+- **Tela de abertura** (2,5 s) com a arte do SpeedGuard (velocímetro e rastro de luz) e os créditos do autor
+- **Ícone próprio** com o velocímetro (inclui ícone adaptativo do Android 8+)
 - **Mapa** (OpenStreetMap) com sua posição e os radares da região
 - **Base mundial de radares** baixada automaticamente do OpenStreetMap num raio de 50 km, atualizada a cada 24 h ou a cada 30 km rodados, e guardada para uso offline
 - **Alerta por voz e vibração** cerca de 25 segundos antes do radar (entre 300 m e 1,2 km), dizendo o tipo, a distância e o limite
@@ -43,6 +45,9 @@ Autor: Luiz Alberto Cardoso
 | `lib/community_service.dart` | Radares compartilhados entre usuários (Firestore via REST) |
 | `lib/firebase_config.dart` | ID do projeto e chave do Firebase |
 | `lib/overlay.dart` | Painel flutuante sobre outros apps |
+| `lib/splash_screen.dart` | Tela de abertura com créditos (2,5 s) |
+| `assets/splash.png`, `assets/icon.png` | Arte da abertura e do ícone (criação original) |
+| `android/app/src/main/res/` | Ícones do app e fundo escuro de abertura |
 | `lib/speed_picker.dart` | Janela de reportar radar com as velocidades prontas |
 | `lib/country_rules.dart` | Regras por país |
 | `lib/models.dart` | Modelo do radar |
@@ -86,7 +91,7 @@ service cloud.firestore {
 ## Próximas versões
 
 - Exigir mais de uma resposta "Não" antes de apagar, para evitar abuso
-- Ícone próprio e idiomas além do português
+- Idiomas além do português
 
 ## Créditos
 

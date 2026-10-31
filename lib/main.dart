@@ -18,6 +18,7 @@ import 'firebase_config.dart';
 import 'models.dart';
 import 'overlay.dart';
 import 'radar_service.dart';
+import 'splash_screen.dart';
 import 'speed_picker.dart';
 
 void main() {
@@ -48,7 +49,7 @@ class SpeedGuardApp extends StatelessWidget {
             seedColor: const Color(0xFFE53935), brightness: Brightness.dark),
         useMaterial3: true,
       ),
-      home: const HomePage(),
+      home: const SplashScreen(next: HomePage()),
     );
   }
 }
