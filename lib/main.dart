@@ -18,6 +18,7 @@ import 'firebase_config.dart';
 import 'models.dart';
 import 'overlay.dart';
 import 'radar_service.dart';
+import 'speed_picker.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -97,6 +98,13 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       try {
         final m = jsonDecode(event.toString()) as Map;
         if (m['answer'] is bool) _answer(m['answer'] as bool);
+        if (m['report'] == true) {
+          _submitReport(
+            mobile: m['mobile'] != false,
+            limit: (m['limit'] as num?)?.toInt(),
+            fromBubble: true,
+          );
+        }
       } catch (_) {}
     });
     _init();
@@ -142,11 +150,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     try {
       if (!await FlutterOverlayWindow.isPermissionGranted()) return;
       await FlutterOverlayWindow.showOverlay(
-        height: 380,
-        width: 380,
-        alignment: OverlayAlignment.centerRight,
+        height: kPanelH,
+        width: kPanelW,
+        alignment: OverlayAlignment.topLeft,
         enableDrag: true,
-        positionGravity: PositionGravity.auto,
+        positionGravity: PositionGravity.none,
         overlayTitle: 'SpeedGuard',
         overlayContent: 'Bolha de radares ativa',
       );
@@ -348,80 +356,83 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   }
 
   Future<void> _report() async {
-    final pos = _pos;
-    if (pos == null) {
+    if (_pos == null) {
       _snack('Aguarde o sinal do GPS para reportar.');
       return;
     }
-    final ctrl = TextEditingController();
-    var mobile = true;
-    final ok = await showDialog<bool>(
+    final choice = await showDialog<SpeedChoice>(
       context: context,
-      builder: (_) => StatefulBuilder(
-        builder: (ctx, setDlg) => AlertDialog(
-        title: const Text('Reportar radar aqui'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SegmentedButton<bool>(
-              segments: const [
-                ButtonSegment(value: true, label: Text('Móvel')),
-                ButtonSegment(value: false, label: Text('Fixo')),
-              ],
-              selected: {mobile},
-              onSelectionChanged: (v) => setDlg(() => mobile = v.first),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: ctrl,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                  labelText: 'Limite de velocidade (opcional)',
-                  suffixText: 'km/h'),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              communityEnabled
-                  ? (mobile
-                      ? 'Todos verão este radar. A cada 48 h, quem passar aqui confirma se ele continua.'
-                      : 'Todos os usuários verão este radar.')
-                  : 'O radar fica salvo só neste aparelho.',
-              style: Theme.of(ctx).textTheme.bodySmall,
-            ),
-          ],
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(16),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 340),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SpeedPicker(
+                onSelected: (c) => Navigator.pop(ctx, c),
+                onCancel: () => Navigator.pop(ctx),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                communityEnabled
+                    ? 'Todos verão este radar. Radares móveis são confirmados a cada 48 h por quem passar.'
+                    : 'O radar fica salvo só neste aparelho.',
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.white70, fontSize: 12),
+              ),
+            ],
+          ),
         ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancelar')),
-          FilledButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('Salvar')),
-        ],
-      ),
       ),
     );
-    if (ok != true) return;
-    final limit = int.tryParse(ctrl.text.trim());
+    if (choice == null) return;
+    await _submitReport(mobile: choice.mobile, limit: choice.limit);
+  }
+
+  /// Salva um radar reportado aqui (pelo app ou pelo botão + da bolha).
+  Future<void> _submitReport({
+    required bool mobile,
+    int? limit,
+    bool fromBubble = false,
+  }) async {
+    final pos = _pos;
+    if (pos == null) {
+      if (fromBubble) {
+        if (_voice) _tts.speak('Sem sinal de GPS. Radar não salvo.');
+      } else {
+        _snack('Aguarde o sinal do GPS para reportar.');
+      }
+      return;
+    }
     final dir = pos.speed > 2.5 ? pos.heading : null;
+    var shared = false;
     if (communityEnabled) {
-      final sent = await _community.report(
+      shared = await _community.report(
         lat: pos.latitude,
         lon: pos.longitude,
         mobile: mobile,
         maxSpeed: limit,
         direction: dir,
       );
-      if (sent) {
-        setState(() {});
-        _snack('Radar compartilhado com todos. Obrigado!');
-        return;
-      }
-      _snack('Sem conexão: radar salvo só neste aparelho.');
     }
-    await _service.addUserRadar(pos.latitude, pos.longitude, limit, dir);
+    if (!shared) {
+      await _service.addUserRadar(pos.latitude, pos.longitude, limit, dir);
+    }
+    if (!mounted) return;
     setState(() {});
-    if (!communityEnabled) _snack('Radar salvo neste aparelho.');
+    if (fromBubble) {
+      if (_voice) _tts.speak('Radar reportado. Obrigado!');
+      return;
+    }
+    if (shared) {
+      _snack('Radar compartilhado com todos. Obrigado!');
+    } else if (communityEnabled) {
+      _snack('Sem conexão: radar salvo só neste aparelho.');
+    } else {
+      _snack('Radar salvo neste aparelho.');
+    }
   }
 
   void _showRadar(Radar r) {

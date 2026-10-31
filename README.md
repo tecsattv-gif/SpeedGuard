@@ -4,7 +4,7 @@ App Android de alerta de radares para o mundo todo, feito em Flutter. Avisa por 
 
 Autor: Luiz Alberto Cardoso
 
-## Funções (versão 1.2)
+## Funções (versão 1.3)
 
 - **Mapa** (OpenStreetMap) com sua posição e os radares da região
 - **Base mundial de radares** baixada automaticamente do OpenStreetMap num raio de 50 km, atualizada a cada 24 h ou a cada 30 km rodados, e guardada para uso offline
@@ -13,9 +13,12 @@ Autor: Luiz Alberto Cardoso
 - Só avisa radares **à frente** e, quando o sentido do radar é conhecido, só para quem vai naquele sentido
 - **Velocímetro** grande, que fica vermelho acima do limite
 - **Funciona com a tela apagada ou em segundo plano** (notificação "SpeedGuard ativo")
-- **Reportar radar** (móvel ou fixo) na sua posição atual, com limite opcional. Com o Firebase configurado, **todos os usuários veem**. Sem Firebase, fica só no aparelho
+- **Reportar radar** (móvel ou fixo) na sua posição atual: abre uma janela com as placas de limite prontas (30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130 ou "?") e **um toque já salva**, sem digitar. Com o Firebase configurado, **todos os usuários veem**. Sem Firebase, fica só no aparelho
 - **Confirmação de radares móveis**: eles não somem sozinhos. Depois de 48 h, quem passar a menos de 150 m recebe a pergunta "O radar móvel ainda está aqui?" na tela e na bolha flutuante. **Sim** mantém por mais 48 h; **Não** apaga o radar
-- **Bolha flutuante** por cima do Google Maps / Waze, com velocidade, distância e limite do próximo radar (ativar em Configurações; pede a permissão "Sobrepor a outros apps")
+- **Painel flutuante** por cima do Google Maps / Waze, no estilo do CamSam (ativar em Configurações; pede a permissão "Sobrepor a outros apps"). Aparece no canto superior esquerdo, pode ser arrastado e ocupa só o tamanho do painel, sem bloquear o mapa:
+  - em cima: velocidade atual (vermelha acima do limite)
+  - no meio: setas verdes com caminho livre; perto de radar, a placa do limite e a distância (laranja, ou vermelho se estiver acima do limite); a pergunta "Radar ainda aí?" com ✓/✗
+  - embaixo: botão **+** que abre a janela de reportar radar com as velocidades prontas, sem sair do Maps. Fecha sozinha em 20 s se nada for escolhido; o app confirma por voz "Radar reportado"
 - **Modo discreto**: só vibra e diz "Radar", sem detalhes
 - Cores no mapa: vermelho = fixo, amarelo = semáforo, roxo = reportado por usuários, laranja = seu reporte local
 - **Regras por país**, detectado pelo GPS:
@@ -39,7 +42,8 @@ Autor: Luiz Alberto Cardoso
 | `lib/radar_service.dart` | Baixa radares (Overpass/OSM), cache, radares do usuário, detecção do país |
 | `lib/community_service.dart` | Radares compartilhados entre usuários (Firestore via REST) |
 | `lib/firebase_config.dart` | ID do projeto e chave do Firebase |
-| `lib/overlay.dart` | Bolha flutuante |
+| `lib/overlay.dart` | Painel flutuante sobre outros apps |
+| `lib/speed_picker.dart` | Janela de reportar radar com as velocidades prontas |
 | `lib/country_rules.dart` | Regras por país |
 | `lib/models.dart` | Modelo do radar |
 | `android/app/src/main/AndroidManifest.xml` | Permissões (GPS, segundo plano, internet) |
