@@ -7,11 +7,21 @@ import 'package:flutter_overlay_window/flutter_overlay_window.dart';
 import 'speed_picker.dart';
 import 'theme.dart';
 
-/// Tamanhos da janela flutuante (em dp, como o plugin espera).
-const int kPanelW = 88;
-const int kPanelH = 240;
+/// Tamanhos da janela flutuante, em dp (mesmo tamanho do painel do CamSam).
+const int kPanelW = 64;
+const int kPanelH = 250;
 const int kPickerW = 300;
 const int kPickerH = 370;
+
+/// Densidade da tela (pixels por dp).
+double screenDpr() =>
+    WidgetsBinding.instance.platformDispatcher.views.first.devicePixelRatio;
+
+/// Valor a enviar ao plugin para obter [dp] na tela. A versão publicada do
+/// plugin mede a janela em pixels, então o app envia dp × densidade; o painel
+/// confere o tamanho real e corrige se o plugin usar dp.
+int overlayUnits(int dp, [double? unitsPerDp]) =>
+    (dp * (unitsPerDp ?? screenDpr())).round();
 
 /// Painel flutuante por cima do Google Maps / Waze (estilo CamSam):
 /// velocidade em cima, alerta do radar no meio e botão "+" embaixo.
@@ -66,8 +76,25 @@ class _OverlayBubbleState extends State<OverlayBubble> {
     setState(() => _ask = false);
   }
 
+  /// Quantas unidades do plugin valem 1 dp (calibrado no 1º desenho).
+  double? _unitsPerDp;
+  bool _calibrated = false;
+
+  /// Mede a janela real e, se o plugin usar outra unidade, corrige o tamanho.
+  void _calibrate(double windowWidthDp) {
+    if (_calibrated || windowWidthDp <= 0) return;
+    _calibrated = true;
+    final sent = overlayUnits(kPanelW);
+    _unitsPerDp = sent / windowWidthDp;
+    if ((windowWidthDp - kPanelW).abs() > 3) {
+      FlutterOverlayWindow.resizeOverlay(overlayUnits(kPanelW, _unitsPerDp),
+          overlayUnits(kPanelH, _unitsPerDp), true);
+    }
+  }
+
   Future<void> _openPicker() async {
-    await FlutterOverlayWindow.resizeOverlay(kPickerW, kPickerH, false);
+    await FlutterOverlayWindow.resizeOverlay(overlayUnits(kPickerW, _unitsPerDp),
+        overlayUnits(kPickerH, _unitsPerDp), false);
     if (!mounted) return;
     setState(() => _picker = true);
     // Dirigindo: se ninguém escolher em 20 s, fecha sozinho.
@@ -78,7 +105,8 @@ class _OverlayBubbleState extends State<OverlayBubble> {
   Future<void> _closePicker() async {
     _pickerTimer?.cancel();
     if (mounted) setState(() => _picker = false);
-    await FlutterOverlayWindow.resizeOverlay(kPanelW, kPanelH, true);
+    await FlutterOverlayWindow.resizeOverlay(overlayUnits(kPanelW, _unitsPerDp),
+        overlayUnits(kPanelH, _unitsPerDp), true);
   }
 
   Future<void> _choose(SpeedChoice c) async {
@@ -98,6 +126,10 @@ class _OverlayBubbleState extends State<OverlayBubble> {
 
   @override
   Widget build(BuildContext context) {
+    if (!_calibrated) {
+      final w = MediaQuery.sizeOf(context).width;
+      WidgetsBinding.instance.addPostFrameCallback((_) => _calibrate(w));
+    }
     return Material(
       color: Colors.transparent,
       child: _picker
@@ -140,12 +172,18 @@ class _OverlayBubbleState extends State<OverlayBubble> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text('$_speed',
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text('$_speed',
                     style: TextStyle(
                         color: _over ? SG.red : Colors.white,
                         fontSize: 32,
                         fontWeight: FontWeight.bold,
                         height: 1)),
+                  ),
+                ),
                 const Text('Km/h',
                     style: TextStyle(
                         color: SG.violetLight,
@@ -165,7 +203,7 @@ class _OverlayBubbleState extends State<OverlayBubble> {
               onTap: _openPicker,
               child: const Center(
                 child: Icon(Icons.add_circle_outline,
-                    color: SG.violetLight, size: 44),
+                    color: SG.violetLight, size: 40),
               ),
             ),
           ),
@@ -179,21 +217,16 @@ class _OverlayBubbleState extends State<OverlayBubble> {
       return Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Text('Radar\nainda aí?',
+          const Text('Ainda\naí?',
               textAlign: TextAlign.center,
               style: TextStyle(
                   color: Colors.white,
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              _round(Icons.check, const Color(0xFF1FAA6B), () => _reply(true)),
-              const SizedBox(width: 6),
-              _round(Icons.close, SG.red, () => _reply(false)),
-            ],
-          ),
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold, height: 1.1)),
+          const SizedBox(height: 3),
+          _round(Icons.check, const Color(0xFF1FAA6B), () => _reply(true)),
+          const SizedBox(height: 4),
+          _round(Icons.close, SG.red, () => _reply(false)),
         ],
       );
     }
@@ -201,7 +234,7 @@ class _OverlayBubbleState extends State<OverlayBubble> {
       return const Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.check_circle, color: Colors.lightGreenAccent, size: 40),
+          Icon(Icons.check_circle, color: Colors.lightGreenAccent, size: 34),
           Text('Enviado',
               style: TextStyle(
                   color: Colors.white,
@@ -215,7 +248,7 @@ class _OverlayBubbleState extends State<OverlayBubble> {
       // Caminho livre: setas verdes
       return const Center(
         child: Icon(Icons.keyboard_double_arrow_up,
-            color: Colors.lightGreenAccent, size: 64),
+            color: Colors.lightGreenAccent, size: 54),
       );
     }
     final color = _over ? SG.red : SG.orange;
@@ -223,8 +256,8 @@ class _OverlayBubbleState extends State<OverlayBubble> {
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         _limit != null
-            ? SpeedSign(label: '$_limit', size: 54)
-            : Icon(Icons.camera_alt, color: color, size: 44),
+            ? SpeedSign(label: '$_limit', size: 46)
+            : Icon(Icons.camera_alt, color: color, size: 38),
         const SizedBox(height: 6),
         Text(
           d >= 1000 ? '${(d / 1000).toStringAsFixed(1)} km' : '${d.round()} m',
@@ -238,8 +271,8 @@ class _OverlayBubbleState extends State<OverlayBubble> {
   Widget _round(IconData icon, Color c, VoidCallback onTap) => GestureDetector(
         onTap: onTap,
         child: Container(
-          width: 34,
-          height: 34,
+          width: 32,
+          height: 32,
           decoration: BoxDecoration(color: c, shape: BoxShape.circle),
           child: Icon(icon, color: Colors.white, size: 22),
         ),

@@ -166,8 +166,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         return;
       }
       await FlutterOverlayWindow.showOverlay(
-        height: kPanelH,
-        width: kPanelW,
+        height: overlayUnits(kPanelH),
+        width: overlayUnits(kPanelW),
         alignment: OverlayAlignment.topLeft,
         enableDrag: true,
         positionGravity: PositionGravity.none,

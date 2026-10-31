@@ -4,7 +4,7 @@ App Android de alerta de radares para o mundo todo, feito em Flutter. Avisa por 
 
 Autor: Luiz Alberto Cardoso
 
-## Funções (versão 1.5)
+## Funções (versão 1.5.1)
 
 - **Visual neon** com as cores da tela de abertura: fundo roxo escuro, velocímetro com borda violeta brilhante, botão INICIAR em degradê vermelho→rosa, cartões e botões roxos; o painel flutuante e a janela de reportar seguem a mesma paleta
 - **Tela de abertura** (2,5 s) com a arte do SpeedGuard (velocímetro e rastro de luz) e os créditos do autor
@@ -18,7 +18,7 @@ Autor: Luiz Alberto Cardoso
 - **Funciona com a tela apagada ou em segundo plano** (notificação "SpeedGuard ativo")
 - **Reportar radar** (móvel ou fixo) na sua posição atual: abre uma janela com as placas de limite prontas (30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130 ou "?") e **um toque já salva**, sem digitar. Com o Firebase configurado, **todos os usuários veem**. Sem Firebase, fica só no aparelho
 - **Confirmação de radares móveis**: eles não somem sozinhos. Depois de 48 h, quem passar a menos de 150 m recebe a pergunta "O radar móvel ainda está aqui?" na tela e na bolha flutuante. **Sim** mantém por mais 48 h; **Não** apaga o radar
-- **Painel flutuante** por cima do Google Maps / Waze, no estilo do CamSam (ativar em Configurações; pede a permissão "Sobrepor a outros apps"). Aparece no canto superior esquerdo, pode ser arrastado e ocupa só o tamanho do painel, sem bloquear o mapa:
+- **Painel flutuante** por cima do Google Maps / Waze, no estilo do CamSam (ativar em Configurações; pede a permissão "Sobrepor a outros apps"). Aparece no canto superior esquerdo com o mesmo tamanho do painel do CamSam (64 × 250 dp), pode ser arrastado e não bloqueia o resto do mapa. O tamanho é convertido para pixels e conferido pelo próprio painel ao abrir, para ficar certo em qualquer tela:
   - em cima: velocidade atual (vermelha acima do limite)
   - no meio: setas verdes com caminho livre; perto de radar, a placa do limite e a distância (laranja, ou vermelho se estiver acima do limite); a pergunta "Radar ainda aí?" com ✓/✗
   - embaixo: botão **+** que abre a janela de reportar radar com as velocidades prontas, sem sair do Maps. Fecha sozinha em 20 s se nada for escolhido; o app confirma por voz "Radar reportado"
