@@ -23,6 +23,48 @@ class RadarService {
   DateTime? _cacheTime;
 
   List<Radar> get all => [..._osm, ..._user];
+
+  /// Radares da área que o usuário está olhando no mapa (só para exibir;
+  /// os avisos usam [all], que é a região em volta dele).
+  List<Radar> _area = [];
+  List<Radar> get area {
+    final ids = {for (final r in _osm) r.id};
+    return [for (final r in _area) if (!ids.contains(r.id)) r];
+  }
+
+  /// Baixa os radares do retângulo visível no mapa.
+  /// Retorna quantos encontrou, ou null se falhou.
+  Future<int?> fetchArea(
+      double south, double west, double north, double east) async {
+    final box = '$south,$west,$north,$east';
+    final query = '[out:json][timeout:25];('
+        'node["highway"="speed_camera"]($box);'
+        'node["enforcement"="maxspeed"]($box);'
+        'node["enforcement"="traffic_signals"]($box);'
+        ');out body;';
+    for (final url in _overpassUrls) {
+      try {
+        final res = await http
+            .post(Uri.parse(url),
+                headers: {'User-Agent': _userAgent},
+                body: {'data': query})
+            .timeout(const Duration(seconds: 30));
+        if (res.statusCode != 200) continue;
+        final data = jsonDecode(utf8.decode(res.bodyBytes)) as Map;
+        final els = (data['elements'] as List?) ?? [];
+        final seen = <String>{};
+        _area = els
+            .map((e) => Radar.fromOsm((e as Map).cast<String, dynamic>()))
+            .whereType<Radar>()
+            .where((r) => seen.add(r.id))
+            .toList();
+        return _area.length;
+      } catch (_) {
+        // tenta o próximo servidor
+      }
+    }
+    return null;
+  }
   List<Radar> get userRadars => List.unmodifiable(_user);
 
   Future<void> load() async {
