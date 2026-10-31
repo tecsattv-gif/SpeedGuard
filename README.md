@@ -4,7 +4,7 @@ App Android de alerta de radares para o mundo todo, feito em Flutter. Avisa por 
 
 Autor: Luiz Alberto Cardoso
 
-## Funções (versão 1.4)
+## Funções (versão 1.4.1)
 
 - **Tela de abertura** (2,5 s) com a arte do SpeedGuard (velocímetro e rastro de luz) e os créditos do autor
 - **Ícone próprio** com o velocímetro (inclui ícone adaptativo do Android 8+)
@@ -21,6 +21,7 @@ Autor: Luiz Alberto Cardoso
   - em cima: velocidade atual (vermelha acima do limite)
   - no meio: setas verdes com caminho livre; perto de radar, a placa do limite e a distância (laranja, ou vermelho se estiver acima do limite); a pergunta "Radar ainda aí?" com ✓/✗
   - embaixo: botão **+** que abre a janela de reportar radar com as velocidades prontas, sem sair do Maps. Fecha sozinha em 20 s se nada for escolhido; o app confirma por voz "Radar reportado"
+  - como usar: ative **Configurações → Bolha flutuante**, permita "Sobrepor a outros apps", toque em **INICIAR** e abra o Maps/Waze. O painel abre no instante em que você sai do SpeedGuard (exigência do Android 15+) e some quando você volta para ele. Se faltar a permissão, o app avisa ao voltar
 - **Modo discreto**: só vibra e diz "Radar", sem detalhes
 - Cores no mapa: vermelho = fixo, amarelo = semáforo, roxo = reportado por usuários, laranja = seu reporte local
 - **Regras por país**, detectado pelo GPS:

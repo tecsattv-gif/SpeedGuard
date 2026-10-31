@@ -75,6 +75,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   bool _discreet = false;
   bool _bubble = false;
   bool _overlayShown = false;
+  bool _opening = false;
+  bool _inFront = true;
+  bool _bubbleNoPermission = false;
   bool _loading = false;
   String? _country;
   double? _countryLat, _countryLon;
@@ -138,18 +141,33 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.paused ||
-        state == AppLifecycleState.hidden) {
+    // O painel é aberto já em "inactive", enquanto o app ainda está visível:
+    // no Android 15+ o serviço da janela flutuante é bloqueado se for iniciado
+    // com o app já em segundo plano (paused).
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.hidden ||
+        state == AppLifecycleState.paused) {
+      _inFront = false;
       if (_running && _bubble) _showBubble();
     } else if (state == AppLifecycleState.resumed) {
+      _inFront = true;
       _closeBubble();
+      if (_bubbleNoPermission) {
+        _bubbleNoPermission = false;
+        _snack('Painel flutuante sem permissão: ative "Sobrepor a outros apps" para o SpeedGuard.');
+        FlutterOverlayWindow.requestPermission();
+      }
     }
   }
 
   Future<void> _showBubble() async {
-    if (_overlayShown) return;
+    if (_overlayShown || _opening) return;
+    _opening = true;
     try {
-      if (!await FlutterOverlayWindow.isPermissionGranted()) return;
+      if (!await FlutterOverlayWindow.isPermissionGranted()) {
+        _bubbleNoPermission = true;
+        return;
+      }
       await FlutterOverlayWindow.showOverlay(
         height: kPanelH,
         width: kPanelW,
@@ -160,8 +178,16 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         overlayContent: 'Bolha de radares ativa',
       );
       _overlayShown = true;
+      // Voltou para o app enquanto o painel abria: fecha de novo.
+      if (_inFront) {
+        await _closeBubble();
+        return;
+      }
       _sendBubble();
-    } catch (_) {}
+    } catch (_) {
+    } finally {
+      _opening = false;
+    }
   }
 
   Future<void> _closeBubble() async {
