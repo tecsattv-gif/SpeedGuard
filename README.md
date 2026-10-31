@@ -4,7 +4,7 @@ App Android de alerta de radares para o mundo todo, feito em Flutter. Avisa por 
 
 Autor: Luiz Alberto Cardoso
 
-## Funções (versão 1.6.2)
+## Funções (versão 1.6.3)
 
 - **Visual neon** com as cores da tela de abertura: fundo roxo escuro, velocímetro com borda violeta brilhante, botão INICIAR em degradê vermelho→rosa, cartões e botões roxos; o painel flutuante e a janela de reportar seguem a mesma paleta
 - **Tela de abertura** (2,5 s) com a arte do SpeedGuard (velocímetro e rastro de luz) e os créditos do autor
@@ -16,7 +16,7 @@ Autor: Luiz Alberto Cardoso
 - Só avisa radares **à frente** e, quando o sentido do radar é conhecido, só para quem vai naquele sentido
 - **Velocímetro** grande, que fica vermelho acima do limite
 - **Funciona com a tela apagada ou em segundo plano** (notificação "SpeedGuard ativo")
-- **Reportar radar** (móvel ou fixo) na sua posição atual: abre uma janela com as placas de limite prontas (30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130 ou "?") e **um toque já salva**, sem digitar. Com o Firebase configurado, **todos os usuários veem**. Sem Firebase, fica só no aparelho
+- **Reportar radar** (móvel ou fixo) na sua posição atual: abre uma janela com as placas de limite prontas (30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130 ou "?") e **um toque já salva**, sem digitar. O radar vai para o Firebase e **todos os usuários veem**
 - **Confirmação de radares móveis**: eles não somem sozinhos. Depois de 48 h, quem passar a menos de 150 m recebe a pergunta "O radar móvel ainda está aqui?" na tela e na bolha flutuante. **Sim** mantém por mais 48 h; **Não** apaga o radar
 - **Painel flutuante** por cima do Google Maps / Waze, no estilo do CamSam (ativar em Configurações; pede a permissão "Sobrepor a outros apps"). Aparece no canto superior esquerdo, pode ser arrastado e não bloqueia o resto do mapa. Em **Configurações**, logo abaixo de "Bolha flutuante", dá para escolher:
   - **Tamanho**: Pequeno, Médio (igual ao CamSam, 64 × 250 dp) ou Grande
@@ -70,11 +70,9 @@ O GitHub Actions compila sozinho a cada push na `main` (ou manualmente em **Acti
 
 O workflow roda `flutter create` para gerar os arquivos Android que não estão no repositório, sem sobrescrever o manifesto.
 
-## Ativar radares compartilhados (Firebase)
+## Radares compartilhados (Firebase)
 
-1. Em [console.firebase.google.com](https://console.firebase.google.com), crie um projeto (ex.: `speedguard`)
-2. **Build → Firestore Database → Criar banco de dados** (modo produção, local mais próximo)
-3. Na aba **Regras**, cole e publique:
+**Já ativado** desde a versão 1.6.3. Os radares reportados ficam no Cloud Firestore do projeto Firebase **SpeedGuard001** (ID `speedguard001`, plano Spark gratuito), na coleção `radars`. O app acessa pela API REST, com o ID do projeto e a chave de API da Web em `lib/firebase_config.dart`. A chave não é secreta (vai dentro do app); quem protege os dados são as regras abaixo, já publicadas no console:
 
 ```
 rules_version = '2';
@@ -96,8 +94,7 @@ service cloud.firestore {
 }
 ```
 
-4. Em **Configurações do projeto → Geral**, copie o **ID do projeto** e a **Chave de API da Web** (se não aparecer, adicione um app Web `</>` primeiro)
-5. Coloque os dois em `lib/firebase_config.dart` e faça push
+Para trocar de projeto: crie o Firestore (edição Standard, modo produção), publique essas regras, registre um app Web `</>` em **Configurações do projeto** e coloque o novo `projectId` e `apiKey` em `lib/firebase_config.dart`. Deixando os dois vazios, os reportes ficam só no aparelho.
 
 ## Próximas versões
 
