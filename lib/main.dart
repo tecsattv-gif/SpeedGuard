@@ -22,6 +22,7 @@ import 'overlay.dart';
 import 'radar_service.dart';
 import 'splash_screen.dart';
 import 'theme.dart';
+import 'vehicle_icon.dart';
 import 'speed_picker.dart';
 
 Future<void> main() async {
@@ -88,6 +89,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   bool _follow = true;
   /// Tela cheia: true = mapa, false = tela de alerta (setas grandes).
   bool _mapView = true;
+  /// Ícone da sua posição no mapa (seta, carro, caminhão ou moto).
+  VehicleIcon _vehicle = VehicleIcon.arrow;
   bool _voice = true;
   /// Tipo de aviso sonoro: 'voice' (fala a distância) ou 'beep' (bipes).
   String _sound = 'voice';
@@ -165,6 +168,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     _bubbleScale = p.getDouble('bubbleScale') ?? 1.0;
     _bubbleLand = p.getBool('bubbleLand') ?? false;
     _mapView = p.getBool('mapView') ?? true;
+    _vehicle = VehicleIcon.fromName(p.getString('vehicle'));
     _country = p.getString('country');
     await _service.load();
     await _tts.setLanguage('pt-BR');
@@ -770,6 +774,35 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 padding: EdgeInsets.fromLTRB(16, 12, 16, 6),
                 child: Align(
                   alignment: Alignment.centerLeft,
+                  child: Text('Ícone no mapa'),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final v in VehicleIcon.values)
+                      ChoiceChip(
+                        avatar: Icon(v.icon, size: 18),
+                        label: Text(v.label),
+                        showCheckmark: false,
+                        selected: _vehicle == v,
+                        onSelected: (_) async {
+                          final p = await SharedPreferences.getInstance();
+                          await p.setString('vehicle', v.name);
+                          setSheet(() => _vehicle = v);
+                          setState(() {});
+                        },
+                      ),
+                  ],
+                ),
+              ),
+              const Padding(
+                padding: EdgeInsets.fromLTRB(16, 12, 16, 6),
+                child: Align(
+                  alignment: Alignment.centerLeft,
                   child: Text('Aparência'),
                 ),
               ),
@@ -821,7 +854,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               ),
               const ListTile(
                 leading: Icon(Icons.info_outline),
-                title: Text('SpeedGuard 1.11.0'),
+                title: Text('SpeedGuard 1.12.0'),
                 subtitle: Text('Dados de radares: © colaboradores do '
                     'OpenStreetMap. Respeite sempre os limites de velocidade.'),
               ),
@@ -927,18 +960,13 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 MarkerLayer(markers: [
                   Marker(
                     point: LatLng(pos.latitude, pos.longitude),
-                    width: 40,
-                    height: 40,
+                    width: 64,
+                    height: 64,
                     child: Transform.rotate(
                       angle: (pos.heading < 0 ? 0 : pos.heading) *
                           3.14159265 /
                           180,
-                      child: const Icon(Icons.navigation,
-                          color: SG.pink,
-                          size: 36,
-                          shadows: [
-                            Shadow(color: Colors.black54, blurRadius: 6)
-                          ]),
+                      child: VehicleMarker(type: _vehicle),
                     ),
                   ),
                 ]),
