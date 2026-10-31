@@ -461,6 +461,22 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     final dir = pos.speed > 2.5 ? pos.heading : null;
     var shared = false;
     if (communityEnabled) {
+      // Já existe um radar aqui? Não cria outro: conta como confirmação.
+      await _community.refresh(pos.latitude, pos.longitude);
+      final dup = _community.nearby(pos.latitude, pos.longitude, dir);
+      if (dup != null) {
+        if (dup.type == 'movel') await _community.confirm(dup, true);
+        if (!mounted) return;
+        setState(() {});
+        if (fromBubble) {
+          if (_voice) _tts.speak('Radar já reportado. Confirmado, obrigado!');
+        } else {
+          _snack('Esse radar já estava reportado. Confirmado, obrigado!');
+        }
+        return;
+      }
+    }
+    if (communityEnabled) {
       shared = await _community.report(
         lat: pos.latitude,
         lon: pos.longitude,
@@ -681,7 +697,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               ),
               const ListTile(
                 leading: Icon(Icons.info_outline),
-                title: Text('SpeedGuard 1.8.0'),
+                title: Text('SpeedGuard 1.8.1'),
                 subtitle: Text('Dados de radares: © colaboradores do '
                     'OpenStreetMap. Respeite sempre os limites de velocidade.'),
               ),

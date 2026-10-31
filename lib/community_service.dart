@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:http/http.dart' as http;
 
@@ -135,6 +136,37 @@ class CommunityService {
     } catch (_) {
       return false;
     }
+  }
+
+  /// Distância máxima para considerar que é o mesmo radar.
+  static const sameRadarMeters = 150.0;
+
+  static double _meters(double lat1, double lon1, double lat2, double lon2) {
+    const r = 6371000.0;
+    final p1 = lat1 * math.pi / 180, p2 = lat2 * math.pi / 180;
+    final dp = (lat2 - lat1) * math.pi / 180;
+    final dl = (lon2 - lon1) * math.pi / 180;
+    final h = math.sin(dp / 2) * math.sin(dp / 2) +
+        math.cos(p1) * math.cos(p2) * math.sin(dl / 2) * math.sin(dl / 2);
+    return 2 * r * math.asin(math.sqrt(h));
+  }
+
+  /// Radar compartilhado já existente a menos de 150 m, no mesmo sentido
+  /// (se os dois tiverem sentido conhecido). Serve para não duplicar.
+  Radar? nearby(double lat, double lon, double? direction) {
+    Radar? best;
+    var bestD = sameRadarMeters;
+    for (final r in _radars) {
+      final d = _meters(lat, lon, r.lat, r.lon);
+      if (d > bestD) continue;
+      if (direction != null && r.direction != null) {
+        final diff = (direction - r.direction!).abs() % 360;
+        if ((diff > 180 ? 360 - diff : diff) > 60) continue;
+      }
+      best = r;
+      bestD = d;
+    }
+    return best;
   }
 
   Future<bool> report({
