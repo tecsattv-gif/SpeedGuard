@@ -141,7 +141,7 @@ class _LimitSign extends StatelessWidget {
       ),
       child: Text(
         limit?.toString() ?? '?',
-        style: const TextStyle(
+        style: TextStyle(
             color: Colors.black,
             fontSize: size * 0.38,
             fontWeight: FontWeight.bold,
