@@ -1024,7 +1024,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               ),
               const ListTile(
                 leading: Icon(Icons.info_outline),
-                title: Text('SpeedGuard 1.14.0'),
+                title: Text('SpeedGuard 1.14.1'),
                 subtitle: Text('Dados de radares: © colaboradores do '
                     'OpenStreetMap. Respeite sempre os limites de velocidade.'),
               ),
@@ -1085,12 +1085,20 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           border: Border.all(color: color, width: 3),
         ),
         alignment: Alignment.center,
+        // Número encolhe para caber (ex.: "130" inteiro na placa).
         child: r.maxSpeed != null
-            ? Text('${r.maxSpeed}',
-                style: const TextStyle(
-                    color: Colors.black,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 13))
+            ? Padding(
+                padding: const EdgeInsets.all(4),
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text('${r.maxSpeed}',
+                      style: const TextStyle(
+                          color: Colors.black,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                          letterSpacing: -0.5)),
+                ),
+              )
             : Icon(Icons.photo_camera, size: 16, color: color),
       ),
     );
