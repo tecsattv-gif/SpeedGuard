@@ -302,9 +302,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     if (_voice && _sound == 'voice') _tts.speak(text);
   }
 
-  /// Bipes: 1 = 500 m, 2 = 300 m, 3 = 100 m, 4 = acima do limite.
+  /// Bipe de cada aviso: 1 a 5 = 500 a 100 m (cada vez mais agudo),
+  /// 6 = acima do limite.
   Future<void> _beep(int n) async {
-    final file = n >= 4 ? 'beep_fast' : 'beep$n';
+    final file = n >= 6 ? 'beep_fast' : 'step$n';
     try {
       await _player.stop();
       await _player.play(AssetSource('sounds/$file.wav'));
@@ -348,7 +349,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         } else if (st.speak != null) {
           _tts.speak(!_discreet
               ? st.speak!
-              : st.beeps == 4
+              : st.beeps == 6
                   ? 'Reduza.'
                   : st.beeps > 0
                       ? '${AlertEngine.stages[st.beeps - 1]} metros.'
@@ -600,7 +601,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             children: [
               SwitchListTile(
                 title: const Text('Alertas sonoros'),
-                subtitle: const Text('Avisos a 500 m, 300 m e 100 m do radar'),
+                subtitle: const Text('Um aviso a cada 100 m, de 500 m até o radar'),
                 value: _voice,
                 onChanged: (v) async {
                   final p = await SharedPreferences.getInstance();
@@ -778,7 +779,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               ),
               const ListTile(
                 leading: Icon(Icons.info_outline),
-                title: Text('SpeedGuard 1.9.0'),
+                title: Text('SpeedGuard 1.10.0'),
                 subtitle: Text('Dados de radares: © colaboradores do '
                     'OpenStreetMap. Respeite sempre os limites de velocidade.'),
               ),

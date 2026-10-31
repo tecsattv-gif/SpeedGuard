@@ -45,7 +45,7 @@ class AlertView extends StatelessWidget {
   Widget _content() {
     if (!running) {
       return Column(mainAxisSize: MainAxisSize.min, children: [
-        _Chevrons(color: SG.accent.withValues(alpha: 0.4)),
+        _Chevrons(green: SG.accent.withValues(alpha: 0.4)),
         const SizedBox(height: 24),
         Text(status,
             textAlign: TextAlign.center,
@@ -54,8 +54,7 @@ class AlertView extends StatelessWidget {
     }
     final r = alert.radar;
     if (r == null) {
-      return _Chevrons(
-          color: SG.dark ? const Color(0xFF4ED636) : const Color(0xFF2EAA1E));
+      return _Chevrons(green: _green);
     }
     final color = alert.overLimit ? SG.red : SG.orange;
     if (mode == RadarMode.dangerZone) {
@@ -72,23 +71,37 @@ class AlertView extends StatelessWidget {
     final dist = d >= 1000
         ? '${(d / 1000).toStringAsFixed(1)} km'
         : '${(d / 10).round() * 10} m';
-    return FittedBox(
-      fit: BoxFit.scaleDown,
-      child: Column(mainAxisSize: MainAxisSize.min, children: [
-        _LimitSign(limit: r.maxSpeed, glow: color),
-        const SizedBox(height: 24),
-        Text(dist,
-            style: TextStyle(
-                fontSize: 72,
-                fontWeight: FontWeight.bold,
-                color: color,
-                height: 1,
-                shadows: [Shadow(color: color, blurRadius: 18)])),
-        const SizedBox(height: 10),
-        Text(r.typeLabel,
-            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w600)),
-        if (alert.overLimit) ...[
-          const SizedBox(height: 18),
+    // Uma faixa fica vermelha a cada 100 m: 500 m = 1 … 100 m = 5.
+    final red = d > 515 ? 0 : (5 - ((d - 16) / 100).floor()).clamp(1, 5);
+    return Column(mainAxisSize: MainAxisSize.min, children: [
+      FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          _LimitSign(limit: r.maxSpeed, glow: color, size: 96),
+          const SizedBox(width: 18),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(dist,
+                  style: TextStyle(
+                      fontSize: 56,
+                      fontWeight: FontWeight.bold,
+                      color: color,
+                      height: 1,
+                      shadows: [Shadow(color: color, blurRadius: 18)])),
+              const SizedBox(height: 6),
+              Text(r.typeLabel,
+                  style: const TextStyle(
+                      fontSize: 20, fontWeight: FontWeight.w600)),
+            ],
+          ),
+        ]),
+      ),
+      const SizedBox(height: 20),
+      Flexible(child: _Chevrons(green: _green, red: red)),
+      if (alert.overLimit) ...[
+          const SizedBox(height: 14),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
             decoration: BoxDecoration(
@@ -100,34 +113,37 @@ class AlertView extends StatelessWidget {
                 style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
           ),
         ],
-      ]),
-    );
+    ]);
   }
+
+  Color get _green =>
+      SG.dark ? const Color(0xFF4ED636) : const Color(0xFF2EAA1E);
 }
 
 /// Placa de limite: círculo branco com borda vermelha.
 class _LimitSign extends StatelessWidget {
   final int? limit;
   final Color glow;
-  const _LimitSign({required this.limit, required this.glow});
+  final double size;
+  const _LimitSign({required this.limit, required this.glow, this.size = 170});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 170,
-      height: 170,
+      width: size,
+      height: size,
       alignment: Alignment.center,
       decoration: BoxDecoration(
         color: Colors.white,
         shape: BoxShape.circle,
-        border: Border.all(color: const Color(0xFFE0001B), width: 18),
+        border: Border.all(color: const Color(0xFFE0001B), width: size * 0.1),
         boxShadow: SG.glow(glow, 24),
       ),
       child: Text(
         limit?.toString() ?? '?',
         style: const TextStyle(
             color: Colors.black,
-            fontSize: 64,
+            fontSize: size * 0.38,
             fontWeight: FontWeight.bold,
             height: 1),
       ),
@@ -135,10 +151,12 @@ class _LimitSign extends StatelessWidget {
   }
 }
 
-/// Três setas para cima, a de baixo maior.
+/// Cinco faixas (setas) para cima, a de baixo maior. [red] faixas de
+/// baixo para cima ficam vermelhas (uma a cada 100 m do radar).
 class _Chevrons extends StatelessWidget {
-  final Color color;
-  const _Chevrons({required this.color});
+  final Color green;
+  final int red;
+  const _Chevrons({required this.green, this.red = 0});
 
   @override
   Widget build(BuildContext context) {
@@ -146,40 +164,52 @@ class _Chevrons extends StatelessWidget {
       constraints: const BoxConstraints(maxWidth: 300, maxHeight: 300),
       child: AspectRatio(
         aspectRatio: 1,
-        child: CustomPaint(painter: _ChevronPainter(color)),
+        child: CustomPaint(painter: _ChevronPainter(green, red)),
       ),
     );
   }
 }
 
 class _ChevronPainter extends CustomPainter {
-  final Color color;
-  _ChevronPainter(this.color);
+  static const bands = 5;
+  static const redColor = Color(0xFFFF2846);
+  final Color green;
+  final int red;
+  _ChevronPainter(this.green, this.red);
 
   @override
   void paint(Canvas canvas, Size size) {
     final w = size.width, h = size.height;
-    final paint = Paint()..color = color;
-    // (topo, largura relativa, espessura) de cada seta, de cima para baixo.
-    const rows = [(0.08, 0.58, 0.13), (0.30, 0.74, 0.16), (0.53, 0.92, 0.19)];
-    for (final (top, width, thick) in rows) {
-      final half = w * width / 2;
-      final cx = w / 2;
-      final tipY = h * top;
-      final rise = half * 0.62; // inclinação dos braços
-      final t = h * thick;
+    final cx = w / 2;
+    for (var i = 0; i < bands; i++) {
+      // i = 0 é a de cima (menor); a de baixo (i = 4) é a primeira a ficar
+      // vermelha.
+      final isRed = i >= bands - red;
+      final paint = Paint()..color = isRed ? redColor : green;
+      final half = w * (0.50 + 0.11 * i) / 2;
+      final tipY = h * (0.03 + 0.155 * i);
+      final rise = half * 0.45; // inclinação dos braços
+      final t = h * (0.09 + 0.01 * i); // espessura
       final path = Path()
         ..moveTo(cx, tipY)
         ..lineTo(cx + half, tipY + rise)
-        ..lineTo(cx + half - half * 0.06, tipY + rise + t * 0.8)
+        ..lineTo(cx + half - half * 0.05, tipY + rise + t * 0.85)
         ..lineTo(cx, tipY + t)
-        ..lineTo(cx - half + half * 0.06, tipY + rise + t * 0.8)
+        ..lineTo(cx - half + half * 0.05, tipY + rise + t * 0.85)
         ..lineTo(cx - half, tipY + rise)
         ..close();
+      if (isRed) {
+        canvas.drawPath(
+            path,
+            Paint()
+              ..color = redColor.withValues(alpha: 0.6)
+              ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10));
+      }
       canvas.drawPath(path, paint);
     }
   }
 
   @override
-  bool shouldRepaint(_ChevronPainter old) => old.color != color;
+  bool shouldRepaint(_ChevronPainter old) =>
+      old.green != green || old.red != red;
 }

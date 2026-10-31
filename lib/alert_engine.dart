@@ -9,8 +9,8 @@ class AlertState {
   final double? distance; // metros
   final bool overLimit;
   final String? speak; // frase nova a falar agora (null = nada)
-  /// Bipes a tocar agora: 1 = 500 m, 2 = 300 m, 3 = 100 m,
-  /// 4 = acima do limite, 0 = nada.
+  /// Som a tocar agora: 1 a 5 = aviso de 500, 400, 300, 200 ou 100 m,
+  /// 6 = acima do limite, 0 = nada.
   final int beeps;
   const AlertState(
       {this.radar,
@@ -22,10 +22,11 @@ class AlertState {
 
 /// Decide quando avisar sobre um radar à frente.
 class AlertEngine {
-  /// Distâncias dos avisos, em metros: o 1º a 500 m, depois 300 m e 100 m.
-  static const stages = [500, 300, 100];
+  /// Distâncias dos avisos, em metros: um a cada 100 m, de 500 m até 100 m
+  /// (cada um pinta mais uma faixa de vermelho na tela de alerta).
+  static const stages = [500, 400, 300, 200, 100];
 
-  /// Último aviso dado para cada radar (1, 2 ou 3).
+  /// Último aviso dado para cada radar (1 a 5).
   final Map<String, int> _stage = {};
   final Set<String> _announced = {};
   final Set<String> _warnedSpeed = {};
@@ -100,7 +101,7 @@ class AlertEngine {
       return AlertState(radar: best, distance: null, speak: speak);
     }
 
-    // Em qual aviso estamos: 1 (≤500 m), 2 (≤300 m) ou 3 (≤100 m).
+    // Em qual aviso estamos: 1 (≤500 m) … 5 (≤100 m).
     var stage = 0;
     for (var i = 0; i < stages.length; i++) {
       if (bestDist <= stages[i] + 15) stage = i + 1;
@@ -113,13 +114,16 @@ class AlertEngine {
       beeps = stage;
       final m = '${stages[stage - 1]} metros';
       final limit = best.maxSpeed != null ? ' Limite ${best.maxSpeed}.' : '';
-      speak = stage == 1 || done == 0
+      // 1º aviso completo; depois só a distância; o último repete o limite.
+      speak = done == 0
           ? '${best.typeLabel} a $m.$limit'
-          : 'Radar a $m.$limit';
+          : stage == stages.length
+              ? '$m.$limit'
+              : '$m.';
     } else if (over && !_warnedSpeed.contains(best.id) && bestDist < 400) {
       _warnedSpeed.add(best.id);
       speak = 'Reduza a velocidade.';
-      beeps = 4;
+      beeps = 6;
     }
 
     return AlertState(

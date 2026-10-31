@@ -4,7 +4,7 @@ App Android de alerta de radares para o mundo todo, feito em Flutter. Avisa por 
 
 Autor: Luiz Alberto Cardoso
 
-## Funções (versão 1.9.0)
+## Funções (versão 1.10.0)
 
 - **Visual neon** com as cores da tela de abertura: fundo roxo escuro, velocímetro com borda violeta brilhante, botão INICIAR em degradê vermelho→rosa, cartões e botões roxos; o painel flutuante e a janela de reportar seguem a mesma paleta
 - **Tela de abertura** (2,5 s) com a arte do SpeedGuard (velocímetro e rastro de luz) e os créditos do autor
@@ -12,11 +12,11 @@ Autor: Luiz Alberto Cardoso
 - **Mapa** (OpenStreetMap) com sua posição e os radares da região
 - **Card de status limpo**: enquanto os radares da região são baixados aparece só um símbolo girando ao lado da velocidade; ao terminar, o card "N radares carregados" aparece por 4 segundos e some. Com radar à frente o card volta mostrando a distância
 - **Aparência** em Configurações: **Auto** (segue o modo claro/escuro do celular), **Claro** ou **Escuro**. No modo escuro o mapa também fica escurecido para não ofuscar à noite. A tela de abertura e o painel flutuante continuam sempre escuros
-- **Duas telas no app aberto**, como no CamSam: o botão ao lado de Configurações alterna entre o **Mapa** e a **Tela de alerta** (sem mapa). Na tela de alerta aparecem três setas verdes grandes com o caminho livre e, quando há radar à frente, a placa do limite, a distância em laranja e o tipo do radar; acima do limite fica vermelho com "REDUZA A VELOCIDADE". O app lembra a última tela escolhida
+- **Duas telas no app aberto**, como no CamSam: o botão ao lado de Configurações alterna entre o **Mapa** e a **Tela de alerta** (sem mapa). A tela de alerta mostra **5 faixas verdes** (setas para cima) com o caminho livre. Com radar à frente aparecem a placa do limite, a distância e o tipo do radar, e **a cada 100 m uma faixa fica vermelha, de baixo para cima** (500 m = 1 faixa … 100 m = as 5), junto com o aviso sonoro. Acima do limite aparece "REDUZA A VELOCIDADE". O app lembra a última tela escolhida
 - **Base mundial de radares** baixada automaticamente do OpenStreetMap num raio de 50 km, atualizada a cada 24 h ou a cada 30 km rodados, e guardada para uso offline
-- **Avisos a 500 m, 300 m e 100 m** do radar, com vibração. Em Configurações → **Alertas sonoros** dá para escolher:
-  - **Voz**: "Radar fixo a 500 metros. Limite 80.", depois "Radar a 300 metros…" e "Radar a 100 metros…"
-  - **Bipe**: 1 bipe a 500 m, 2 bipes a 300 m, 3 bipes rápidos a 100 m e uma sequência rápida se estiver acima do limite. Os bipes só abaixam a música/navegação por um instante
+- **Avisos a cada 100 m** do radar (500, 400, 300, 200 e 100 m), com vibração. Em Configurações → **Alertas sonoros** dá para escolher:
+  - **Voz**: "Radar fixo a 500 metros. Limite 80.", depois "400 metros.", "300 metros.", "200 metros." e "100 metros. Limite 80."
+  - **Bipe**: um bipe a cada 100 m, cada vez mais agudo (bipe duplo a 100 m), e uma sequência rápida se estiver acima do limite. Os bipes só abaixam a música/navegação por um instante
   - Se o radar aparecer já perto (ex.: a 250 m), só o aviso daquela distância é dado
   - **Modo discreto** (voz): fala só a distância ("500 metros")
 - **Aviso "Reduza a velocidade"** quando você passa do limite perto do radar
@@ -61,9 +61,9 @@ Autor: Luiz Alberto Cardoso
 | `lib/radar_service.dart` | Baixa radares (Overpass/OSM), cache, radares do usuário, detecção do país |
 | `lib/community_service.dart` | Radares compartilhados entre usuários (Firestore via REST) |
 | `lib/firebase_config.dart` | ID do projeto e chave do Firebase |
-| `lib/alert_view.dart` | Tela de alerta (setas, placa e distância) |
+| `lib/alert_view.dart` | Tela de alerta (5 faixas, placa e distância) |
 | `lib/overlay.dart` | Painel flutuante sobre outros apps |
-| `assets/sounds/` | Bipes dos avisos (500, 300, 100 m e acima do limite) |
+| `assets/sounds/` | Bipes dos avisos (500 a 100 m e acima do limite) |
 | `lib/theme.dart` | Paleta de cores e tema do app |
 | `lib/splash_screen.dart` | Tela de abertura com créditos (2,5 s) |
 | `assets/splash.png`, `assets/icon.png` | Arte da abertura e do ícone (criação original) |
