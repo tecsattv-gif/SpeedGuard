@@ -16,6 +16,7 @@ class _OverlayBubbleState extends State<OverlayBubble> {
   double? _dist;
   int? _limit;
   bool _over = false;
+  bool _ask = false;
 
   @override
   void initState() {
@@ -28,13 +29,68 @@ class _OverlayBubbleState extends State<OverlayBubble> {
           _dist = (m['dist'] as num?)?.toDouble();
           _limit = (m['limit'] as num?)?.toInt();
           _over = m['over'] == true;
+          _ask = m['ask'] == true;
         });
       } catch (_) {}
     });
   }
 
+  void _reply(bool v) {
+    FlutterOverlayWindow.shareData(jsonEncode({'answer': v}));
+    setState(() => _ask = false);
+  }
+
+  Widget _round(IconData icon, Color c, VoidCallback onTap) => GestureDetector(
+        onTap: onTap,
+        child: Container(
+          width: 46,
+          height: 46,
+          decoration: BoxDecoration(color: c, shape: BoxShape.circle),
+          child: Icon(icon, color: Colors.white, size: 28),
+        ),
+      );
+
+  Widget _askBubble() => Material(
+        color: Colors.transparent,
+        child: Center(
+          child: Container(
+            width: 120,
+            height: 120,
+            decoration: BoxDecoration(
+              color: Colors.purple.shade700,
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.white70, width: 2),
+            ),
+            alignment: Alignment.center,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('Radar ainda\nestá aí?',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold)),
+                const SizedBox(height: 6),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _round(Icons.check, Colors.green.shade700,
+                        () => _reply(true)),
+                    const SizedBox(width: 6),
+                    _round(Icons.close, Colors.red.shade700,
+                        () => _reply(false)),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+
   @override
   Widget build(BuildContext context) {
+    if (_ask) return _askBubble();
     final alert = _dist != null;
     final color = _over
         ? Colors.red.shade700

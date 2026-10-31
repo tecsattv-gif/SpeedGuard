@@ -6,7 +6,7 @@ class Radar {
   final int? maxSpeed; // km/h
   final String type; // fixo, semaforo, movel, usuario
   final double? direction; // graus (0 = norte), se conhecido
-  final int? expiresAt; // ms; radares móveis da comunidade expiram
+  final int? checkAfter; // ms; após essa data, pergunta se o radar móvel ainda está lá
 
   const Radar({
     required this.id,
@@ -15,7 +15,7 @@ class Radar {
     this.maxSpeed,
     this.type = 'fixo',
     this.direction,
-    this.expiresAt,
+    this.checkAfter,
   });
 
   String get typeLabel {
@@ -40,7 +40,7 @@ class Radar {
         'maxSpeed': maxSpeed,
         'type': type,
         'direction': direction,
-        'expiresAt': expiresAt,
+        'checkAfter': checkAfter,
       };
 
   factory Radar.fromJson(Map<String, dynamic> j) => Radar(
@@ -50,7 +50,7 @@ class Radar {
         maxSpeed: j['maxSpeed'] as int?,
         type: (j['type'] as String?) ?? 'fixo',
         direction: (j['direction'] as num?)?.toDouble(),
-        expiresAt: j['expiresAt'] as int?,
+        checkAfter: j['checkAfter'] as int?,
       );
 
   /// Converte um nó do OpenStreetMap (Overpass) em Radar.

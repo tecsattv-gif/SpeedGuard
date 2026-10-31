@@ -4,7 +4,7 @@ App Android de alerta de radares para o mundo todo, feito em Flutter. Avisa por 
 
 Autor: Luiz Alberto Cardoso
 
-## Funções (versão 1.1)
+## Funções (versão 1.2)
 
 - **Mapa** (OpenStreetMap) com sua posição e os radares da região
 - **Base mundial de radares** baixada automaticamente do OpenStreetMap num raio de 50 km, atualizada a cada 24 h ou a cada 30 km rodados, e guardada para uso offline
@@ -13,7 +13,8 @@ Autor: Luiz Alberto Cardoso
 - Só avisa radares **à frente** e, quando o sentido do radar é conhecido, só para quem vai naquele sentido
 - **Velocímetro** grande, que fica vermelho acima do limite
 - **Funciona com a tela apagada ou em segundo plano** (notificação "SpeedGuard ativo")
-- **Reportar radar** (móvel ou fixo) na sua posição atual, com limite opcional. Com o Firebase configurado, **todos os usuários veem**: móveis por 3 horas, fixos permanentemente. Sem Firebase, fica só no aparelho
+- **Reportar radar** (móvel ou fixo) na sua posição atual, com limite opcional. Com o Firebase configurado, **todos os usuários veem**. Sem Firebase, fica só no aparelho
+- **Confirmação de radares móveis**: eles não somem sozinhos. Depois de 48 h, quem passar a menos de 150 m recebe a pergunta "O radar móvel ainda está aqui?" na tela e na bolha flutuante. **Sim** mantém por mais 48 h; **Não** apaga o radar
 - **Bolha flutuante** por cima do Google Maps / Waze, com velocidade, distância e limite do próximo radar (ativar em Configurações; pede a permissão "Sobrepor a outros apps")
 - **Modo discreto**: só vibra e diz "Radar", sem detalhes
 - Cores no mapa: vermelho = fixo, amarelo = semáforo, roxo = reportado por usuários, laranja = seu reporte local
@@ -62,10 +63,14 @@ service cloud.firestore {
     match /radars/{id} {
       allow read: if true;
       allow create: if request.resource.data.keys().hasOnly(
-          ['lat','lon','cell','type','maxSpeed','direction','createdAt','expiresAt'])
+          ['lat','lon','cell','type','maxSpeed','direction','createdAt','checkAfter'])
         && request.resource.data.lat is number
         && request.resource.data.lon is number;
-      allow update, delete: if false;
+      // confirmação "ainda está": só renova o prazo
+      allow update: if request.resource.data.diff(resource.data)
+          .affectedKeys().hasOnly(['checkAfter']);
+      // confirmação "não está mais": apaga só radares móveis
+      allow delete: if resource.data.type == 'movel';
     }
   }
 }
@@ -76,7 +81,7 @@ service cloud.firestore {
 
 ## Próximas versões
 
-- Votar "radar não está mais aqui" para remover reportes errados
+- Exigir mais de uma resposta "Não" antes de apagar, para evitar abuso
 - Ícone próprio e idiomas além do português
 
 ## Créditos

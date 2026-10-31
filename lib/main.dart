@@ -78,6 +78,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   double? _countryLat, _countryLon;
   final Set<String> _noticeShown = {};
   AlertState _alert = const AlertState();
+  Radar? _ask; // radar móvel aguardando confirmação
+  Timer? _askTimer;
+  final Set<String> _asked = {};
+  StreamSubscription? _overlaySub;
   String _status = 'Toque em INICIAR para monitorar radares';
 
   CountryRule get _rule => ruleFor(_country);
@@ -88,6 +92,13 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    // Respostas vindas da bolha flutuante.
+    _overlaySub = FlutterOverlayWindow.overlayListener.listen((event) {
+      try {
+        final m = jsonDecode(event.toString()) as Map;
+        if (m['answer'] is bool) _answer(m['answer'] as bool);
+      } catch (_) {}
+    });
     _init();
   }
 
@@ -108,6 +119,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _closeBubble();
+    _overlaySub?.cancel();
+    _askTimer?.cancel();
     _sub?.cancel();
     _tts.stop();
     WakelockPlus.disable();
@@ -160,6 +173,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       'dist': show ? a.distance : null,
       'limit': show ? a.radar!.maxSpeed : null,
       'over': a.overLimit,
+      'ask': _ask != null,
     })).catchError((_) => false);
   }
 
@@ -247,7 +261,46 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         _status = '${_allRadars.length} radares carregados na região';
       }
     });
+    _checkAsk(pos);
     _sendBubble();
+  }
+
+  /// Ao passar perto de um radar móvel com mais de 48 h, pergunta se
+  /// ele ainda está lá.
+  void _checkAsk(Position pos) {
+    if (_ask != null || !communityEnabled) return;
+    for (final r in _community.radars) {
+      if (!CommunityService.needsCheck(r) || _asked.contains(r.id)) continue;
+      final d = Geolocator.distanceBetween(
+          pos.latitude, pos.longitude, r.lat, r.lon);
+      if (d > 150) continue;
+      _asked.add(r.id);
+      HapticFeedback.heavyImpact();
+      if (_voice) _tts.speak('O radar móvel ainda está aí? Responda na tela.');
+      setState(() => _ask = r);
+      _askTimer?.cancel();
+      _askTimer = Timer(const Duration(seconds: 40), () {
+        if (mounted) setState(() => _ask = null);
+        _sendBubble();
+      });
+      return;
+    }
+  }
+
+  Future<void> _answer(bool stillThere) async {
+    final r = _ask;
+    if (r == null) return;
+    _askTimer?.cancel();
+    setState(() => _ask = null);
+    _sendBubble();
+    final ok = await _community.confirm(r, stillThere);
+    if (!mounted) return;
+    setState(() {});
+    _snack(!ok
+        ? 'Sem conexão: resposta não enviada.'
+        : stillThere
+            ? 'Obrigado! Radar mantido por mais 48 horas.'
+            : 'Obrigado! Radar removido.');
   }
 
   Future<void> _checkCountry(Position pos) async {
@@ -330,7 +383,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             Text(
               communityEnabled
                   ? (mobile
-                      ? 'Todos os usuários verão este radar por 3 horas.'
+                      ? 'Todos verão este radar. A cada 48 h, quem passar aqui confirma se ele continua.'
                       : 'Todos os usuários verão este radar.')
                   : 'O radar fica salvo só neste aparelho.',
               style: Theme.of(ctx).textTheme.bodySmall,
@@ -467,7 +520,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               ),
               const ListTile(
                 leading: Icon(Icons.info_outline),
-                title: Text('SpeedGuard 1.1'),
+                title: Text('SpeedGuard 1.2'),
                 subtitle: Text('Dados de radares: © colaboradores do '
                     'OpenStreetMap. Respeite sempre os limites de velocidade.'),
               ),
@@ -593,6 +646,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                       Expanded(child: _alertCard(a)),
                     ],
                   ),
+                  if (_ask != null) _askCard(),
                   if (_loading)
                     const Padding(
                       padding: EdgeInsets.only(top: 8),
@@ -660,6 +714,48 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _askCard() {
+    return Card(
+      color: Colors.purple.shade700,
+      margin: const EdgeInsets.only(top: 8),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          children: [
+            const Text('O radar móvel ainda está aqui?',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: FilledButton.icon(
+                    style: FilledButton.styleFrom(
+                        backgroundColor: Colors.green.shade700,
+                        minimumSize: const Size.fromHeight(48)),
+                    onPressed: () => _answer(true),
+                    icon: const Icon(Icons.check),
+                    label: const Text('SIM'),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: FilledButton.icon(
+                    style: FilledButton.styleFrom(
+                        backgroundColor: Colors.red.shade700,
+                        minimumSize: const Size.fromHeight(48)),
+                    onPressed: () => _answer(false),
+                    icon: const Icon(Icons.close),
+                    label: const Text('NÃO'),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );

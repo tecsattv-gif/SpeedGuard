@@ -6,19 +6,67 @@ import 'firebase_config.dart';
 import 'models.dart';
 
 /// Radares reportados pelos usuários, compartilhados via Firestore (REST).
-/// Radares móveis expiram em 3 horas; fixos ficam permanentes.
+/// Radares móveis não expiram sozinhos: a cada 48 h os motoristas que
+/// passam pelo local confirmam se ainda está lá (sim = +48 h, não = apaga).
 class CommunityService {
-  static const mobileLifetime = Duration(hours: 3);
+  static const checkInterval = Duration(hours: 48);
 
   List<Radar> _radars = [];
   DateTime? _lastFetch;
   double? _lastLat, _lastLon;
 
-  List<Radar> get radars {
-    final now = DateTime.now().millisecondsSinceEpoch;
-    return _radars
-        .where((r) => r.expiresAt == null || r.expiresAt! > now)
-        .toList();
+  List<Radar> get radars => List.unmodifiable(_radars);
+
+  /// Radar móvel que já passou do prazo e precisa de confirmação.
+  static bool needsCheck(Radar r) =>
+      r.type == 'movel' &&
+      r.checkAfter != null &&
+      r.checkAfter! <= DateTime.now().millisecondsSinceEpoch;
+
+  /// Resposta do motorista: ainda está (mantém +48 h) ou não está (apaga).
+  Future<bool> confirm(Radar r, bool stillThere) async {
+    if (!communityEnabled || !r.id.startsWith('cm_')) return false;
+    final docId = r.id.substring(3);
+    final url = '$_base/radars/$docId';
+    try {
+      if (stillThere) {
+        final next =
+            DateTime.now().add(checkInterval).millisecondsSinceEpoch;
+        final res = await http
+            .patch(
+                Uri.parse('$url?updateMask.fieldPaths=checkAfter'
+                    '&key=$firebaseApiKey'),
+                headers: {'Content-Type': 'application/json'},
+                body: jsonEncode({
+                  'fields': {
+                    'checkAfter': {'integerValue': '$next'}
+                  }
+                }))
+            .timeout(const Duration(seconds: 20));
+        if (res.statusCode != 200) return false;
+        final i = _radars.indexWhere((x) => x.id == r.id);
+        if (i >= 0) {
+          _radars[i] = Radar(
+            id: r.id,
+            lat: r.lat,
+            lon: r.lon,
+            maxSpeed: r.maxSpeed,
+            type: r.type,
+            direction: r.direction,
+            checkAfter: next,
+          );
+        }
+      } else {
+        final res = await http
+            .delete(Uri.parse('$url?key=$firebaseApiKey'))
+            .timeout(const Duration(seconds: 20));
+        if (res.statusCode != 200) return false;
+        _radars.removeWhere((x) => x.id == r.id);
+      }
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
   String get _base =>
@@ -98,15 +146,15 @@ class CommunityService {
   }) async {
     if (!communityEnabled) return false;
     final now = DateTime.now();
-    final expires =
-        mobile ? now.add(mobileLifetime).millisecondsSinceEpoch : 0;
+    final checkAfter =
+        mobile ? now.add(checkInterval).millisecondsSinceEpoch : 0;
     final fields = <String, dynamic>{
       'lat': {'doubleValue': lat},
       'lon': {'doubleValue': lon},
       'cell': {'stringValue': cellOf(lat, lon)},
       'type': {'stringValue': mobile ? 'movel' : 'comunidade'},
       'createdAt': {'integerValue': '${now.millisecondsSinceEpoch}'},
-      'expiresAt': {'integerValue': '$expires'},
+      'checkAfter': {'integerValue': '$checkAfter'},
       if (maxSpeed != null) 'maxSpeed': {'integerValue': '$maxSpeed'},
       if (direction != null) 'direction': {'doubleValue': direction},
     };
@@ -138,7 +186,7 @@ class CommunityService {
 
     final lat = n('lat'), lon = n('lon');
     if (lat == null || lon == null) return null;
-    final exp = n('expiresAt')?.toInt() ?? 0;
+    final check = n('checkAfter')?.toInt() ?? 0;
     final name = doc['name']?.toString() ?? '';
     return Radar(
       id: 'cm_${name.split('/').last}',
@@ -147,7 +195,7 @@ class CommunityService {
       maxSpeed: n('maxSpeed')?.toInt(),
       type: (f['type'] as Map?)?['stringValue']?.toString() ?? 'comunidade',
       direction: n('direction')?.toDouble(),
-      expiresAt: exp == 0 ? null : exp,
+      checkAfter: check == 0 ? null : check,
     );
   }
 }
