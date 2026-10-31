@@ -45,6 +45,9 @@
     </application>
 
     <queries>
+        <!-- Botão Navegar: abrir Google Maps e Waze -->
+        <package android:name="com.google.android.apps.maps" />
+        <package android:name="com.waze" />
         <intent>
             <action android:name="android.intent.action.TTS_SERVICE" />
         </intent>

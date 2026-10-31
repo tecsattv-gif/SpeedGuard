@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:android_intent_plus/android_intent.dart';
+import 'package:android_intent_plus/flag.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -519,6 +521,127 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     }
   }
 
+  Widget _pill(IconData icon, String label, VoidCallback onTap) => Material(
+        color: SG.cardHigh,
+        shape: const StadiumBorder(
+            side: BorderSide(color: Color(0x998C50FF), width: 1.5)),
+        child: InkWell(
+          customBorder: const StadiumBorder(),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              Icon(icon, color: SG.accent, size: 20),
+              const SizedBox(width: 8),
+              Text(label,
+                  style: TextStyle(
+                      color: SG.text,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600)),
+            ]),
+          ),
+        ),
+      );
+
+  /// Abre o Google Maps ou o Waze já navegando para o destino digitado
+  /// (ou só abre o app, se o campo ficar vazio). O SpeedGuard continua
+  /// monitorando e o painel flutuante avisa os radares por cima.
+  Future<void> _navigate() async {
+    final ctrl = TextEditingController();
+    final app = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.fromLTRB(
+            16, 0, 16, 16 + MediaQuery.viewInsetsOf(ctx).bottom),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text('Navegar',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 12),
+            TextField(
+              controller: ctrl,
+              autofocus: true,
+              textInputAction: TextInputAction.go,
+              decoration: const InputDecoration(
+                hintText: 'Para onde? (endereço, cidade ou lugar)',
+                prefixIcon: Icon(Icons.search),
+                border: OutlineInputBorder(),
+              ),
+              onSubmitted: (_) => Navigator.pop(ctx, 'google'),
+            ),
+            const SizedBox(height: 14),
+            Row(children: [
+              Expanded(
+                child: FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFF1A73E8),
+                      minimumSize: const Size.fromHeight(52)),
+                  onPressed: () => Navigator.pop(ctx, 'google'),
+                  icon: const Icon(Icons.map),
+                  label: const Text('Google Maps'),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFF33CCFF),
+                      foregroundColor: Colors.black,
+                      minimumSize: const Size.fromHeight(52)),
+                  onPressed: () => Navigator.pop(ctx, 'waze'),
+                  icon: const Icon(Icons.directions_car),
+                  label: const Text('Waze'),
+                ),
+              ),
+            ]),
+            const SizedBox(height: 10),
+            Text(
+              _bubble
+                  ? 'O SpeedGuard continua avisando os radares no painel flutuante.'
+                  : 'Dica: ligue a Bolha flutuante em Configurações para ver os radares por cima do mapa.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: SG.textSoft, fontSize: 12),
+            ),
+          ],
+        ),
+      ),
+    );
+    final dest = ctrl.text.trim();
+    ctrl.dispose();
+    if (app == null) return;
+    // Liga o monitoramento antes de sair, para avisar os radares no caminho.
+    if (!_running) await _start();
+    final q = Uri.encodeComponent(dest);
+    final AndroidIntent intent;
+    if (app == 'waze') {
+      intent = AndroidIntent(
+        action: 'action_view',
+        data: dest.isEmpty
+            ? 'https://waze.com/ul'
+            : 'https://waze.com/ul?q=$q&navigate=yes',
+        package: 'com.waze',
+        flags: const [Flag.FLAG_ACTIVITY_NEW_TASK],
+      );
+    } else {
+      intent = AndroidIntent(
+        action: 'action_view',
+        data: dest.isEmpty ? 'geo:0,0' : 'google.navigation:q=$q',
+        package: 'com.google.android.apps.maps',
+        flags: const [Flag.FLAG_ACTIVITY_NEW_TASK],
+      );
+    }
+    try {
+      await intent.launch();
+    } catch (_) {
+      _snack(app == 'waze'
+          ? 'Não foi possível abrir o Waze. Ele está instalado?'
+          : 'Não foi possível abrir o Google Maps. Ele está instalado?');
+    }
+  }
+
   /// Painel "Opções do mapa", como no CamSam: liga/desliga cada camada.
   Future<void> _mapOptions() async {
     Future<void> save() async {
@@ -1024,7 +1147,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               ),
               const ListTile(
                 leading: Icon(Icons.info_outline),
-                title: Text('SpeedGuard 1.14.1'),
+                title: Text('SpeedGuard 1.15.0'),
                 subtitle: Text('Dados de radares: © colaboradores do '
                     'OpenStreetMap. Respeite sempre os limites de velocidade.'),
               ),
@@ -1219,32 +1342,15 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             ),
           ),
 
-          // Botão "Opções": o que aparece no mapa e gera aviso.
+          // Botões "Opções" (camadas do mapa) e "Navegar" (Google/Waze).
           Positioned(
             left: 12,
             bottom: 12,
-            child: Material(
-              color: SG.cardHigh,
-              shape: const StadiumBorder(
-                  side: BorderSide(color: Color(0x998C50FF), width: 1.5)),
-              child: InkWell(
-                customBorder: const StadiumBorder(),
-                onTap: _mapOptions,
-                child: Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                  child: Row(mainAxisSize: MainAxisSize.min, children: [
-                    Icon(Icons.tune, color: SG.accent, size: 20),
-                    const SizedBox(width: 8),
-                    Text('Opções',
-                        style: TextStyle(
-                            color: SG.text,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600)),
-                  ]),
-                ),
-              ),
-            ),
+            child: Row(children: [
+              _pill(Icons.tune, 'Opções', _mapOptions),
+              const SizedBox(width: 8),
+              _pill(Icons.navigation, 'Navegar', _navigate),
+            ]),
           ),
 
           if (_rule.mode == RadarMode.disabled && _running)
