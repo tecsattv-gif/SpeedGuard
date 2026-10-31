@@ -94,6 +94,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   /// Mostra o card "N radares carregados" só alguns segundos após atualizar.
   bool _showCount = false;
   Timer? _countTimer;
+  /// Radares da área vista no mapa (ao arrastar para outra região).
+  Timer? _areaTimer;
+  bool _areaLoading = false;
+  LatLngBounds? _areaBounds;
+  bool _zoomHintShown = false;
   final _player = AudioPlayer();
   bool _discreet = false;
   bool _bubble = false;
@@ -178,6 +183,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     _tts.stop();
     _player.dispose();
     _countTimer?.cancel();
+    _areaTimer?.cancel();
     WakelockPlus.disable();
     super.dispose();
   }
@@ -295,6 +301,42 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       _running = true;
       _status = 'Procurando sinal de GPS…';
     });
+  }
+
+  /// Zoom mínimo para baixar a área vista (evita pedir um país inteiro).
+  static const _areaMinZoom = 9.0;
+
+  Future<void> _loadArea(MapCamera camera) async {
+    if (!mounted || _rule.mode != RadarMode.full) return;
+    if (camera.zoom < _areaMinZoom) {
+      if (!_zoomHintShown) {
+        _zoomHintShown = true;
+        _snack('Aproxime o mapa para ver os radares desta região.');
+      }
+      return;
+    }
+    final b = camera.visibleBounds;
+    // Já baixou uma área que cobre esta? Não baixa de novo.
+    final last = _areaBounds;
+    if (last != null &&
+        last.contains(b.northWest) &&
+        last.contains(b.southEast)) {
+      return;
+    }
+    // Pede um pouco além da tela, para arrastar sem recarregar toda hora.
+    final dLat = (b.north - b.south) * 0.25;
+    final dLon = (b.east - b.west) * 0.25;
+    final want = LatLngBounds(LatLng(b.south - dLat, b.west - dLon),
+        LatLng(b.north + dLat, b.east + dLon));
+    setState(() => _areaLoading = true);
+    final n = await _service.fetchArea(
+        want.south, want.west, want.north, want.east);
+    if (!mounted) return;
+    setState(() {
+      _areaLoading = false;
+      if (n != null) _areaBounds = want;
+    });
+    if (n == null) _snack('Sem conexão para baixar os radares desta região.');
   }
 
   /// Fala avisos gerais (só no modo voz).
@@ -779,7 +821,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               ),
               const ListTile(
                 leading: Icon(Icons.info_outline),
-                title: Text('SpeedGuard 1.10.0'),
+                title: Text('SpeedGuard 1.11.0'),
                 subtitle: Text('Dados de radares: © colaboradores do '
                     'OpenStreetMap. Respeite sempre os limites de velocidade.'),
               ),
@@ -854,6 +896,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               initialZoom: 15,
               onPositionChanged: (camera, hasGesture) {
                 if (hasGesture && _follow) setState(() => _follow = false);
+                // Soltou o mapa em outra região: baixa os radares de lá.
+                if (hasGesture) {
+                  _areaTimer?.cancel();
+                  _areaTimer = Timer(const Duration(milliseconds: 1200),
+                      () => _loadArea(camera));
+                }
               },
             ),
             children: [
@@ -866,7 +914,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               if (showRadars)
                 MarkerLayer(
                   markers: [
-                    for (final r in _allRadars)
+                    for (final r in [..._allRadars, ..._service.area])
                       Marker(
                         point: LatLng(r.lat, r.lon),
                         width: 34,
@@ -932,7 +980,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                             ? _alertCard(a)
                             : Align(
                                 alignment: Alignment.centerRight,
-                                child: _loading
+                                child: _loading || _areaLoading
                                     ? const _UpdatingBadge()
                                     : const SizedBox.shrink(),
                               ),
