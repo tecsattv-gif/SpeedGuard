@@ -4,7 +4,7 @@ App Android de alerta de radares para o mundo todo, feito em Flutter. Avisa por 
 
 Autor: Luiz Alberto Cardoso
 
-## Funções (versão 1.12.0)
+## Funções (versão 1.13.0)
 
 - **Visual neon** com as cores da tela de abertura: fundo roxo escuro, velocímetro com borda violeta brilhante, botão INICIAR em degradê vermelho→rosa, cartões e botões roxos; o painel flutuante e a janela de reportar seguem a mesma paleta
 - **Tela de abertura** (2,5 s) com a arte do SpeedGuard (velocímetro e rastro de luz) e os créditos do autor
@@ -37,11 +37,10 @@ Autor: Luiz Alberto Cardoso
 
   Conteúdo do painel:
   - em cima: velocidade atual (vermelha acima do limite)
-  - no meio: setas verdes com caminho livre; perto de radar, a placa do limite e a distância (laranja, ou vermelho se estiver acima do limite); a pergunta "Radar ainda aí?" com ✓/✗
+  - no meio: as mesmas **5 faixas verdes** da tela de alerta. De 500 m até o radar, **a cada 100 m uma faixa fica vermelha, de baixo para cima**, com a placa do limite e a distância (laranja, ou vermelho se estiver acima do limite); o aviso de voz ou bipe toca junto. Depois de passar o radar, as faixas voltam a ficar verdes. Também mostra a pergunta "Radar ainda aí?" com ✓/✗
   - embaixo: botão **+** que abre a janela de reportar radar com as velocidades prontas, sem sair do Maps. Fecha sozinha em 20 s se nada for escolhido; o app confirma por voz "Radar reportado"
   - como usar: ative **Configurações → Bolha flutuante**, permita "Sobrepor a outros apps", toque em **INICIAR** e abra o Maps/Waze. O painel abre no instante em que você sai do SpeedGuard (exigência do Android 15+) e some quando você volta para ele. Se faltar a permissão, o app avisa ao voltar
-- **Modo discreto**: só vibra e diz "Radar", sem detalhes
-- Cores no mapa: vermelho = fixo, amarelo = semáforo, violeta = reportado por usuários, laranja = seu reporte local; sua posição é a seta rosa
+- Cores no mapa: vermelho = fixo, amarelo = semáforo, violeta = reportado por usuários, laranja = seu reporte local; sua posição é o ícone escolhido (seta, carro, caminhão ou moto)
 - **Regras por país**, detectado pelo GPS:
 
 | País | Comportamento |

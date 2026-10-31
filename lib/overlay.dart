@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_overlay_window/flutter_overlay_window.dart';
 
+import 'alert_view.dart';
 import 'speed_picker.dart';
 import 'theme.dart';
 
@@ -341,21 +342,25 @@ class _OverlayBubbleState extends State<OverlayBubble> {
       ]);
     }
     final d = _dist;
+    const green = Color(0xFF4ED636);
     if (d == null) {
-      // Caminho livre: setas verdes
-      return const Icon(Icons.keyboard_double_arrow_up,
-          color: Colors.lightGreenAccent, size: 54);
+      // Caminho livre (ou já passou do radar): 5 faixas verdes.
+      return const RadarBands(green: green, size: 56);
     }
+    // A cada 100 m (de 500 m até o radar) uma faixa fica vermelha,
+    // de baixo para cima.
     final color = _over ? SG.red : SG.orange;
-    return flow([
-      _limit != null
-          ? SpeedSign(label: '$_limit', size: 46)
-          : Icon(Icons.camera_alt, color: color, size: 38),
-      gap,
+    final info = Column(mainAxisSize: MainAxisSize.min, children: [
+      if (_limit != null) SpeedSign(label: '$_limit', size: 30),
       Text(
         d >= 1000 ? '${(d / 1000).toStringAsFixed(1)} km' : '${d.round()} m',
-        style: TextStyle(color: color, fontSize: 15, fontWeight: FontWeight.bold),
+        style: TextStyle(color: color, fontSize: 14, fontWeight: FontWeight.bold),
       ),
+    ]);
+    return flow([
+      RadarBands(green: green, red: RadarBands.redFor(d), size: 50),
+      gap,
+      info,
     ]);
   }
 

@@ -45,7 +45,7 @@ class AlertView extends StatelessWidget {
   Widget _content() {
     if (!running) {
       return Column(mainAxisSize: MainAxisSize.min, children: [
-        _Chevrons(green: SG.accent.withValues(alpha: 0.4)),
+        RadarBands(green: SG.accent.withValues(alpha: 0.4)),
         const SizedBox(height: 24),
         Text(status,
             textAlign: TextAlign.center,
@@ -54,7 +54,7 @@ class AlertView extends StatelessWidget {
     }
     final r = alert.radar;
     if (r == null) {
-      return _Chevrons(green: _green);
+      return RadarBands(green: _green);
     }
     final color = alert.overLimit ? SG.red : SG.orange;
     if (mode == RadarMode.dangerZone) {
@@ -72,7 +72,7 @@ class AlertView extends StatelessWidget {
         ? '${(d / 1000).toStringAsFixed(1)} km'
         : '${(d / 10).round() * 10} m';
     // Uma faixa fica vermelha a cada 100 m: 500 m = 1 … 100 m = 5.
-    final red = d > 515 ? 0 : (5 - ((d - 16) / 100).floor()).clamp(1, 5);
+    final red = RadarBands.redFor(d);
     return Column(mainAxisSize: MainAxisSize.min, children: [
       FittedBox(
         fit: BoxFit.scaleDown,
@@ -99,7 +99,7 @@ class AlertView extends StatelessWidget {
         ]),
       ),
       const SizedBox(height: 20),
-      Flexible(child: _Chevrons(green: _green, red: red)),
+      Flexible(child: RadarBands(green: _green, red: red)),
       if (alert.overLimit) ...[
           const SizedBox(height: 14),
           Container(
@@ -153,13 +153,27 @@ class _LimitSign extends StatelessWidget {
 
 /// Cinco faixas (setas) para cima, a de baixo maior. [red] faixas de
 /// baixo para cima ficam vermelhas (uma a cada 100 m do radar).
-class _Chevrons extends StatelessWidget {
+class RadarBands extends StatelessWidget {
   final Color green;
   final int red;
-  const _Chevrons({required this.green, this.red = 0});
+
+  /// Tamanho fixo (painel flutuante); sem ele ocupa até 300 px.
+  final double? size;
+  const RadarBands({super.key, required this.green, this.red = 0, this.size});
+
+  /// Quantas faixas ficam vermelhas a esta distância do radar:
+  /// 500 m = 1, 400 m = 2, 300 m = 3, 200 m = 4, 100 m ou menos = 5.
+  static int redFor(double d) =>
+      d > 515 ? 0 : (5 - ((d - 16) / 100).floor()).clamp(1, 5);
 
   @override
   Widget build(BuildContext context) {
+    if (size != null) {
+      return SizedBox.square(
+        dimension: size,
+        child: CustomPaint(painter: _ChevronPainter(green, red)),
+      );
+    }
     return ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 300, maxHeight: 300),
       child: AspectRatio(
