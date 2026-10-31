@@ -101,6 +101,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       try {
         final m = jsonDecode(event.toString()) as Map;
         if (m['answer'] is bool) _answer(m['answer'] as bool);
+        // Usuário fechou o painel segurando o dedo nele.
+        if (m['closed'] == true) _overlayShown = false;
         if (m['report'] == true) {
           _submitReport(
             mobile: m['mobile'] != false,

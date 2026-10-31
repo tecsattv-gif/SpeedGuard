@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_overlay_window/flutter_overlay_window.dart';
 
 import 'speed_picker.dart';
@@ -115,6 +116,15 @@ class _OverlayBubbleState extends State<OverlayBubble> {
         true);
   }
 
+  /// Fecha o painel (o monitoramento continua no app).
+  Future<void> _closeSelf() async {
+    HapticFeedback.heavyImpact();
+    try {
+      await FlutterOverlayWindow.shareData(jsonEncode({'closed': true}));
+    } catch (_) {}
+    await FlutterOverlayWindow.closeOverlay();
+  }
+
   Future<void> _openPicker() async {
     await FlutterOverlayWindow.resizeOverlay(overlayUnits(kPickerW, _unitsPerDp),
         overlayUnits(kPickerH, _unitsPerDp), false);
@@ -166,7 +176,11 @@ class _OverlayBubbleState extends State<OverlayBubble> {
               alignment: Alignment.topLeft,
               child: SizedBox.fromSize(
                 size: panelDp(_land, _scale),
-                child: FittedBox(child: _panel()),
+                // Segurar o dedo no painel fecha a janela.
+                child: GestureDetector(
+                  onLongPress: _closeSelf,
+                  child: FittedBox(child: _panel()),
+                ),
               ),
             ),
     );
