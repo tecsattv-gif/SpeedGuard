@@ -18,10 +18,11 @@ Autor: Luiz Alberto Cardoso
 
 | País | Comportamento |
 |---|---|
-| França | Não mostra radares no mapa; avisa só "zona de perigo à frente" |
 | Suíça | Alertas desligados (proibido por lei) |
 | Alemanha | Funciona, com aviso de que só passageiros podem usar |
-| Demais países | Modo completo |
+| Demais países (inclusive França) | Modo completo |
+
+> França: o modo "zona de perigo" foi removido a pedido do autor. Lá, usar ao dirigir um app que mostra a posição exata dos radares é infração (art. R413-15 do Code de la route).
 
 > Antes de publicar na Play Store, revisar a legislação de cada país e completar a lista em `lib/country_rules.dart`.
 

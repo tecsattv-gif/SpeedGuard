@@ -20,12 +20,6 @@ class CountryRule {
 /// Regras especiais. Países fora desta lista usam o modo completo.
 /// IMPORTANTE: revisar a legislação antes de publicar na loja.
 const Map<String, CountryRule> specialRules = {
-  'fr': CountryRule(
-    'França',
-    RadarMode.dangerZone,
-    'Na França é proibido indicar a posição exata dos radares. '
-        'O app avisa apenas "zona de perigo" à frente.',
-  ),
   'ch': CountryRule(
     'Suíça',
     RadarMode.disabled,
