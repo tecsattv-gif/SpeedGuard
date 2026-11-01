@@ -26,6 +26,7 @@ import 'radar_service.dart';
 import 'splash_screen.dart';
 import 'layers.dart';
 import 'theme.dart';
+import 'tutorial_page.dart';
 import 'vehicle_icon.dart';
 import 'speed_picker.dart';
 
@@ -1214,6 +1215,18 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               ),
               const SizedBox(height: 8),
               ListTile(
+                leading: const Icon(Icons.play_circle_outline),
+                title: const Text('Tutorial'),
+                subtitle: const Text('Vídeo de como configurar e usar o app'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => const TutorialPage()));
+                },
+              ),
+              ListTile(
                 leading: const Icon(Icons.refresh),
                 title: const Text('Atualizar radares agora'),
                 onTap: () {
@@ -1231,7 +1244,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               ),
               const ListTile(
                 leading: Icon(Icons.info_outline),
-                title: Text('SpeedGuard 1.17.0'),
+                title: Text('SpeedGuard 1.18.0'),
                 subtitle: Text('Dados de radares: © colaboradores do '
                     'OpenStreetMap. Respeite sempre os limites de velocidade.'),
               ),
