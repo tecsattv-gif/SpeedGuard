@@ -1244,7 +1244,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               ),
               const ListTile(
                 leading: Icon(Icons.info_outline),
-                title: Text('SpeedGuard 1.18.0'),
+                title: Text('SpeedGuard 1.18.1'),
                 subtitle: Text('Dados de radares: © colaboradores do '
                     'OpenStreetMap. Respeite sempre os limites de velocidade.'),
               ),
@@ -1525,16 +1525,18 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     await p.setBool('mapView', _mapView);
   }
 
-  /// Dois cards pequenos: conectados no mundo e no país onde você está.
+  /// Dois cards pequenos, um embaixo do outro, logo abaixo do círculo da
+  /// velocidade: conectados no mundo e no país onde você está.
   Widget _onlineCards() {
     final p = _presence;
     final code = p.countryCode;
     return Padding(
       padding: const EdgeInsets.only(top: 8),
       child: Align(
-        alignment: Alignment.centerRight,
-        child: Row(
+        alignment: Alignment.centerLeft,
+        child: Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _OnlineChip(
               icon: '🌍',
@@ -1543,7 +1545,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               tooltip: 'Pessoas com o SpeedGuard conectado no mundo',
             ),
             if (code != null && p.country != null) ...[
-              const SizedBox(width: 6),
+              const SizedBox(height: 6),
               _OnlineChip(
                 icon: PresenceService.flag(code),
                 count: p.country!,
