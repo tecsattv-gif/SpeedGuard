@@ -4,6 +4,8 @@ App Android de alerta de radares para o mundo todo, feito em Flutter. Avisa por 
 
 Autor: Luiz Alberto Cardoso
 
+**Site do app:** https://tecsattv-gif.github.io/SpeedGuard/ (recursos, vídeo tutorial e passo a passo)
+
 ## Funções (versão 1.18.2)
 
 - **Visual neon** com as cores da tela de abertura: fundo roxo escuro, velocímetro com borda violeta brilhante, botão INICIAR em degradê vermelho→rosa, cartões e botões roxos; o painel flutuante e a janela de reportar seguem a mesma paleta
@@ -87,6 +89,13 @@ Autor: Luiz Alberto Cardoso
 | `lib/country_rules.dart` | Regras por país |
 | `lib/models.dart` | Modelo do radar |
 | `android/app/src/main/AndroidManifest.xml` | Permissões (GPS, segundo plano, internet) |
+| `docs/` | Site de divulgação (GitHub Pages): `index.html`, imagens, vídeo, `robots.txt` e `sitemap.xml` |
+
+## Site de divulgação (GitHub Pages)
+
+A pasta `docs/` é o site público do app, com recursos, vídeo tutorial, passo a passo e regras por país. Para publicar: **Settings → Pages → Build and deployment → Deploy from a branch → `main` / `/docs` → Save**. O endereço fica https://tecsattv-gif.github.io/SpeedGuard/. Mudanças em `docs/` não disparam o build do APK.
+
+Para aparecer no Google: no [Google Search Console](https://search.google.com/search-console), adicione a propriedade com prefixo de URL `https://tecsattv-gif.github.io/SpeedGuard/`, verifique pelo arquivo HTML (coloque-o em `docs/`) e envie o sitemap `sitemap.xml`.
 
 ## Como gerar o APK
 

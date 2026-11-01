@@ -1,0 +1,371 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SpeedGuard — App de alerta de radares para Android</title>
+<meta name="description" content="SpeedGuard: app Android gratuito de alerta de radares para o mundo todo. Avisos por voz a cada 100 m, painel flutuante sobre Google Maps e Waze, reportes compartilhados e tutorial em vídeo.">
+<meta name="keywords" content="alerta de radar, radar app, app de radares, aviso de radar, radar móvel, Android, SpeedGuard">
+<meta name="author" content="Luiz Alberto Cardoso">
+<link rel="canonical" href="https://tecsattv-gif.github.io/SpeedGuard/">
+<link rel="icon" type="image/png" href="icon.png">
+<meta name="theme-color" content="#14081F">
+<meta property="og:type" content="website">
+<meta property="og:title" content="SpeedGuard — Alerta de radares">
+<meta property="og:description" content="SpeedGuard: app Android gratuito de alerta de radares para o mundo todo. Avisos por voz a cada 100 m, painel flutuante sobre Google Maps e Waze, reportes compartilhados e tutorial em vídeo.">
+<meta property="og:url" content="https://tecsattv-gif.github.io/SpeedGuard/">
+<meta property="og:image" content="https://tecsattv-gif.github.io/SpeedGuard/icon.png">
+<meta name="twitter:card" content="summary">
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"SoftwareApplication","name":"SpeedGuard","operatingSystem":"Android","applicationCategory":"TravelApplication","softwareVersion":"1.18.2","description":"SpeedGuard: app Android gratuito de alerta de radares para o mundo todo. Avisos por voz a cada 100 m, painel flutuante sobre Google Maps e Waze, reportes compartilhados e tutorial em vídeo.","author":{"@type":"Person","name":"Luiz Alberto Cardoso"},"offers":{"@type":"Offer","price":"0","priceCurrency":"EUR"},"url":"https://tecsattv-gif.github.io/SpeedGuard/"}
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Exo+2:ital,wght@0,600;0,800;1,800;1,900&amp;family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#14081F}
+a{color:#C9A9FF}a:hover{color:#FFFFFF}
+.sg h1,.sg h2,.sg h3,.sg p{margin:0}
+.sg-video{width:100%;display:block;border-radius:16px;background:#000}
+@media (max-width:720px){
+.sg-hero-title{font-size:48px !important}
+.sg-h2{font-size:32px !important}
+.sg-pad{padding-left:16px !important;padding-right:16px !important}
+}
+</style>
+</head>
+<body>
+<div class="sg" style="background: #14081F; color: #EDE6F8; font-family: Inter, system-ui, sans-serif; font-size: 17px; line-height: 1.6; min-width: 0">
+
+<!-- Topo -->
+<header class="sg-pad" style="max-width: 1200px; margin: 0 auto; padding: 20px 40px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px">
+<div style="display: flex; align-items: center; gap: 12px">
+<img src="icon.png" alt="Ícone do SpeedGuard" style="width: 44px; height: 44px; border-radius: 12px">
+<span style="font-family: 'Exo 2', sans-serif; font-style: italic; font-weight: 900; font-size: 24px; letter-spacing: 0.5px; color: #FFFFFF">SPEED<span style="color: #FF2D55">GUARD</span></span>
+</div>
+<nav aria-label="Seções" style="display: flex; flex-wrap: wrap; gap: 20px; font-size: 15px; font-weight: 600">
+<a href="#recursos" style="text-decoration: none">Recursos</a>
+<a href="#video" style="text-decoration: none">Vídeo</a>
+<a href="#tutorial" style="text-decoration: none">Tutorial</a>
+<a href="#paises" style="text-decoration: none">Países</a>
+<a href="#leiame" style="text-decoration: none">Leia-me</a>
+</nav>
+</header>
+
+<!-- Hero -->
+<section class="sg-pad" style="max-width: 1200px; margin: 0 auto; padding: 48px 40px 80px; display: flex; flex-wrap: wrap; align-items: center; gap: 56px">
+<div style="flex: 999 1 480px; min-width: 0; display: flex; flex-direction: column; gap: 24px">
+<span style="align-self: flex-start; border: 1px solid #8C50FF; color: #D9C6FF; border-radius: 999px; padding: 6px 14px; font-size: 14px; font-weight: 600">App Android · versão 1.18.2</span>
+<h1 class="sg-hero-title" style="font-family: 'Exo 2', sans-serif; font-style: italic; font-weight: 900; font-size: 72px; line-height: 1.02; color: #FFFFFF">Saiba do radar <span style="color: #FF2D55">antes</span> de chegar nele.</h1>
+<p style="font-size: 20px; color: #CDBFE3; max-width: 560px">O SpeedGuard avisa por voz e vibração a cada 100 metros antes de radares fixos, de semáforo e móveis — no mundo todo, inclusive por cima do Google Maps e do Waze.</p>
+<div style="display: flex; flex-wrap: wrap; gap: 14px">
+<a href="https://github.com/tecsattv-gif/SpeedGuard/actions/workflows/build.yml" style="text-decoration: none; background: linear-gradient(90deg, #FF2D55, #E0389B); color: #FFFFFF; font-weight: 700; padding: 15px 26px; border-radius: 14px; min-height: 44px; box-sizing: border-box; display: inline-flex; align-items: center; gap: 10px">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"></path><path d="m7 10 5 5 5-5"></path><path d="M5 21h14"></path></svg>
+Baixar o APK</a>
+<a href="#tutorial" style="text-decoration: none; border: 1.5px solid #8C50FF; color: #FFFFFF; font-weight: 700; padding: 15px 26px; border-radius: 14px; min-height: 44px; box-sizing: border-box; display: inline-flex; align-items: center">Ver o tutorial</a>
+</div>
+<div style="display: flex; flex-wrap: wrap; gap: 28px; padding-top: 8px; font-size: 15px; color: #BBA9D6">
+<span>Radares do OpenStreetMap</span>
+<span>Funciona offline e com a tela apagada</span>
+<span>Reportes compartilhados</span>
+</div>
+</div>
+<div style="flex: 1 1 260px; display: flex; justify-content: center">
+<img src="splash.png" alt="Tela de abertura do SpeedGuard com o velocímetro neon" style="width: 280px; height: 498px; object-fit: cover; border-radius: 36px; border: 6px solid #2E1850; box-shadow: 0 0 60px rgba(140, 80, 255, 0.45)">
+</div>
+</section>
+
+<!-- Como funciona o alerta -->
+<section style="background: #1B0D2B; border-top: 1px solid #2E1850; border-bottom: 1px solid #2E1850">
+<div class="sg-pad" style="max-width: 1200px; margin: 0 auto; padding: 72px 40px; display: flex; flex-wrap: wrap; align-items: center; gap: 56px">
+<div style="flex: 1 1 300px; display: flex; justify-content: center">
+<div role="img" aria-label="Tela de alerta: 5 faixas; três já vermelhas, radar a 300 metros, limite 80" style="width: 260px; background: #14081F; border: 2px solid #8C50FF; border-radius: 28px; padding: 24px; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; gap: 10px">
+<div style="width: 76px; height: 76px; border-radius: 50%; border: 8px solid #FF2D55; background: #FFFFFF; color: #14081F; display: flex; align-items: center; justify-content: center; font-family: 'Exo 2', sans-serif; font-weight: 800; font-size: 30px; box-sizing: border-box">80</div>
+<div style="font-family: 'Exo 2', sans-serif; font-weight: 800; font-size: 28px; color: #FFB35C">300 m</div>
+<div style="font-size: 13px; color: #CDBFE3; margin-bottom: 6px">Radar fixo</div>
+<div style="width: 100%; height: 30px; border-radius: 8px; background: #1E9E57"></div>
+<div style="width: 100%; height: 30px; border-radius: 8px; background: #1E9E57"></div>
+<div style="width: 100%; height: 30px; border-radius: 8px; background: #E5243F"></div>
+<div style="width: 100%; height: 30px; border-radius: 8px; background: #E5243F"></div>
+<div style="width: 100%; height: 30px; border-radius: 8px; background: #E5243F"></div>
+</div>
+</div>
+<div style="flex: 999 1 460px; min-width: 0; display: flex; flex-direction: column; gap: 18px">
+<p style="font-size: 14px; font-weight: 700; letter-spacing: 2px; color: #C9A9FF">COMO FUNCIONA</p>
+<h2 class="sg-h2" style="font-family: 'Exo 2', sans-serif; font-weight: 800; font-size: 44px; line-height: 1.1; color: #FFFFFF">Cinco faixas. Cada 100 metros, uma fica vermelha.</h2>
+<p style="color: #CDBFE3">Com o caminho livre, as 5 faixas ficam verdes. A partir de 500 m do radar, uma faixa acende em vermelho a cada 100 m, de baixo para cima, junto com o aviso de voz ou bipe. Aparecem a placa do limite, a distância e o tipo de radar. Se você estiver acima do limite, o app pede: "Reduza a velocidade".</p>
+<p style="color: #CDBFE3">Só são avisados os radares à frente — e, quando o sentido do radar é conhecido, só para quem vai naquele sentido.</p>
+</div>
+</div>
+</section>
+
+<!-- Recursos -->
+<section id="recursos" class="sg-pad" style="max-width: 1200px; margin: 0 auto; padding: 88px 40px; display: flex; flex-direction: column; gap: 40px">
+<div style="display: flex; flex-direction: column; gap: 12px; max-width: 720px">
+<p style="font-size: 14px; font-weight: 700; letter-spacing: 2px; color: #C9A9FF">RECURSOS</p>
+<h2 class="sg-h2" style="font-family: 'Exo 2', sans-serif; font-weight: 800; font-size: 44px; line-height: 1.1; color: #FFFFFF">Tudo o que um motorista precisa, sem distrair.</h2>
+</div>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 20px">
+
+<div style="background: #221236; border: 1px solid #2E1850; border-radius: 20px; padding: 26px; display: flex; flex-direction: column; gap: 10px">
+<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#8C50FF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4V5z"></path><path d="M15.5 8.5a5 5 0 0 1 0 7"></path><path d="M19 5a10 10 0 0 1 0 14"></path></svg>
+<h3 style="font-size: 19px; color: #FFFFFF">Voz ou bipe</h3>
+<p style="font-size: 15px; color: #CDBFE3">Avisos em 500, 400, 300, 200 e 100 m com vibração. Escolha voz completa, bipe cada vez mais agudo ou modo discreto (só a distância).</p>
+</div>
+
+<div style="background: #221236; border: 1px solid #2E1850; border-radius: 20px; padding: 26px; display: flex; flex-direction: column; gap: 10px">
+<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#8C50FF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="10" height="16" rx="2"></rect><rect x="11" y="9" width="10" height="12" rx="2"></rect></svg>
+<h3 style="font-size: 19px; color: #FFFFFF">Painel flutuante</h3>
+<p style="font-size: 15px; color: #CDBFE3">Fica por cima do Google Maps e do Waze com velocidade, faixas e placa. Vertical ou horizontal, em três tamanhos. Toque duplo abre o app.</p>
+</div>
+
+<div style="background: #221236; border: 1px solid #2E1850; border-radius: 20px; padding: 26px; display: flex; flex-direction: column; gap: 10px">
+<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#8C50FF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M3 12h18"></path><path d="M12 3a14 14 0 0 1 0 18"></path><path d="M12 3a14 14 0 0 0 0 18"></path></svg>
+<h3 style="font-size: 19px; color: #FFFFFF">Base mundial</h3>
+<p style="font-size: 15px; color: #CDBFE3">Radares do OpenStreetMap num raio de 50 km, atualizados a cada 24 h ou 30 km rodados, e guardados para uso sem internet.</p>
+</div>
+
+<div style="background: #221236; border: 1px solid #2E1850; border-radius: 20px; padding: 26px; display: flex; flex-direction: column; gap: 10px">
+<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#8C50FF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5"></circle><path d="M2.5 20a6.5 6.5 0 0 1 13 0"></path><path d="M16 4.5a3.5 3.5 0 0 1 0 7"></path><path d="M18 14.5a6.5 6.5 0 0 1 3.5 5.5"></path></svg>
+<h3 style="font-size: 19px; color: #FFFFFF">Comunidade</h3>
+<p style="font-size: 15px; color: #CDBFE3">Radares e avisos reportados aparecem para todos. Cards mostram quantas pessoas estão conectadas no mundo e no país onde você está.</p>
+</div>
+
+<div style="background: #221236; border: 1px solid #2E1850; border-radius: 20px; padding: 26px; display: flex; flex-direction: column; gap: 10px">
+<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#8C50FF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 2 20h20L12 3z"></path><path d="M12 10v4"></path><path d="M12 17h.01"></path></svg>
+<h3 style="font-size: 19px; color: #FFFFFF">Avisos de trânsito</h3>
+<p style="font-size: 15px; color: #CDBFE3">Fila, obras, perigo e polícia com um toque. Cada aviso vale 6 horas e some sozinho; repetir no mesmo lugar renova, sem duplicar.</p>
+</div>
+
+<div style="background: #221236; border: 1px solid #2E1850; border-radius: 20px; padding: 26px; display: flex; flex-direction: column; gap: 10px">
+<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#8C50FF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11 21 3l-8 18-2-8-8-2z"></path></svg>
+<h3 style="font-size: 19px; color: #FFFFFF">Navegar</h3>
+<p style="font-size: 15px; color: #CDBFE3">Digite o destino e escolha Google Maps ou Waze. O SpeedGuard liga o monitoramento sozinho e o painel avisa por cima da rota.</p>
+</div>
+
+<div style="background: #221236; border: 1px solid #2E1850; border-radius: 20px; padding: 26px; display: flex; flex-direction: column; gap: 10px">
+<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#8C50FF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 2 9 5-9 5-9-5 9-5z"></path><path d="m3 12 9 5 9-5"></path><path d="m3 17 9 5 9-5"></path></svg>
+<h3 style="font-size: 19px; color: #FFFFFF">Camadas do mapa</h3>
+<p style="font-size: 15px; color: #CDBFE3">No botão Opções, ligue ou desligue radares fixos, de semáforo, móveis, filas, obras, perigos e polícia. O que está desligado não avisa.</p>
+</div>
+
+<div style="background: #221236; border: 1px solid #2E1850; border-radius: 20px; padding: 26px; display: flex; flex-direction: column; gap: 10px">
+<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#8C50FF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 3a9 9 0 0 0 0 18z" fill="#8C50FF"></path></svg>
+<h3 style="font-size: 19px; color: #FFFFFF">Do seu jeito</h3>
+<p style="font-size: 15px; color: #CDBFE3">Seis cores, modo claro, escuro ou automático, e ícone de seta, carro, caminhão ou moto girando com a direção.</p>
+</div>
+
+<div style="background: #221236; border: 1px solid #2E1850; border-radius: 20px; padding: 26px; display: flex; flex-direction: column; gap: 10px">
+<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#8C50FF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s-8-4-8-11V5l8-3 8 3v6c0 7-8 11-8 11z"></path><path d="m9 12 2 2 4-4"></path></svg>
+<h3 style="font-size: 19px; color: #FFFFFF">Respeita cada país</h3>
+<p style="font-size: 15px; color: #CDBFE3">O país é detectado pelo GPS e o app se adapta: desliga os alertas onde a lei proíbe e avisa onde há restrições.</p>
+</div>
+
+</div>
+</section>
+
+<!-- Vídeo -->
+<section id="video" style="background: #1B0D2B; border-top: 1px solid #2E1850; border-bottom: 1px solid #2E1850">
+<div class="sg-pad" style="max-width: 1000px; margin: 0 auto; padding: 80px 40px; display: flex; flex-direction: column; gap: 28px">
+<div style="display: flex; flex-direction: column; gap: 12px">
+<p style="font-size: 14px; font-weight: 700; letter-spacing: 2px; color: #C9A9FF">VÍDEO TUTORIAL</p>
+<h2 class="sg-h2" style="font-family: 'Exo 2', sans-serif; font-weight: 800; font-size: 44px; line-height: 1.1; color: #FFFFFF">Veja o SpeedGuard em 7 minutos.</h2>
+<p style="color: #CDBFE3">Vídeo narrado mostrando como configurar e usar o app. Ele também está dentro do app, em Configurações → Tutorial, e funciona sem internet.</p>
+</div>
+<video class="sg-video" controls="controls" preload="metadata" poster="icon.png" src="tutorial.mp4" style="border: 2px solid #2E1850; aspect-ratio: 16 / 9; object-fit: contain">Seu navegador não reproduz vídeo.</video>
+</div>
+</section>
+
+<!-- Tutorial -->
+<section id="tutorial" class="sg-pad" style="max-width: 1200px; margin: 0 auto; padding: 88px 40px; display: flex; flex-direction: column; gap: 40px">
+<div style="display: flex; flex-direction: column; gap: 12px; max-width: 760px">
+<p style="font-size: 14px; font-weight: 700; letter-spacing: 2px; color: #C9A9FF">PASSO A PASSO</p>
+<h2 class="sg-h2" style="font-family: 'Exo 2', sans-serif; font-weight: 800; font-size: 44px; line-height: 1.1; color: #FFFFFF">Como usar o SpeedGuard</h2>
+<p style="color: #CDBFE3">Siga os passos na ordem na primeira vez. Depois, basta tocar em INICIAR antes de sair.</p>
+</div>
+<ol style="list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 20px">
+
+<li style="background: #221236; border: 1px solid #2E1850; border-radius: 20px; padding: 26px; display: flex; gap: 18px">
+<span style="flex: 0 0 auto; width: 44px; height: 44px; border-radius: 12px; background: #8C50FF; color: #FFFFFF; font-family: 'Exo 2', sans-serif; font-weight: 800; font-size: 22px; display: flex; align-items: center; justify-content: center">1</span>
+<div style="display: flex; flex-direction: column; gap: 6px; min-width: 0">
+<h3 style="font-size: 19px; color: #FFFFFF">Instale o app</h3>
+<p style="font-size: 15px; color: #CDBFE3">Baixe o APK no GitHub (Actions → Build APK → última execução → Artifacts → SpeedGuard-apk), abra o arquivo no celular Android e permita instalar de fontes desconhecidas quando pedir.</p>
+</div>
+</li>
+
+<li style="background: #221236; border: 1px solid #2E1850; border-radius: 20px; padding: 26px; display: flex; gap: 18px">
+<span style="flex: 0 0 auto; width: 44px; height: 44px; border-radius: 12px; background: #8C50FF; color: #FFFFFF; font-family: 'Exo 2', sans-serif; font-weight: 800; font-size: 22px; display: flex; align-items: center; justify-content: center">2</span>
+<div style="display: flex; flex-direction: column; gap: 6px; min-width: 0">
+<h3 style="font-size: 19px; color: #FFFFFF">Dê as permissões</h3>
+<p style="font-size: 15px; color: #CDBFE3">Permita a localização (inclusive em segundo plano) e as notificações. Sem elas o app não consegue avisar com a tela apagada.</p>
+</div>
+</li>
+
+<li style="background: #221236; border: 1px solid #2E1850; border-radius: 20px; padding: 26px; display: flex; gap: 18px">
+<span style="flex: 0 0 auto; width: 44px; height: 44px; border-radius: 12px; background: #8C50FF; color: #FFFFFF; font-family: 'Exo 2', sans-serif; font-weight: 800; font-size: 22px; display: flex; align-items: center; justify-content: center">3</span>
+<div style="display: flex; flex-direction: column; gap: 6px; min-width: 0">
+<h3 style="font-size: 19px; color: #FFFFFF">Toque em INICIAR</h3>
+<p style="font-size: 15px; color: #CDBFE3">O app baixa os radares num raio de 50 km (um símbolo gira ao lado da velocidade) e mostra "N radares carregados". A notificação "SpeedGuard ativo" indica que o monitoramento está ligado. PARAR desliga.</p>
+</div>
+</li>
+
+<li style="background: #221236; border: 1px solid #2E1850; border-radius: 20px; padding: 26px; display: flex; gap: 18px">
+<span style="flex: 0 0 auto; width: 44px; height: 44px; border-radius: 12px; background: #8C50FF; color: #FFFFFF; font-family: 'Exo 2', sans-serif; font-weight: 800; font-size: 22px; display: flex; align-items: center; justify-content: center">4</span>
+<div style="display: flex; flex-direction: column; gap: 6px; min-width: 0">
+<h3 style="font-size: 19px; color: #FFFFFF">Escolha como ser avisado</h3>
+<p style="font-size: 15px; color: #CDBFE3">Em Configurações → Alertas sonoros: Voz ("Radar fixo a 500 metros. Limite 80."), Bipe ou Modo discreto. Os bipes só abaixam a música por um instante.</p>
+</div>
+</li>
+
+<li style="background: #221236; border: 1px solid #2E1850; border-radius: 20px; padding: 26px; display: flex; gap: 18px">
+<span style="flex: 0 0 auto; width: 44px; height: 44px; border-radius: 12px; background: #8C50FF; color: #FFFFFF; font-family: 'Exo 2', sans-serif; font-weight: 800; font-size: 22px; display: flex; align-items: center; justify-content: center">5</span>
+<div style="display: flex; flex-direction: column; gap: 6px; min-width: 0">
+<h3 style="font-size: 19px; color: #FFFFFF">Ligue o painel flutuante</h3>
+<p style="font-size: 15px; color: #CDBFE3">Configurações → Bolha flutuante, permita "Sobrepor a outros apps" e escolha tamanho e formato. Toque em INICIAR e abra o Maps ou Waze: o painel aparece no canto e pode ser arrastado. Para fechar, toque no ✕ ou segure o dedo sobre ele por meio segundo.</p>
+</div>
+</li>
+
+<li style="background: #221236; border: 1px solid #2E1850; border-radius: 20px; padding: 26px; display: flex; gap: 18px">
+<span style="flex: 0 0 auto; width: 44px; height: 44px; border-radius: 12px; background: #8C50FF; color: #FFFFFF; font-family: 'Exo 2', sans-serif; font-weight: 800; font-size: 22px; display: flex; align-items: center; justify-content: center">6</span>
+<div style="display: flex; flex-direction: column; gap: 6px; min-width: 0">
+<h3 style="font-size: 19px; color: #FFFFFF">Navegue até o destino</h3>
+<p style="font-size: 15px; color: #CDBFE3">Toque em Navegar (ao lado de Opções), digite o destino e escolha Google Maps ou Waze. Se o monitoramento estiver parado, o SpeedGuard liga sozinho antes.</p>
+</div>
+</li>
+
+<li style="background: #221236; border: 1px solid #2E1850; border-radius: 20px; padding: 26px; display: flex; gap: 18px">
+<span style="flex: 0 0 auto; width: 44px; height: 44px; border-radius: 12px; background: #8C50FF; color: #FFFFFF; font-family: 'Exo 2', sans-serif; font-weight: 800; font-size: 22px; display: flex; align-items: center; justify-content: center">7</span>
+<div style="display: flex; flex-direction: column; gap: 6px; min-width: 0">
+<h3 style="font-size: 19px; color: #FFFFFF">Reporte radares e avisos</h3>
+<p style="font-size: 15px; color: #CDBFE3">No botão de reportar (ou no + do painel), toque na placa do limite — 30 a 130 ou "?" — e pronto: um toque salva, sem digitar. Acima das placas estão Fila, Obras, Perigo e Polícia. Peça só ao passageiro, ou faça parado.</p>
+</div>
+</li>
+
+<li style="background: #221236; border: 1px solid #2E1850; border-radius: 20px; padding: 26px; display: flex; gap: 18px">
+<span style="flex: 0 0 auto; width: 44px; height: 44px; border-radius: 12px; background: #8C50FF; color: #FFFFFF; font-family: 'Exo 2', sans-serif; font-weight: 800; font-size: 22px; display: flex; align-items: center; justify-content: center">8</span>
+<div style="display: flex; flex-direction: column; gap: 6px; min-width: 0">
+<h3 style="font-size: 19px; color: #FFFFFF">Confirme radares móveis</h3>
+<p style="font-size: 15px; color: #CDBFE3">Radar móvel com mais de 48 h? Ao passar a menos de 150 m aparece "O radar móvel ainda está aqui?". Sim mantém por mais 48 h; Não apaga para todos.</p>
+</div>
+</li>
+
+<li style="background: #221236; border: 1px solid #2E1850; border-radius: 20px; padding: 26px; display: flex; gap: 18px">
+<span style="flex: 0 0 auto; width: 44px; height: 44px; border-radius: 12px; background: #8C50FF; color: #FFFFFF; font-family: 'Exo 2', sans-serif; font-weight: 800; font-size: 22px; display: flex; align-items: center; justify-content: center">9</span>
+<div style="display: flex; flex-direction: column; gap: 6px; min-width: 0">
+<h3 style="font-size: 19px; color: #FFFFFF">Ajuste a tela</h3>
+<p style="font-size: 15px; color: #CDBFE3">O botão ao lado de Configurações alterna entre Mapa e Tela de alerta. Em Opções, escolha as camadas; em Configurações, cor, aparência e ícone no mapa. Para ver outra região, arraste o mapa e aproxime.</p>
+</div>
+</li>
+
+</ol>
+</section>
+
+<!-- Países -->
+<section id="paises" style="background: #1B0D2B; border-top: 1px solid #2E1850; border-bottom: 1px solid #2E1850">
+<div class="sg-pad" style="max-width: 1000px; margin: 0 auto; padding: 80px 40px; display: flex; flex-direction: column; gap: 28px">
+<div style="display: flex; flex-direction: column; gap: 12px">
+<p style="font-size: 14px; font-weight: 700; letter-spacing: 2px; color: #C9A9FF">REGRAS POR PAÍS</p>
+<h2 class="sg-h2" style="font-family: 'Exo 2', sans-serif; font-weight: 800; font-size: 44px; line-height: 1.1; color: #FFFFFF">Use com responsabilidade.</h2>
+<p style="color: #CDBFE3">O SpeedGuard detecta o país pelo GPS e muda o comportamento automaticamente. Confira sempre a lei do lugar onde você dirige.</p>
+</div>
+<div style="overflow-x: auto; border: 1px solid #2E1850; border-radius: 16px">
+<table style="width: 100%; border-collapse: collapse; font-size: 16px; min-width: 480px">
+<thead>
+<tr style="background: #2E1850; text-align: left">
+<th scope="col" style="padding: 14px 20px; color: #FFFFFF">País</th>
+<th scope="col" style="padding: 14px 20px; color: #FFFFFF">Comportamento</th>
+</tr>
+</thead>
+<tbody>
+<tr style="border-top: 1px solid #2E1850">
+<td style="padding: 14px 20px; color: #FFFFFF; font-weight: 600">Suíça</td>
+<td style="padding: 14px 20px; color: #CDBFE3">Alertas desligados (proibido por lei)</td>
+</tr>
+<tr style="border-top: 1px solid #2E1850">
+<td style="padding: 14px 20px; color: #FFFFFF; font-weight: 600">Alemanha</td>
+<td style="padding: 14px 20px; color: #CDBFE3">Funciona, com aviso de que só passageiros podem usar</td>
+</tr>
+<tr style="border-top: 1px solid #2E1850">
+<td style="padding: 14px 20px; color: #FFFFFF; font-weight: 600">França</td>
+<td style="padding: 14px 20px; color: #CDBFE3">Modo completo — atenção: usar ao dirigir um app que mostra a posição exata dos radares é infração (art. R413-15 do Code de la route)</td>
+</tr>
+<tr style="border-top: 1px solid #2E1850">
+<td style="padding: 14px 20px; color: #FFFFFF; font-weight: 600">Demais países</td>
+<td style="padding: 14px 20px; color: #CDBFE3">Modo completo</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</section>
+
+<!-- Leia-me -->
+<section id="leiame" class="sg-pad" style="max-width: 1200px; margin: 0 auto; padding: 88px 40px; display: flex; flex-direction: column; gap: 36px">
+<div style="display: flex; flex-direction: column; gap: 12px; max-width: 760px">
+<p style="font-size: 14px; font-weight: 700; letter-spacing: 2px; color: #C9A9FF">LEIA-ME</p>
+<h2 class="sg-h2" style="font-family: 'Exo 2', sans-serif; font-weight: 800; font-size: 44px; line-height: 1.1; color: #FFFFFF">Por dentro do app</h2>
+</div>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 32px">
+
+<div style="display: flex; flex-direction: column; gap: 10px">
+<h3 style="font-size: 20px; color: #FFFFFF">Cores no mapa</h3>
+<ul style="margin: 0; padding-left: 20px; color: #CDBFE3; font-size: 15px; display: flex; flex-direction: column; gap: 6px">
+<li>Vermelho: radar fixo</li>
+<li>Amarelo: radar de semáforo</li>
+<li>Violeta: reportado por usuários</li>
+<li>Laranja: seu reporte local</li>
+<li>Sua posição: o ícone escolhido (seta, carro, caminhão ou moto)</li>
+</ul>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 10px">
+<h3 style="font-size: 20px; color: #FFFFFF">Reportes compartilhados</h3>
+<ul style="margin: 0; padding-left: 20px; color: #CDBFE3; font-size: 15px; display: flex; flex-direction: column; gap: 6px">
+<li>Radares e avisos vão para o Firebase e todos veem</li>
+<li>Sem duplicados: a menos de 150 m, no mesmo sentido, o reporte vira confirmação</li>
+<li>Avisos de trânsito somem em 6 h e são apagados do servidor</li>
+<li>A contagem de conectados guarda só o código do país e o horário, sem dados pessoais</li>
+</ul>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 10px">
+<h3 style="font-size: 20px; color: #FFFFFF">Requisitos</h3>
+<ul style="margin: 0; padding-left: 20px; color: #CDBFE3; font-size: 15px; display: flex; flex-direction: column; gap: 6px">
+<li>Celular Android com GPS</li>
+<li>Internet para baixar radares e compartilhar reportes (os radares ficam salvos para uso offline)</li>
+<li>Permissão "Sobrepor a outros apps" para o painel flutuante</li>
+</ul>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 10px">
+<h3 style="font-size: 20px; color: #FFFFFF">Código aberto</h3>
+<p style="color: #CDBFE3; font-size: 15px">Feito em Flutter. O APK é compilado automaticamente pelo GitHub Actions a cada atualização. Código, histórico de versões e README completo no <a href="https://github.com/tecsattv-gif/SpeedGuard">repositório do GitHub</a>.</p>
+</div>
+
+</div>
+</section>
+
+<!-- Chamada final -->
+<section class="sg-pad" style="max-width: 1200px; margin: 0 auto; padding: 0 40px 88px">
+<div style="background: #2E1850; border: 1px solid #8C50FF; border-radius: 28px; padding: 48px 40px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 28px">
+<div style="display: flex; align-items: center; gap: 20px; flex: 1 1 360px; min-width: 0">
+<img src="icon.png" alt="" style="width: 80px; height: 80px; border-radius: 20px; flex: 0 0 auto">
+<div style="display: flex; flex-direction: column; gap: 6px">
+<h2 style="font-family: 'Exo 2', sans-serif; font-style: italic; font-weight: 900; font-size: 34px; line-height: 1.1; color: #FFFFFF">Dirija tranquilo.</h2>
+<p style="color: #CDBFE3">Baixe o SpeedGuard e ative em menos de um minuto.</p>
+</div>
+</div>
+<a href="https://github.com/tecsattv-gif/SpeedGuard/actions/workflows/build.yml" style="text-decoration: none; background: linear-gradient(90deg, #FF2D55, #E0389B); color: #FFFFFF; font-weight: 700; padding: 16px 30px; border-radius: 14px; min-height: 44px; box-sizing: border-box; display: inline-flex; align-items: center">Baixar o APK</a>
+</div>
+</section>
+
+<!-- Rodapé -->
+<footer style="border-top: 1px solid #2E1850">
+<div class="sg-pad" style="max-width: 1200px; margin: 0 auto; padding: 32px 40px; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 16px; font-size: 14px; color: #BBA9D6">
+<span>SpeedGuard · criado por Luiz Alberto Cardoso · <a href="mailto:tecsattv@gmail.com">tecsattv@gmail.com</a></span>
+<span>Dados de radares e mapas: © colaboradores do OpenStreetMap (ODbL)</span>
+</div>
+</footer>
+
+</div>
+</body>
+</html>

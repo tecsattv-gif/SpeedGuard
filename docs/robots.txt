@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://tecsattv-gif.github.io/SpeedGuard/sitemap.xml
