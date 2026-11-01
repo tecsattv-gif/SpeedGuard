@@ -136,6 +136,7 @@ class CommunityService {
           .timeout(const Duration(seconds: 20));
       if (res.statusCode != 200) return false;
       final list = jsonDecode(utf8.decode(res.bodyBytes)) as List;
+      _deleteExpired(list);
       _radars = [
         for (final item in list)
           if ((item as Map)['document'] != null)
@@ -220,6 +221,30 @@ class CommunityService {
       return true;
     } catch (_) {
       return false;
+    }
+  }
+
+  /// Apaga do Firebase os avisos (fila, obra, perigo, polícia) com mais
+  /// de 6 h. Qualquer celular que baixar a região faz a limpeza; as regras
+  /// do Firestore só permitem apagar aviso já vencido.
+  void _deleteExpired(List items) {
+    const events = {'fila', 'obra', 'perigo', 'policia'};
+    final now = DateTime.now().millisecondsSinceEpoch;
+    for (final item in items) {
+      final doc = (item as Map)['document'] as Map?;
+      final f = (doc?['fields'] as Map?);
+      if (doc == null || f == null) continue;
+      final type = (f['type'] as Map?)?['stringValue']?.toString();
+      final raw = (f['checkAfter'] as Map?)?['integerValue'];
+      final check = int.tryParse('$raw') ?? 0;
+      if (!events.contains(type) || check >= now) continue;
+      final name = doc['name']?.toString() ?? '';
+      final id = name.split('/').last;
+      if (id.isEmpty) continue;
+      http
+          .delete(Uri.parse('$_base/radars/$id?key=$firebaseApiKey'))
+          .timeout(const Duration(seconds: 20))
+          .catchError((_) => http.Response('', 0));
     }
   }
 
