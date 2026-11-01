@@ -4,7 +4,7 @@ App Android de alerta de radares para o mundo todo, feito em Flutter. Avisa por 
 
 Autor: Luiz Alberto Cardoso
 
-## Funções (versão 1.16.1)
+## Funções (versão 1.17.0)
 
 - **Visual neon** com as cores da tela de abertura: fundo roxo escuro, velocímetro com borda violeta brilhante, botão INICIAR em degradê vermelho→rosa, cartões e botões roxos; o painel flutuante e a janela de reportar seguem a mesma paleta
 - **Tela de abertura** (2,5 s) com a arte do SpeedGuard (velocímetro e rastro de luz) e os créditos do autor
@@ -16,6 +16,7 @@ Autor: Luiz Alberto Cardoso
   - 🟠 Filas · 🟠 Obras · 🟠 Perigos (acidente, obstáculo, avaria, pista escorregadia) · 🔵 Polícia
   - Mais: **O mapa segue você**
 - **Avisos de trânsito reportados pelos motoristas**: no botão de reportar aparecem **Fila, Obras, Perigo e Polícia** acima das placas de velocidade; um toque já reporta para todos. Cada aviso **some sozinho depois de 6 horas** e é **apagado do Firebase automaticamente** pelo primeiro celular que baixar a região depois disso (as regras só permitem apagar aviso já vencido); se alguém reportar o mesmo aviso no mesmo lugar (até 150 m), ele não duplica e ganha mais 6 h. Os avisos usam os mesmos alertas de 500 a 100 m dos radares
+- **Pessoas conectadas**: dois cards pequenos logo abaixo da velocidade mostram quantas pessoas estão com o SpeedGuard conectado agora: 🌍 **no mundo** e com a bandeira do **país onde você está** (ex.: 🇫🇷 12 no país). Conta quem está com o app aberto ou monitorando; atualiza a cada minuto e quem fecha o app sai da contagem em até 4 minutos. Cada aparelho grava só o código do país e o horário na coleção `presence` do Firebase (sem dados pessoais). Os cards só aparecem depois que as regras da coleção `presence` (abaixo) forem publicadas no console
 - **Ícone no mapa** (Configurações → Ícone no mapa): **Seta**, **Carro**, **Caminhão** (cavalo com carreta) ou **Moto**, desenhados vistos de cima e girando conforme a direção
 - **Card de status limpo**: enquanto os radares da região são baixados aparece só um símbolo girando ao lado da velocidade; ao terminar, o card "N radares carregados" aparece por 4 segundos e some. Com radar à frente o card volta mostrando a distância
 - **Cores do app** em Configurações: **Roxo** (padrão), **Azul**, **Verde**, **Laranja**, **Vermelho** ou **Grafite**. Troca na hora o app inteiro (fundos, bordas, botões, velocímetro e o painel flutuante); as cores de alerta (vermelho e laranja dos radares) continuam as mesmas para não confundir
@@ -69,6 +70,7 @@ Autor: Luiz Alberto Cardoso
 | `lib/alert_engine.dart` | Decide quando e o que avisar |
 | `lib/radar_service.dart` | Baixa radares (Overpass/OSM), cache, radares do usuário, detecção do país |
 | `lib/community_service.dart` | Radares compartilhados entre usuários (Firestore via REST) |
+| `lib/presence_service.dart` | Contagem de pessoas conectadas no mundo e no país (Firestore via REST) |
 | `lib/firebase_config.dart` | ID do projeto e chave do Firebase |
 | `lib/layers.dart` | Camadas do painel Opções (radares e avisos de trânsito) |
 | `lib/vehicle_icon.dart` | Ícones da sua posição (seta, carro, caminhão, moto) |
@@ -92,7 +94,7 @@ O workflow roda `flutter create` para gerar os arquivos Android que não estão 
 
 ## Radares compartilhados (Firebase)
 
-**Já ativado** desde a versão 1.6.3. Os radares reportados ficam no Cloud Firestore do projeto Firebase **SpeedGuard001** (ID `speedguard001`, plano Spark gratuito), na coleção `radars`. O app acessa pela API REST, com o ID do projeto e a chave de API da Web em `lib/firebase_config.dart`. A chave não é secreta (vai dentro do app); quem protege os dados são as regras abaixo, já publicadas no console:
+**Já ativado** desde a versão 1.6.3. Os radares reportados ficam no Cloud Firestore do projeto Firebase **SpeedGuard001** (ID `speedguard001`, plano Spark gratuito), na coleção `radars`; as pessoas conectadas ficam na coleção `presence`. O app acessa pela API REST, com o ID do projeto e a chave de API da Web em `lib/firebase_config.dart`. A chave não é secreta (vai dentro do app); quem protege os dados são as regras abaixo, já publicadas no console:
 
 ```
 rules_version = '2';
@@ -111,6 +113,15 @@ service cloud.firestore {
       allow delete: if resource.data.type == 'movel'
         || (resource.data.type in ['fila', 'obra', 'perigo', 'policia']
             && resource.data.checkAfter < request.time.toMillis());
+    }
+    // pessoas conectadas: um documento por aparelho (país + horário)
+    match /presence/{id} {
+      allow read: if true;
+      allow create, update: if request.resource.data.keys().hasOnly(
+          ['country','bucket','cbucket','lastSeen'])
+        && request.resource.data.bucket is int
+        && request.resource.data.country is string
+        && request.resource.data.country.size() <= 3;
     }
   }
 }

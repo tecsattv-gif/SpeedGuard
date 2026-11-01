@@ -21,6 +21,7 @@ import 'country_rules.dart';
 import 'firebase_config.dart';
 import 'models.dart';
 import 'overlay.dart';
+import 'presence_service.dart';
 import 'radar_service.dart';
 import 'splash_screen.dart';
 import 'layers.dart';
@@ -92,6 +93,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   final _engine = AlertEngine();
   final _tts = FlutterTts();
   final _community = CommunityService();
+  /// Quantas pessoas estão conectadas (mundo e país).
+  final _presence = PresenceService();
+  Timer? _presenceTimer;
 
   StreamSubscription<Position>? _sub;
   Position? _pos;
@@ -198,11 +202,25 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     await _tts.setSpeechRate(0.5);
     await _tts.awaitSpeakCompletion(false);
     if (mounted) setState(() {});
+    _presenceTick();
+    _presenceTimer =
+        Timer.periodic(PresenceService.beat, (_) => _presenceTick());
+  }
+
+  /// A cada minuto: avisa que está conectado (app aberto ou monitorando)
+  /// e, com o app na tela, atualiza os cards de conectados.
+  Future<void> _presenceTick() async {
+    if (!_inFront && !_running) return;
+    await _presence.ping(_country);
+    if (!_inFront) return;
+    final ok = await _presence.refresh(_country);
+    if (ok && mounted) setState(() {});
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _presenceTimer?.cancel();
     _closeBubble();
     _overlaySub?.cancel();
     _askTimer?.cancel();
@@ -228,6 +246,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     } else if (state == AppLifecycleState.resumed) {
       _inFront = true;
       _closeBubble();
+      _presenceTick();
       if (_bubbleNoPermission) {
         _bubbleNoPermission = false;
         _snack('Painel flutuante sem permissão: ative "Sobrepor a outros apps" para o SpeedGuard.');
@@ -493,6 +512,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       final p = await SharedPreferences.getInstance();
       await p.setString('country', code);
       setState(() => _country = code);
+      _presenceTick();
     }
     final notice = _rule.notice;
     if (notice != null && _noticeShown.add(code) && mounted) {
@@ -1211,7 +1231,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               ),
               const ListTile(
                 leading: Icon(Icons.info_outline),
-                title: Text('SpeedGuard 1.16.1'),
+                title: Text('SpeedGuard 1.17.0'),
                 subtitle: Text('Dados de radares: © colaboradores do '
                     'OpenStreetMap. Respeite sempre os limites de velocidade.'),
               ),
@@ -1401,6 +1421,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                     ],
                   ),
                   if (_ask != null) _askCard(),
+                  if (_presence.world != null) _onlineCards(),
                 ],
               ),
             ),
@@ -1489,6 +1510,39 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     setState(() => _mapView = !_mapView);
     final p = await SharedPreferences.getInstance();
     await p.setBool('mapView', _mapView);
+  }
+
+  /// Dois cards pequenos: conectados no mundo e no país onde você está.
+  Widget _onlineCards() {
+    final p = _presence;
+    final code = p.countryCode;
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Align(
+        alignment: Alignment.centerRight,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _OnlineChip(
+              icon: '🌍',
+              count: p.world!,
+              label: 'no mundo',
+              tooltip: 'Pessoas com o SpeedGuard conectado no mundo',
+            ),
+            if (code != null && p.country != null) ...[
+              const SizedBox(width: 6),
+              _OnlineChip(
+                icon: PresenceService.flag(code),
+                count: p.country!,
+                label: 'no país',
+                tooltip: 'Pessoas com o SpeedGuard conectado em '
+                    '${ruleFor(code).name}',
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _askCard() {
@@ -1623,6 +1677,56 @@ class _UpdatingBadgeState extends State<_UpdatingBadge>
         child: RotationTransition(
           turns: _spin,
           child: Icon(Icons.sync, color: SG.accent, size: 30),
+        ),
+      ),
+    );
+  }
+}
+
+/// Card pequeno "🌍 128 no mundo" / "🇫🇷 12 no país".
+class _OnlineChip extends StatelessWidget {
+  final String icon;
+  final int count;
+  final String label;
+  final String tooltip;
+  const _OnlineChip({
+    required this.icon,
+    required this.count,
+    required this.label,
+    required this.tooltip,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(8, 4, 10, 4),
+        decoration: BoxDecoration(
+          color: SG.card.withValues(alpha: 0.92),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: SG.line),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(icon, style: const TextStyle(fontSize: 13)),
+            const SizedBox(width: 5),
+            Container(
+              width: 6,
+              height: 6,
+              decoration: const BoxDecoration(
+                  color: Color(0xFF3DDC84), shape: BoxShape.circle),
+            ),
+            const SizedBox(width: 5),
+            Text(PresenceService.format(count),
+                style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: SG.text)),
+            const SizedBox(width: 3),
+            Text(label, style: TextStyle(fontSize: 11, color: SG.textSoft)),
+          ],
         ),
       ),
     );
