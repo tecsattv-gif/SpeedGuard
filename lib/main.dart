@@ -1244,7 +1244,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               ),
               const ListTile(
                 leading: Icon(Icons.info_outline),
-                title: Text('SpeedGuard 1.18.1'),
+                title: Text('SpeedGuard 1.18.2'),
                 subtitle: Text('Dados de radares: © colaboradores do '
                     'OpenStreetMap. Respeite sempre os limites de velocidade.'),
               ),
@@ -1411,6 +1411,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               padding: const EdgeInsets.all(12),
               child: Column(
                 children: [
+                  // Conectados no mundo e no país, no alto da tela.
+                  if (_presence.world != null) _onlineCards(),
                   Row(
                     children: [
                       _SpeedBox(speed: speed, over: a.overLimit),
@@ -1434,7 +1436,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                     ],
                   ),
                   if (_ask != null) _askCard(),
-                  if (_presence.world != null) _onlineCards(),
                 ],
               ),
             ),
@@ -1525,37 +1526,33 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     await p.setBool('mapView', _mapView);
   }
 
-  /// Dois cards pequenos, um embaixo do outro, logo abaixo do círculo da
-  /// velocidade: conectados no mundo e no país onde você está.
+  /// Dois cards pequenos lado a lado, no alto da tela (acima da
+  /// velocidade): conectados no mundo e no país onde você está.
   Widget _onlineCards() {
     final p = _presence;
     final code = p.countryCode;
     return Padding(
-      padding: const EdgeInsets.only(top: 8),
-      child: Align(
-        alignment: Alignment.centerLeft,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          _OnlineChip(
+            icon: '🌍',
+            count: p.world!,
+            label: 'no mundo',
+            tooltip: 'Pessoas com o SpeedGuard conectado no mundo',
+          ),
+          if (code != null && p.country != null) ...[
+            const SizedBox(width: 8),
             _OnlineChip(
-              icon: '🌍',
-              count: p.world!,
-              label: 'no mundo',
-              tooltip: 'Pessoas com o SpeedGuard conectado no mundo',
+              icon: PresenceService.flag(code),
+              count: p.country!,
+              label: 'no país',
+              tooltip: 'Pessoas com o SpeedGuard conectado em '
+                  '${ruleFor(code).name}',
             ),
-            if (code != null && p.country != null) ...[
-              const SizedBox(height: 6),
-              _OnlineChip(
-                icon: PresenceService.flag(code),
-                count: p.country!,
-                label: 'no país',
-                tooltip: 'Pessoas com o SpeedGuard conectado em '
-                    '${ruleFor(code).name}',
-              ),
-            ],
           ],
-        ),
+        ],
       ),
     );
   }
