@@ -500,6 +500,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     }
     _parks.update(pos.latitude, pos.longitude);
     final prog = _routeProgress(pos);
+    // Rota longa: busca o próximo pedaço quando faltam < 40 km do buscado.
+    if (prog != null && _parks.needMore(_route, prog)) {
+      _parks.loadRoute(_route,
+          country: _country, from: _parks.loadedUntil);
+    }
     _parksAhead = prog != null
         ? _parks.alongRoute(prog)
         : _parks.ahead(pos.latitude, pos.longitude,
@@ -542,8 +547,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     setState(() {});
     _snack(n == null
         ? 'Não consegui buscar os parks da rota. Toque no P para tentar de novo.'
-        : '$n parks na rota até ${_route.destName} '
-            '(${_km(_route.total)}). Toque no P para ver.');
+        : 'Parks da rota até ${_route.destName} prontos. Toque no P para ver.');
   }
 
   static String _km(double m) => m < 1000
@@ -648,12 +652,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             if (routing && _parks.hasRoute) {
               final prog =
                   _route.progress(pos.latitude, pos.longitude) ?? 0;
-              list = _parks.alongRoute(prog, max: 0); // todos da rota
-              title = 'Parks da rota até ${_route.destName}';
+              list = _parks.alongRoute(prog, max: 5); // os 5 próximos
+              title = 'Próximos parks até ${_route.destName}';
               hint = _parks.routeLoading
-                  ? '${list.length} parks até agora · buscando o resto da rota '
-                      '(${_parks.routeChunksDone}/${_parks.routeChunks})…'
-                  : '${list.length} parks · distância pela estrada';
+                  ? 'Buscando mais parks da rota…'
+                  : 'Distância pela estrada';
             } else {
               list = _parks.ahead(pos.latitude, pos.longitude,
                   pos.speed > 2.5 ? pos.heading : -1,

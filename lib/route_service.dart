@@ -120,6 +120,26 @@ class RouteService {
     return cum[i];
   }
 
+  /// Pontos da rota entre [from] e [to] metros, um a cada ~[step] m.
+  List<(double, double)> sampleRange(double from, double to,
+      [double step = 1000]) {
+    if (!active) return [];
+    final out = <(double, double)>[];
+    var last = -1e9;
+    for (var i = 0; i < pts.length; i++) {
+      if (cum[i] < from) continue;
+      if (cum[i] > to) {
+        out.add(pts[i]);
+        break;
+      }
+      if (cum[i] - last >= step || out.isEmpty) {
+        out.add(pts[i]);
+        last = cum[i];
+      }
+    }
+    return out;
+  }
+
   /// Rota simplificada (um ponto a cada ~[step] m) para a busca dos parks.
   List<(double, double)> sample([double step = 1500]) {
     if (!active) return [];

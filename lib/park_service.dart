@@ -57,8 +57,24 @@ class ParkService {
     'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
   ];
   static const _ua = 'SpeedGuard/1.24 (Android; tecsattv-gif/SpeedGuard)';
-  static const _radius = 60000.0; // parks num raio de 60 km
-  static const _refetch = 25000.0; // baixa de novo a cada 25 km
+  static const _radius = 25000.0; // parks num raio de ~25 km
+  static const _refetch = 12000.0; // baixa de novo a cada 12 km
+  /// Pedaço da rota buscado de cada vez (o resto vem conforme anda).
+  static const routeWindow = 80000.0;
+
+  /// Busca leve (retângulo, só os filtros com índice no servidor).
+  static String query(List<String> boxes) {
+    final sb = StringBuffer('[out:json][timeout:15];(');
+    for (final b in boxes) {
+      sb
+        ..write('nw["highway"="rest_area"]($b);')
+        ..write('nw["highway"="services"]($b);')
+        ..write('nw["amenity"="parking"]["hgv"~"^(yes|designated|only)\$"]($b);')
+        ..write('nw["parking"="truck_stop"]($b);');
+    }
+    sb.write(');out center tags;');
+    return sb.toString();
+  }
 
   List<Park> _parks = [];
   double? _lat, _lon;
@@ -80,13 +96,12 @@ class ParkService {
       return;
     }
     _busy = true;
-    final a = 'around:${_radius.toInt()},$lat,$lon';
-    final q = '[out:json][timeout:25];('
-        'nwr["highway"~"^(rest_area|services)\$"]($a);'
-        'nwr["amenity"="parking"]["hgv"~"^(yes|designated|only)\$"]($a);'
-        'nwr["amenity"="parking"]["name"~"truck|camion|LKW|vrachtwagen|safe parking|Autohof",i]($a);'
-        'nwr["amenity"="parking"]["parking"="truck_stop"]($a);'
-        ');out center tags;';
+    const dLat = 0.225; // ~25 km
+    final dLon = dLat / math.cos(lat * math.pi / 180);
+    final q = query(['${(lat - dLat).toStringAsFixed(4)},'
+        '${(lon - dLon).toStringAsFixed(4)},'
+        '${(lat + dLat).toStringAsFixed(4)},'
+        '${(lon + dLon).toStringAsFixed(4)}']);
     try {
       final list = await _fetch(q);
       if (list == null) {
@@ -159,10 +174,22 @@ class ParkService {
   /// Chamado a cada trecho buscado (para a tela se atualizar).
   void Function()? onRouteUpdate;
   Object? _routeOf; // rota que está sendo buscada
+  List<Park> _found = []; // parks já baixados desta rota
+  double _loadedUntil = 0; // até onde (m) a rota já foi buscada
+
+  /// Precisa buscar o próximo pedaço da rota? (faltam < 40 km do buscado)
+  bool needMore(RouteService route, double progress) =>
+      routeReady &&
+      !routeLoading &&
+      _loadedUntil < route.total &&
+      progress + 40000 > _loadedUntil;
+  double get loadedUntil => _loadedUntil;
   int get routeCount => _route.length;
 
   void clearRoute() {
     _route = [];
+    _found = [];
+    _loadedUntil = 0;
     routeReady = false;
     _routeOf = null;
   }
@@ -170,17 +197,21 @@ class ParkService {
   /// Busca os parks num corredor de 600 m em volta da rota (em trechos de
   /// ~200 km) e guarda os que ficam no seu sentido. Devolve quantos achou,
   /// ou null se a busca falhou.
-  Future<int?> loadRoute(RouteService route, {String? country}) async {
+  Future<int?> loadRoute(RouteService route,
+      {String? country, double from = 0}) async {
     routeLoading = true;
-    routeReady = false;
-    _route = [];
-    _routeOf = route.pts;
+    if (from == 0 || !identical(route.pts, _routeOf)) {
+      routeReady = false;
+      _route = [];
+      _found = [];
+      _routeOf = route.pts;
+    }
     try {
       // A rota é dividida em trechos de ~15 km; cada trecho vira um
       // retângulo (com 700 m de folga) e a busca é por retângulos, que o
       // servidor responde rápido. (A busca em volta da linha da rota, da
       // 1.25.0, demorava demais e a lista nunca aparecia.)
-      final pts = route.sample(1000);
+      final pts = route.sampleRange(from, from + routeWindow);
       final boxes = <String>[];
       for (var i = 0; i < pts.length; i += 15) {
         final part = pts.sublist(i, math.min(i + 16, pts.length));
@@ -205,22 +236,14 @@ class ParkService {
       // Trecho que falhar é pulado (a rota não fica travada por causa dele).
       final leftHand =
           const {'gb', 'ie', 'mt', 'cy'}.contains(country?.toLowerCase());
-      final found = <Park>[];
+      final found = _found;
       var ok = 0;
       routeChunks = (boxes.length + 3) ~/ 4;
       routeChunksDone = 0;
       for (var i = 0; i < boxes.length; i += 4) {
         if (!identical(route.pts, _routeOf)) return null; // rota trocada
-        final sb = StringBuffer('[out:json][timeout:20];(');
-        for (final b in boxes.sublist(i, math.min(i + 4, boxes.length))) {
-          sb
-            ..write('nwr["highway"~"^(rest_area|services)\$"]($b);')
-            ..write('nwr["amenity"="parking"]["hgv"~"^(yes|designated|only)\$"]($b);')
-            ..write('nwr["amenity"="parking"]["parking"="truck_stop"]($b);')
-            ..write('nwr["amenity"="parking"]["name"~"[Tt]ruck|[Cc]amion|LKW|[Vv]rachtwagen|[Ss]afe [Pp]arking|Autohof"]($b);');
-        }
-        sb.write(');out center tags;');
-        final list = await _fetch(sb.toString(), 25);
+        final list = await _fetch(
+            query(boxes.sublist(i, math.min(i + 4, boxes.length))), 20);
         routeChunksDone++;
         if (list == null) continue;
         ok++;
@@ -242,6 +265,7 @@ class ParkService {
         onRouteUpdate?.call();
       }
       if (ok == 0) return null;
+      _loadedUntil = from + routeWindow;
       return _route.length;
     } finally {
       routeLoading = false;
