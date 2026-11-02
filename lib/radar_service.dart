@@ -21,6 +21,7 @@ class RadarService {
   static const double refetchDistance = 15000; // rebaixa após 15 km
   static const Duration cacheLife = Duration(hours: 6);
   static const Duration retryAfterFail = Duration(seconds: 90);
+  static const _queryVersion = 2;
 
   List<Radar> _osm = [];
   List<Radar> _user = [];
@@ -42,11 +43,16 @@ class RadarService {
   /// servidores falharem. Resposta 200 com erro interno ("remark" de
   /// timeout/memória) conta como falha, para não gravar uma lista vazia.
   Future<List<Radar>?> _query(String area) async {
-    final query = '[out:json][timeout:20];('
-        'node["highway"="speed_camera"]($area);'
-        'node["enforcement"="maxspeed"]($area);'
-        'node["enforcement"="traffic_signals"]($area);'
-        ');out body;';
+    // Radares em nós soltos e também nas relações de fiscalização
+    // (type=enforcement), que é como a maioria dos radares de semáforo e
+    // muitos de velocidade estão marcados: a câmera é o membro "device"
+    // (ou "from", se não houver device) e o tipo fica na relação.
+    final query = '[out:json][timeout:25];'
+        '(node["highway"="speed_camera"]($area);'
+        'node["enforcement"]($area);)->.n;'
+        'relation["type"="enforcement"]($area)->.r;'
+        '(node(r.r:"device");node(r.r:"from");)->.d;'
+        '(.n;.d;.r;);out body;';
     for (final url in _overpassUrls) {
       try {
         final res = await http
@@ -64,17 +70,68 @@ class RadarService {
         }
         final els = data['elements'];
         if (els is! List) continue;
-        final seen = <String>{};
-        return els
-            .map((e) => Radar.fromOsm((e as Map).cast<String, dynamic>()))
-            .whereType<Radar>()
-            .where((r) => seen.add(r.id))
-            .toList();
+        return _fromElements(els);
       } catch (_) {
         // tenta o próximo servidor
       }
     }
     return null;
+  }
+
+  /// Junta nós e relações de fiscalização numa lista de radares.
+  static List<Radar> _fromElements(List els) {
+    final nodes = <int, Map<String, dynamic>>{};
+    final direct = <int>{}; // nós que já são radar por si
+    final fromRel = <int, Map<String, dynamic>>{}; // nó -> tags da relação
+    for (final e in els) {
+      final m = (e as Map).cast<String, dynamic>();
+      final id = (m['id'] as num).toInt();
+      final tags = (m['tags'] as Map?)?.cast<String, dynamic>() ?? {};
+      if (m['type'] == 'node') {
+        nodes[id] = m;
+        if (tags['highway'] == 'speed_camera' || tags['enforcement'] != null) {
+          direct.add(id);
+        }
+      } else if (m['type'] == 'relation') {
+        final enf = tags['enforcement']?.toString() ?? '';
+        if (!const {'maxspeed', 'traffic_signals', 'average_speed'}
+            .contains(enf)) {
+          continue;
+        }
+        final members = (m['members'] as List?) ?? [];
+        int? pick(String role) {
+          for (final mm in members) {
+            final x = (mm as Map);
+            if (x['type'] == 'node' && x['role'] == role) {
+              return (x['ref'] as num).toInt();
+            }
+          }
+          return null;
+        }
+        final node = pick('device') ?? pick('from');
+        if (node != null) fromRel[node] = tags;
+      }
+    }
+    final out = <Radar>[];
+    final seen = <String>{};
+    for (final id in {...direct, ...fromRel.keys}) {
+      final n = nodes[id];
+      if (n == null) continue;
+      final own = (n['tags'] as Map?)?.cast<String, dynamic>() ?? {};
+      final rel = fromRel[id];
+      final tags = <String, dynamic>{
+        if (rel != null) ...rel,
+        ...own,
+        // O tipo e o limite da relação valem mais que os do nó.
+        if (rel?['enforcement'] != null) 'enforcement': rel!['enforcement'],
+        if (own['maxspeed'] == null && rel?['maxspeed'] != null)
+          'maxspeed': rel!['maxspeed'],
+      };
+      tags.remove('type');
+      final r = Radar.fromOsm({...n, 'tags': tags});
+      if (r != null && seen.add(r.id)) out.add(r);
+    }
+    return out;
   }
 
   /// Baixa os radares do retângulo visível no mapa.
@@ -97,6 +154,11 @@ class RadarService {
     _cacheLon = p.getDouble('cache_lon');
     final t = p.getInt('cache_time');
     _cacheTime = t == null ? null : DateTime.fromMillisecondsSinceEpoch(t);
+    // Busca mudou (1.23.1: radares de semáforo das relações): baixa de novo.
+    if (p.getInt('osm_query_v') != _queryVersion) {
+      _cacheTime = null;
+      await p.setInt('osm_query_v', _queryVersion);
+    }
   }
 
   List<Radar> _decode(String? s) {

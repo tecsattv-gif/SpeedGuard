@@ -73,9 +73,17 @@ class Radar {
     final lon = (el['lon'] as num?)?.toDouble();
     if (lat == null || lon == null) return null;
     final tags = (el['tags'] as Map?)?.cast<String, dynamic>() ?? {};
-    final enforcement = tags['enforcement']?.toString();
+    // Radar de semáforo: marcado de vários jeitos no OpenStreetMap.
+    final kinds = [
+      tags['enforcement'],
+      tags['speed_camera'],
+      tags['camera:type'],
+      tags['surveillance:type'],
+    ].map((v) => v?.toString().toLowerCase() ?? '').join(';');
     String type = 'fixo';
-    if (enforcement == 'traffic_signals') type = 'semaforo';
+    if (kinds.contains('traffic_signals') || kinds.contains('red_light')) {
+      type = 'semaforo';
+    }
     if (tags['mobile'] == 'yes') type = 'movel';
     return Radar(
       id: 'osm_${el['id']}',
