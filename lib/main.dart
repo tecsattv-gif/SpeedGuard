@@ -347,11 +347,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     if (!await _ensurePermission()) return;
     final settings = AndroidSettings(
       accuracy: LocationAccuracy.bestForNavigation,
-      // Todas as leituras, 1 por segundo, direto do chip de GPS
-      // (o provedor "fused" misturava posições de antena/Wi-Fi).
-      distanceFilter: 0,
+      // Provedor "fused" do Android (na 1.22.0 forçar o chip de GPS
+      // deixou as leituras lentas e travadas em alguns celulares).
+      distanceFilter: 5,
       intervalDuration: const Duration(seconds: 1),
-      forceLocationManager: true,
       foregroundNotificationConfig: const ForegroundNotificationConfig(
         notificationTitle: 'SpeedGuard ativo',
         notificationText: 'Monitorando radares no caminho',
@@ -362,11 +361,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         .listen(_onRawPosition, onError: (e) => _snack('Erro no GPS: $e'));
     _gps.reset();
     _predictTimer?.cancel();
-    // GPS atrasou? Segue o veículo pela última velocidade e direção,
-    // para não passar por um radar sem avisar.
+    // GPS ficou alguns segundos sem leitura? Os avisos de radar seguem
+    // o veículo pela última velocidade e direção (a tela não muda).
     _predictTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       final p = _gps.predict(DateTime.now());
-      if (p != null) _onPosition(p);
+      if (p != null) _runAlerts(p);
     });
     await WakelockPlus.enable();
     setState(() {
@@ -461,6 +460,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         if (mounted) setState(() {});
       });
     }
+    _runAlerts(pos);
+    _checkAsk(pos);
+  }
+
+  /// Calcula o radar à frente e toca os avisos.
+  void _runAlerts(Position pos) {
     final st = _engine.update(
         pos: pos, radars: _allRadars, mode: _rule.mode);
     if (st.speak != null || st.beeps > 0) {
@@ -488,7 +493,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         _status = '${_allRadars.length} radares carregados na região';
       }
     });
-    _checkAsk(pos);
     _sendBubble();
   }
 

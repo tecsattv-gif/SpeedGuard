@@ -6,7 +6,7 @@ Autor: Luiz Alberto Cardoso
 
 **Site do app:** https://tecsattv-gif.github.io/SpeedGuard/ (recursos, vídeo tutorial e passo a passo)
 
-## Funções (versão 1.22.0)
+## Funções (versão 1.22.1)
 
 - **Visual neon** com as cores da tela de abertura: fundo roxo escuro, velocímetro com borda violeta brilhante, botão INICIAR em degradê vermelho→rosa, cartões e botões roxos; o painel flutuante e a janela de reportar seguem a mesma paleta
 - **Tela de abertura** (2,5 s) com a arte do SpeedGuard (velocímetro e rastro de luz) e os créditos do autor
@@ -25,7 +25,8 @@ Autor: Luiz Alberto Cardoso
 - **Cores do app** em Configurações: **Roxo** (padrão), **Azul**, **Verde**, **Laranja**, **Vermelho** ou **Grafite**. Troca na hora o app inteiro (fundos, bordas, botões, velocímetro e o painel flutuante); as cores de alerta (vermelho e laranja dos radares) continuam as mesmas para não confundir
 - **Aparência** em Configurações: **Auto** (segue o modo claro/escuro do celular), **Claro** ou **Escuro**. No modo escuro o mapa também fica escurecido para não ofuscar à noite. A tela de abertura e o painel flutuante continuam sempre escuros
 - **Duas telas no app aberto**, como no CamSam: o botão ao lado de Configurações alterna entre o **Mapa** e a **Tela de alerta** (sem mapa). A tela de alerta mostra **6 faixas verdes** (setas para cima) com o caminho livre. Com radar à frente aparecem a placa do limite, a distância e o tipo do radar, e **a cada aviso uma faixa fica vermelha, de baixo para cima** (1000 m = 1 faixa, 800 m = 2, 500 m = 3, 400 m = 4, 300 m = 5, 100 m = as 6), junto com o aviso sonoro. Acima do limite aparece "REDUZA A VELOCIDADE". O app lembra a última tela escolhida
-- **GPS rápido e filtrado** (1.22.0): lê o chip de GPS direto, **1 vez por segundo** (antes o Android misturava posições de antena/Wi-Fi, que jogavam o caminhão para uma rua ao lado com 0 km/h e o app perdia radares). Leituras com precisão pior que 35 m ou saltos impossíveis (acima de ~270 km/h) são descartados; velocidade e direção vazias são calculadas pelas últimas posições. Se o GPS atrasar (túnel, viaduto), o app **segue o veículo pela última velocidade e direção por até 8 s**, para não passar por um radar sem avisar. Em curvas e trevos o radar à frente é aceito com até 60° de diferença de direção
+- **GPS** (1.22.1): usa o provedor normal do Android (*fused*), como até a 1.21.0 — a velocidade e a posição na tela são as do GPS, sem atraso. Um filtro leve só descarta leituras de antena/Wi‑Fi que chegam no meio de leituras boas (jogavam o veículo para uma rua ao lado com 0 km/h) e saltos impossíveis. Se o GPS ficar de 2 a 6 s sem mandar leitura acima de 30 km/h, **só os avisos de radar** seguem o veículo pela última velocidade e direção. (A 1.22.0 forçava o chip de GPS e corrigia a velocidade; em alguns celulares isso deixou tudo lento e foi desfeito.)
+- **Sentido do radar**: no OpenStreetMap uns marcam o sentido do trânsito e outros para onde a câmera aponta. Desde a 1.22.1 o radar só é ignorado quando está atravessado em relação à via (antes radares marcados "ao contrário" não avisavam)
 - **Base mundial de radares** baixada automaticamente do OpenStreetMap num raio de 30 km, atualizada a cada 6 h ou a cada 15 km rodados, e guardada para uso offline. Usa três servidores Overpass (overpass-api.de, private.coffee e mail.ru): se um estiver fora do ar, ocupado ou estourar o tempo, tenta o próximo. Resposta com erro interno do servidor não apaga os radares já salvos, e depois de uma falha o app espera 90 s antes de tentar de novo (antes pedia a cada leitura do GPS e o servidor bloqueava). Configurações → **Atualizar radares agora** força o download na hora
 - **Ver radares de outra região**: arraste o mapa para qualquer lugar do mundo e aproxime o zoom; 1 segundo depois de soltar, o app baixa os radares da área que está na tela (com uma margem em volta) e mostra o símbolo girando enquanto carrega. Esses radares são só para ver no mapa; os avisos continuam usando os radares em volta de você
 - **Avisos a 1000, 800, 500, 400, 300 e 100 m** do radar (desde a 1.22.0; antes eram de 500 a 100 m), com vibração. O radar aparece na tela a partir de 1100 m. Em Configurações → **Alertas sonoros** dá para escolher:
@@ -72,7 +73,7 @@ Autor: Luiz Alberto Cardoso
 | Arquivo | O que faz |
 |---|---|
 | `lib/main.dart` | Telas, mapa, GPS e voz |
-| `lib/gps_filter.dart` | Filtro do GPS: descarta leituras ruins e estima a posição quando o GPS atrasa |
+| `lib/gps_filter.dart` | Filtro leve do GPS: descarta leituras de antena/Wi‑Fi e estima a posição só para os avisos quando o GPS atrasa |
 | `lib/alert_engine.dart` | Decide quando e o que avisar |
 | `lib/radar_service.dart` | Baixa radares (Overpass/OSM), cache, radares do usuário, detecção do país |
 | `lib/community_service.dart` | Radares compartilhados entre usuários (Firestore via REST) |

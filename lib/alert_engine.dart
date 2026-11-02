@@ -78,10 +78,13 @@ class AlertEngine {
         if (d > 80 && _angleDiff(pos.heading, (bearing + 360) % 360) > 60) {
           continue;
         }
-        // Se o radar tem sentido conhecido, só vale para quem vai nesse sentido.
-        if (r.direction != null &&
-            _angleDiff(pos.heading, r.direction!) > 70) {
-          continue;
+        // Sentido do radar: no OpenStreetMap uns marcam o sentido do trânsito
+        // e outros para onde a câmera aponta (o contrário). Só descarta
+        // quando o radar está atravessado em relação à via — assim não
+        // perde mais radar por causa do jeito que foi marcado.
+        if (r.direction != null) {
+          final diff = _angleDiff(pos.heading, r.direction!);
+          if (diff > 70 && diff < 110) continue;
         }
       }
       if (d < bestDist) {
