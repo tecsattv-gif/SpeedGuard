@@ -362,10 +362,10 @@ class _OverlayBubbleState extends State<OverlayBubble> {
     final d = _dist;
     const green = Color(0xFF4ED636);
     if (d == null) {
-      // Caminho livre (ou já passou do radar): 5 faixas verdes.
+      // Caminho livre (ou já passou do radar): todas as faixas verdes.
       return const RadarBands(green: green, size: 56);
     }
-    // A cada 100 m (de 500 m até o radar) uma faixa fica vermelha,
+    // A cada aviso (1000, 800, 500, 400, 300 e 100 m) uma faixa fica vermelha,
     // de baixo para cima.
     final color = _over ? SG.red : SG.orange;
     final info = Column(mainAxisSize: MainAxisSize.min, children: [

@@ -6,7 +6,7 @@ Autor: Luiz Alberto Cardoso
 
 **Site do app:** https://tecsattv-gif.github.io/SpeedGuard/ (recursos, vídeo tutorial e passo a passo)
 
-## Funções (versão 1.21.0)
+## Funções (versão 1.22.0)
 
 - **Visual neon** com as cores da tela de abertura: fundo roxo escuro, velocímetro com borda violeta brilhante, botão INICIAR em degradê vermelho→rosa, cartões e botões roxos; o painel flutuante e a janela de reportar seguem a mesma paleta
 - **Tela de abertura** (2,5 s) com a arte do SpeedGuard (velocímetro e rastro de luz) e os créditos do autor
@@ -17,21 +17,22 @@ Autor: Luiz Alberto Cardoso
   - 🔴 Radares fixos (inclui os reportados) · 🟠 Radares de semáforo · 🟣 Radares móveis
   - 🟠 Filas · 🔴 Acidentes · 🟠 Obras · 🟠 Perigos (obstáculo, avaria, pista escorregadia) · 🔵 Polícia
   - Mais: **O mapa segue você**
-- **Avisos de trânsito reportados pelos motoristas**: no botão de reportar aparecem **Fila, Acidente, Obras, Perigo e Polícia** acima das placas de velocidade; um toque já reporta para todos. Cada aviso **some sozinho depois de 6 horas** e é **apagado do Firebase automaticamente** pelo primeiro celular que baixar a região depois disso (as regras só permitem apagar aviso já vencido); se alguém reportar o mesmo aviso no mesmo lugar (até 150 m), ele não duplica e ganha mais 6 h. Os avisos usam os mesmos alertas de 500 a 100 m dos radares
+- **Avisos de trânsito reportados pelos motoristas**: no botão de reportar aparecem **Fila, Acidente, Obras, Perigo e Polícia** acima das placas de velocidade; um toque já reporta para todos. Cada aviso **some sozinho depois de 6 horas** e é **apagado do Firebase automaticamente** pelo primeiro celular que baixar a região depois disso (as regras só permitem apagar aviso já vencido); se alguém reportar o mesmo aviso no mesmo lugar (até 150 m), ele não duplica e ganha mais 6 h. Os avisos usam os mesmos alertas de 1000 a 100 m dos radares
 - **Tutorial em vídeo** (Configurações → **Tutorial**): vídeo de 7 min, narrado, mostrando como configurar e usar o app. O vídeo vai dentro do app (`assets/tutorial.mp4`, ~11 MB) e funciona sem internet; tem play/pausa, voltar e avançar 10 s e barra para arrastar
 - **Pessoas conectadas**: dois cards pequenos, lado a lado no alto da tela (acima do círculo da velocidade), mostram quantas pessoas estão com o SpeedGuard conectado agora: 🌍 **no mundo** e com a bandeira do **país onde você está** (ex.: 🇫🇷 12 no país). Conta quem está com o app aberto ou monitorando; atualiza a cada minuto e quem fecha o app sai da contagem em até 4 minutos. Cada aparelho grava só o código do país e o horário na coleção `presence` do Firebase (sem dados pessoais). Os cards só aparecem depois que as regras da coleção `presence` (abaixo) forem publicadas no console
 - **Ícone no mapa** (Configurações → Ícone no mapa): **Seta**, **Carro**, **Caminhão** (cavalo com carreta) ou **Moto**, desenhados vistos de cima e girando conforme a direção
 - **Card de status limpo**: enquanto os radares da região são baixados aparece só um símbolo girando ao lado da velocidade; ao terminar, o card "N radares carregados" aparece por 4 segundos e some. Com radar à frente o card volta mostrando a distância
 - **Cores do app** em Configurações: **Roxo** (padrão), **Azul**, **Verde**, **Laranja**, **Vermelho** ou **Grafite**. Troca na hora o app inteiro (fundos, bordas, botões, velocímetro e o painel flutuante); as cores de alerta (vermelho e laranja dos radares) continuam as mesmas para não confundir
 - **Aparência** em Configurações: **Auto** (segue o modo claro/escuro do celular), **Claro** ou **Escuro**. No modo escuro o mapa também fica escurecido para não ofuscar à noite. A tela de abertura e o painel flutuante continuam sempre escuros
-- **Duas telas no app aberto**, como no CamSam: o botão ao lado de Configurações alterna entre o **Mapa** e a **Tela de alerta** (sem mapa). A tela de alerta mostra **5 faixas verdes** (setas para cima) com o caminho livre. Com radar à frente aparecem a placa do limite, a distância e o tipo do radar, e **a cada 100 m uma faixa fica vermelha, de baixo para cima** (500 m = 1 faixa … 100 m = as 5), junto com o aviso sonoro. Acima do limite aparece "REDUZA A VELOCIDADE". O app lembra a última tela escolhida
+- **Duas telas no app aberto**, como no CamSam: o botão ao lado de Configurações alterna entre o **Mapa** e a **Tela de alerta** (sem mapa). A tela de alerta mostra **6 faixas verdes** (setas para cima) com o caminho livre. Com radar à frente aparecem a placa do limite, a distância e o tipo do radar, e **a cada aviso uma faixa fica vermelha, de baixo para cima** (1000 m = 1 faixa, 800 m = 2, 500 m = 3, 400 m = 4, 300 m = 5, 100 m = as 6), junto com o aviso sonoro. Acima do limite aparece "REDUZA A VELOCIDADE". O app lembra a última tela escolhida
+- **GPS rápido e filtrado** (1.22.0): lê o chip de GPS direto, **1 vez por segundo** (antes o Android misturava posições de antena/Wi-Fi, que jogavam o caminhão para uma rua ao lado com 0 km/h e o app perdia radares). Leituras com precisão pior que 35 m ou saltos impossíveis (acima de ~270 km/h) são descartados; velocidade e direção vazias são calculadas pelas últimas posições. Se o GPS atrasar (túnel, viaduto), o app **segue o veículo pela última velocidade e direção por até 8 s**, para não passar por um radar sem avisar. Em curvas e trevos o radar à frente é aceito com até 60° de diferença de direção
 - **Base mundial de radares** baixada automaticamente do OpenStreetMap num raio de 30 km, atualizada a cada 6 h ou a cada 15 km rodados, e guardada para uso offline. Usa três servidores Overpass (overpass-api.de, private.coffee e mail.ru): se um estiver fora do ar, ocupado ou estourar o tempo, tenta o próximo. Resposta com erro interno do servidor não apaga os radares já salvos, e depois de uma falha o app espera 90 s antes de tentar de novo (antes pedia a cada leitura do GPS e o servidor bloqueava). Configurações → **Atualizar radares agora** força o download na hora
 - **Ver radares de outra região**: arraste o mapa para qualquer lugar do mundo e aproxime o zoom; 1 segundo depois de soltar, o app baixa os radares da área que está na tela (com uma margem em volta) e mostra o símbolo girando enquanto carrega. Esses radares são só para ver no mapa; os avisos continuam usando os radares em volta de você
-- **Avisos a cada 100 m** do radar (500, 400, 300, 200 e 100 m), com vibração. Em Configurações → **Alertas sonoros** dá para escolher:
-  - **Voz**: "Radar fixo a 500 metros. Limite 80.", depois "400 metros.", "300 metros.", "200 metros." e "100 metros. Limite 80."
-  - **Bipe**: um bipe a cada 100 m, cada vez mais agudo (bipe duplo a 100 m), e uma sequência rápida se estiver acima do limite. Os bipes só abaixam a música/navegação por um instante
+- **Avisos a 1000, 800, 500, 400, 300 e 100 m** do radar (desde a 1.22.0; antes eram de 500 a 100 m), com vibração. O radar aparece na tela a partir de 1100 m. Em Configurações → **Alertas sonoros** dá para escolher:
+  - **Voz**: o 1º aviso já fala o limite do radar — "Radar fixo a 1000 metros. Limite 80." —, depois "800 metros.", "500 metros.", "400 metros.", "300 metros." e por fim "100 metros. Limite 80."
+  - **Bipe**: um bipe a cada aviso, cada vez mais agudo (bipe duplo a 100 m), e uma sequência rápida se estiver acima do limite. Os bipes só abaixam a música/navegação por um instante
   - Se o radar aparecer já perto (ex.: a 250 m), só o aviso daquela distância é dado
-  - **Modo discreto** (voz): fala só a distância ("500 metros")
+  - **Modo discreto** (voz): fala só a distância ("1000 metros")
 - **Aviso "Reduza a velocidade"** quando você passa do limite perto do radar
 - Só avisa radares **à frente** e, quando o sentido do radar é conhecido, só para quem vai naquele sentido
 - **Velocímetro** grande, que fica vermelho acima do limite
@@ -49,7 +50,7 @@ Autor: Luiz Alberto Cardoso
 
   Conteúdo do painel:
   - em cima: velocidade atual (vermelha acima do limite)
-  - no meio: as mesmas **5 faixas verdes** da tela de alerta. De 500 m até o radar, **a cada 100 m uma faixa fica vermelha, de baixo para cima**, com a placa do limite e a distância (laranja, ou vermelho se estiver acima do limite); o aviso de voz ou bipe toca junto. Depois de passar o radar, as faixas voltam a ficar verdes. Também mostra a pergunta "Radar ainda aí?" com ✓/✗
+  - no meio: as mesmas **6 faixas verdes** da tela de alerta. De 1000 m até o radar, **a cada aviso uma faixa fica vermelha, de baixo para cima**, com a placa do limite e a distância (laranja, ou vermelho se estiver acima do limite); o aviso de voz ou bipe toca junto. Depois de passar o radar, as faixas voltam a ficar verdes. Também mostra a pergunta "Radar ainda aí?" com ✓/✗
   - embaixo: botão **+** que abre a janela de reportar radar com as velocidades prontas, sem sair do Maps. Fecha sozinha em 20 s se nada for escolhido; o app confirma por voz "Radar reportado"
   - como usar: ative **Configurações → Bolha flutuante**, permita "Sobrepor a outros apps", toque em **INICIAR** e abra o Maps/Waze. O painel abre no instante em que você sai do SpeedGuard (exigência do Android 15+) e some quando você volta para ele. Se faltar a permissão, o app avisa ao voltar
 - Placas no mapa mostram o limite inteiro, inclusive com 3 dígitos (110, 130)
@@ -71,6 +72,7 @@ Autor: Luiz Alberto Cardoso
 | Arquivo | O que faz |
 |---|---|
 | `lib/main.dart` | Telas, mapa, GPS e voz |
+| `lib/gps_filter.dart` | Filtro do GPS: descarta leituras ruins e estima a posição quando o GPS atrasa |
 | `lib/alert_engine.dart` | Decide quando e o que avisar |
 | `lib/radar_service.dart` | Baixa radares (Overpass/OSM), cache, radares do usuário, detecção do país |
 | `lib/community_service.dart` | Radares compartilhados entre usuários (Firestore via REST) |
@@ -79,9 +81,9 @@ Autor: Luiz Alberto Cardoso
 | `lib/firebase_config.dart` | ID do projeto e chave do Firebase |
 | `lib/layers.dart` | Camadas do painel Opções (radares e avisos de trânsito) |
 | `lib/vehicle_icon.dart` | Ícones da sua posição (seta, carro, caminhão, moto) |
-| `lib/alert_view.dart` | Tela de alerta (5 faixas, placa e distância) |
+| `lib/alert_view.dart` | Tela de alerta (6 faixas, placa e distância) |
 | `lib/overlay.dart` | Painel flutuante sobre outros apps |
-| `assets/sounds/` | Bipes dos avisos (500 a 100 m e acima do limite) |
+| `assets/sounds/` | Bipes dos avisos (1000 a 100 m e acima do limite) |
 | `lib/theme.dart` | Paleta de cores e tema do app |
 | `lib/splash_screen.dart` | Tela de abertura com créditos (2,5 s) |
 | `assets/splash.png`, `assets/icon.png` | Arte da abertura e do ícone (criação original) |

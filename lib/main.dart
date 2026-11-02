@@ -28,6 +28,7 @@ import 'layers.dart';
 import 'theme.dart';
 import 'tutorial_page.dart';
 import 'vehicle_icon.dart';
+import 'gps_filter.dart';
 import 'speed_picker.dart';
 
 Future<void> main() async {
@@ -100,6 +101,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   StreamSubscription<Position>? _sub;
   Position? _pos;
+  final _gps = GpsFilter();
+  Timer? _predictTimer;
   bool _running = false;
   bool _follow = true;
   /// Tela cheia: true = mapa, false = tela de alerta (setas grandes).
@@ -235,6 +238,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     _overlaySub?.cancel();
     _askTimer?.cancel();
     _sub?.cancel();
+    _predictTimer?.cancel();
     _tts.stop();
     _player.dispose();
     _countTimer?.cancel();
@@ -343,8 +347,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     if (!await _ensurePermission()) return;
     final settings = AndroidSettings(
       accuracy: LocationAccuracy.bestForNavigation,
-      distanceFilter: 5,
+      // Todas as leituras, 1 por segundo, direto do chip de GPS
+      // (o provedor "fused" misturava posições de antena/Wi-Fi).
+      distanceFilter: 0,
       intervalDuration: const Duration(seconds: 1),
+      forceLocationManager: true,
       foregroundNotificationConfig: const ForegroundNotificationConfig(
         notificationTitle: 'SpeedGuard ativo',
         notificationText: 'Monitorando radares no caminho',
@@ -352,7 +359,15 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       ),
     );
     _sub = Geolocator.getPositionStream(locationSettings: settings)
-        .listen(_onPosition, onError: (e) => _snack('Erro no GPS: $e'));
+        .listen(_onRawPosition, onError: (e) => _snack('Erro no GPS: $e'));
+    _gps.reset();
+    _predictTimer?.cancel();
+    // GPS atrasou? Segue o veículo pela última velocidade e direção,
+    // para não passar por um radar sem avisar.
+    _predictTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      final p = _gps.predict(DateTime.now());
+      if (p != null) _onPosition(p);
+    });
     await WakelockPlus.enable();
     setState(() {
       _running = true;
@@ -404,7 +419,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   /// Bipe de cada aviso: 1 a 5 = 500 a 100 m (cada vez mais agudo),
   /// 6 = acima do limite.
   Future<void> _beep(int n) async {
-    final file = n >= 6 ? 'beep_fast' : 'step$n';
+    final file = n >= AlertEngine.overBeep ? 'beep_fast' : 'step$n';
     try {
       await _player.stop();
       await _player.play(AssetSource('sounds/$file.wav'));
@@ -414,6 +429,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   Future<void> _stop() async {
     await _sub?.cancel();
     _sub = null;
+    _predictTimer?.cancel();
+    _predictTimer = null;
+    _gps.reset();
     // Parou o monitoramento: o painel flutuante sai da tela.
     await _closeBubble();
     await WakelockPlus.disable();
@@ -422,6 +440,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       _alert = const AlertState();
       _status = 'Monitoramento parado';
     });
+  }
+
+  void _onRawPosition(Position raw) {
+    final pos = _gps.accept(raw);
+    if (pos != null) _onPosition(pos);
   }
 
   Future<void> _onPosition(Position pos) async {
@@ -448,7 +471,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         } else if (st.speak != null) {
           _tts.speak(!_discreet
               ? st.speak!
-              : st.beeps == 6
+              : st.beeps == AlertEngine.overBeep
                   ? 'Reduza.'
                   : st.beeps > 0
                       ? '${AlertEngine.stages[st.beeps - 1]} metros.'
@@ -961,7 +984,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             children: [
               SwitchListTile(
                 title: const Text('Alertas sonoros'),
-                subtitle: const Text('Um aviso a cada 100 m, de 500 m até o radar'),
+                subtitle: const Text('Avisos a 1000, 800, 500, 400, 300 e 100 m do radar'),
                 value: _voice,
                 onChanged: (v) async {
                   final p = await SharedPreferences.getInstance();
@@ -994,7 +1017,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                       if (v.first == 'beep') {
                         _beep(1);
                       } else {
-                        _tts.speak('Radar fixo a 500 metros. Limite 80.');
+                        _tts.speak('Radar fixo a 1000 metros. Limite 80.');
                       }
                     },
                   ),

@@ -72,7 +72,7 @@ class AlertView extends StatelessWidget {
     final dist = d >= 1000
         ? '${(d / 1000).toStringAsFixed(1)} km'
         : '${(d / 10).round() * 10} m';
-    // Uma faixa fica vermelha a cada 100 m: 500 m = 1 … 100 m = 5.
+    // Uma faixa fica vermelha a cada aviso: 1000 m = 1 … 100 m = 6.
     final red = RadarBands.redFor(d);
     return Column(mainAxisSize: MainAxisSize.min, children: [
       FittedBox(
@@ -174,9 +174,9 @@ class RadarBands extends StatelessWidget {
   const RadarBands({super.key, required this.green, this.red = 0, this.size});
 
   /// Quantas faixas ficam vermelhas a esta distância do radar:
-  /// 500 m = 1, 400 m = 2, 300 m = 3, 200 m = 4, 100 m ou menos = 5.
+  /// 1000 m = 1, 800 m = 2, 500 m = 3, 400 m = 4, 300 m = 5, 100 m = 6.
   static int redFor(double d) =>
-      d > 515 ? 0 : (5 - ((d - 16) / 100).floor()).clamp(1, 5);
+      AlertEngine.stages.where((s) => d <= s + 15).length;
 
   @override
   Widget build(BuildContext context) {
@@ -197,7 +197,7 @@ class RadarBands extends StatelessWidget {
 }
 
 class _ChevronPainter extends CustomPainter {
-  static const bands = 5;
+  static const bands = 6;
   static const redColor = Color(0xFFFF2846);
   final Color green;
   final int red;
@@ -208,14 +208,14 @@ class _ChevronPainter extends CustomPainter {
     final w = size.width, h = size.height;
     final cx = w / 2;
     for (var i = 0; i < bands; i++) {
-      // i = 0 é a de cima (menor); a de baixo (i = 4) é a primeira a ficar
+      // i = 0 é a de cima (menor); a de baixo (i = 5) é a primeira a ficar
       // vermelha.
       final isRed = i >= bands - red;
       final paint = Paint()..color = isRed ? redColor : green;
-      final half = w * (0.50 + 0.11 * i) / 2;
-      final tipY = h * (0.03 + 0.155 * i);
+      final half = w * (0.45 + 0.11 * i) / 2;
+      final tipY = h * (0.02 + 0.125 * i);
       final rise = half * 0.45; // inclinação dos braços
-      final t = h * (0.09 + 0.01 * i); // espessura
+      final t = h * (0.08 + 0.01 * i); // espessura
       final path = Path()
         ..moveTo(cx, tipY)
         ..lineTo(cx + half, tipY + rise)
