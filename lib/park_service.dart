@@ -61,7 +61,7 @@ class ParkService {
   static const _radius = 25000.0; // parks num raio de ~25 km
   static const _refetch = 12000.0; // baixa de novo a cada 12 km
   /// Pedaço da rota buscado de cada vez (o resto vem conforme anda).
-  static const routeWindow = 80000.0;
+  static const routeWindow = 200000.0; // 200 km (base própria é leve)
 
   /// Busca leve (retângulo, só os filtros com índice no servidor).
   static String query(List<String> boxes) {
@@ -210,7 +210,7 @@ class ParkService {
       routeReady &&
       !routeLoading &&
       _loadedUntil < route.total &&
-      progress + 40000 > _loadedUntil;
+      progress + 120000 > _loadedUntil;
   double get loadedUntil => _loadedUntil;
   int get routeCount => _route.length;
 

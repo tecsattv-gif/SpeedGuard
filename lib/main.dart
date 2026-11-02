@@ -652,7 +652,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             if (routing && _parks.hasRoute) {
               final prog =
                   _route.progress(pos.latitude, pos.longitude) ?? 0;
-              list = _parks.alongRoute(prog, max: 5); // os 5 próximos
+              list = _parks.alongRoute(prog, max: 10); // os 10 próximos
               title = 'Próximos parks até ${_route.destName}';
               hint = _parks.routeLoading
                   ? 'Buscando mais parks da rota…'
@@ -695,13 +695,25 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                             fontSize: 24,
                             fontWeight: FontWeight.w900)),
                   ),
-                  title: Text(
-                      a.park.name.isNotEmpty ? a.park.name : a.park.kindLabel,
+                  // Distância em destaque antes do nome.
+                  title: Text.rich(
+                      TextSpan(children: [
+                        TextSpan(
+                            text: '${_km(a.distance)}  ',
+                            style: const TextStyle(
+                                color: Color(0xFF64B5F6),
+                                fontSize: 18,
+                                fontWeight: FontWeight.w900)),
+                        TextSpan(
+                            text: a.park.name.isNotEmpty
+                                ? a.park.name
+                                : a.park.kindLabel,
+                            style:
+                                const TextStyle(fontWeight: FontWeight.w600)),
+                      ]),
                       maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontWeight: FontWeight.w600)),
+                      overflow: TextOverflow.ellipsis),
                   subtitle: Text([
-                    _km(a.distance),
                     if (a.park.name.isNotEmpty) a.park.kindLabel,
                     if (a.side != null) 'à ${a.side}',
                     ...a.park.features,
