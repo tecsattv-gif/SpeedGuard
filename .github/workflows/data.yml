@@ -48,7 +48,10 @@ jobs:
           only = set(os.environ.get('ONLY', '').split())
           for f in d['features']:
               p = f['properties']
-              if p.get('parent') != os.environ['REGION'] or p['id'] in skip:
+              # Ids com "/" (ex.: us/texas) são pedaços de um país que já
+              # está inteiro na lista.
+              if (p.get('parent') != os.environ['REGION'] or p['id'] in skip
+                      or '/' in p['id']):
                   continue
               if only and p['id'] not in only:
                   continue
@@ -66,9 +69,9 @@ jobs:
             osmium tags-filter map.osm.pbf \
               nwr/highway=rest_area,services nwr/amenity=parking nwr/parking=truck_stop \
               n/highway=speed_camera n/enforcement r/type=enforcement \
-              -o "work/$ID.osm.pbf" --overwrite
+              -o "work/$ID.osm.pbf" --overwrite || echo "  filtro falhou em $ID"
             rm -f map.osm.pbf
-            ls -la "work/$ID.osm.pbf"
+            ls -la "work/$ID.osm.pbf" || true
           done < list.txt
           ls work | wc -l
 
