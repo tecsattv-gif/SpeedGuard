@@ -661,6 +661,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                       ? 'Comece a andar para ver só os do seu sentido.'
                       : 'Digite o destino em Navegar para ver todos os parks da rota.';
             }
+            // Ainda buscando: atualiza a janela sozinha a cada 2 s.
+            if (waiting || (routing && _parks.routeLoading)) {
+              Future.delayed(const Duration(seconds: 2), () {
+                if (ctx.mounted) setSheet(() {});
+              });
+            }
             Widget tile(ParkAhead a) => ListTile(
                   contentPadding: EdgeInsets.zero,
                   onTap: () {
@@ -702,7 +708,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   ]),
                 );
             return Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
+              // Espaço para a barra de navegação do Android não cobrir
+              // o botão "Encerrar rota".
+              padding: EdgeInsets.fromLTRB(
+                  16, 8, 16, 20 + MediaQuery.viewPaddingOf(ctx).bottom),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -717,6 +726,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                         style: TextStyle(color: SG.textSoft, fontSize: 12)),
                   const SizedBox(height: 8),
                   if (waiting && list.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.all(24),
+                      child: Center(child: CircularProgressIndicator()),
+                    )
+                  else if (list.isEmpty && routing && _parks.routeLoading)
                     const Padding(
                       padding: EdgeInsets.all(24),
                       child: Center(child: CircularProgressIndicator()),

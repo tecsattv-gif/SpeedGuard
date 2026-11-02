@@ -4,6 +4,8 @@ import 'dart:math' as math;
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 
+import 'overpass_gate.dart';
+
 /// Uma via do OpenStreetMap com o limite de velocidade.
 class _Way {
   final String type; // highway=*
@@ -48,6 +50,14 @@ class RoadLimitService {
         'residential|motorway_link|trunk_link|primary_link|secondary_link|'
         'tertiary_link)\$"];out tags geom;';
     try {
+      await OverpassGate.run(() => _load(q, lat, lon));
+    } finally {
+      _busy = false;
+    }
+  }
+
+  Future<void> _load(String q, double lat, double lon) async {
+    {
       for (final url in _urls) {
         try {
           final res = await http
@@ -85,8 +95,6 @@ class RoadLimitService {
         }
       }
       _lastFail = DateTime.now();
-    } finally {
-      _busy = false;
     }
   }
 

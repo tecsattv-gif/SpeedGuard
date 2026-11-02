@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'models.dart';
+import 'overpass_gate.dart';
 
 /// Busca radares no OpenStreetMap, guarda em cache e mantém os
 /// radares reportados pelo usuário.
@@ -42,7 +43,10 @@ class RadarService {
   /// Pergunta ao Overpass. Devolve a lista de radares ou null se todos os
   /// servidores falharem. Resposta 200 com erro interno ("remark" de
   /// timeout/memória) conta como falha, para não gravar uma lista vazia.
-  Future<List<Radar>?> _query(String area) async {
+  Future<List<Radar>?> _query(String area) =>
+      OverpassGate.run(() => _queryNow(area));
+
+  Future<List<Radar>?> _queryNow(String area) async {
     // Radares em nós soltos e também nas relações de fiscalização
     // (type=enforcement), que é como a maioria dos radares de semáforo e
     // muitos de velocidade estão marcados: a câmera é o membro "device"

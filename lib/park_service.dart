@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 
+import 'overpass_gate.dart';
 import 'route_service.dart';
 
 /// Park (área de descanso, área de serviço ou estacionamento de caminhão).
@@ -82,7 +83,8 @@ class ParkService {
     final a = 'around:${_radius.toInt()},$lat,$lon';
     final q = '[out:json][timeout:25];('
         'nwr["highway"~"^(rest_area|services)\$"]($a);'
-        'nwr["amenity"="parking"]["hgv"~"^(yes|designated)\$"]($a);'
+        'nwr["amenity"="parking"]["hgv"~"^(yes|designated|only)\$"]($a);'
+        'nwr["amenity"="parking"]["name"~"truck|camion|LKW|vrachtwagen|safe parking|Autohof",i]($a);'
         'nwr["amenity"="parking"]["parking"="truck_stop"]($a);'
         ');out center tags;';
     try {
@@ -101,7 +103,10 @@ class ParkService {
   }
 
   /// Faz a busca no Overpass (tenta os 3 servidores). null = falhou.
-  Future<List<Park>?> _fetch(String q, [int timeout = 30]) async {
+  Future<List<Park>?> _fetch(String q, [int timeout = 30]) =>
+      OverpassGate.run(() => _fetchNow(q, timeout));
+
+  Future<List<Park>?> _fetchNow(String q, int timeout) async {
     for (final url in _urls) {
       try {
         final res = await http
@@ -167,7 +172,8 @@ class ParkService {
         final a = 'around:600,$line';
         final q = '[out:json][timeout:60];('
             'nwr["highway"~"^(rest_area|services)\$"]($a);'
-            'nwr["amenity"="parking"]["hgv"~"^(yes|designated)\$"]($a);'
+            'nwr["amenity"="parking"]["hgv"~"^(yes|designated|only)\$"]($a);'
+        'nwr["amenity"="parking"]["name"~"truck|camion|LKW|vrachtwagen|safe parking|Autohof",i]($a);'
             'nwr["amenity"="parking"]["parking"="truck_stop"]($a);'
             ');out center tags;';
         final list = await _fetch(q, 70);
