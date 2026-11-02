@@ -101,6 +101,8 @@ Para aparecer no Google: no [Google Search Console](https://search.google.com/se
 
 O GitHub Actions compila sozinho a cada push na `main` (ou manualmente em **Actions → Build APK → Run workflow**). O APK fica em **Actions → última execução → Artifacts → SpeedGuard-apk**.
 
+**Assinatura fixa (obrigatória):** o APK é assinado sempre com a mesma chave, guardada no segredo **`SPEEDGUARD_KEYSTORE`** do repositório (Settings → Secrets and variables → Actions), em base64. Sem esse segredo o build para com erro, de propósito: antes cada build saía com uma chave nova e o Android recusava instalar a versão nova por cima ("App não instalado"). Guarde uma cópia da chave fora do GitHub; se ela se perder, quem já tem o app terá de desinstalar para instalar de novo. A partir da 1.20.0 as atualizações instalam por cima normalmente.
+
 O workflow roda `flutter create` para gerar os arquivos Android que não estão no repositório, sem sobrescrever o manifesto.
 
 ## Radares compartilhados (Firebase)

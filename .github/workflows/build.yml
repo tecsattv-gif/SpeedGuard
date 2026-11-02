@@ -30,6 +30,19 @@ jobs:
       - name: Dependências
         run: flutter pub get
 
+      # Assinatura fixa: sem ela cada build sai com uma chave nova e o
+      # Android recusa instalar por cima da versão anterior.
+      - name: Chave de assinatura fixa
+        env:
+          KS: ${{ secrets.SPEEDGUARD_KEYSTORE }}
+        run: |
+          if [ -z "$KS" ]; then
+            echo "::error::Falta o segredo SPEEDGUARD_KEYSTORE (Settings > Secrets and variables > Actions)"
+            exit 1
+          fi
+          mkdir -p ~/.android
+          echo "$KS" | base64 -d > ~/.android/debug.keystore
+
       - name: Compilar APK
         run: flutter build apk --release
 
