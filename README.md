@@ -6,7 +6,7 @@ Autor: Luiz Alberto Cardoso
 
 **Site do app:** https://tecsattv-gif.github.io/SpeedGuard/ (recursos, vídeo tutorial e passo a passo)
 
-## Funções (versão 1.23.1)
+## Funções (versão 1.23.2)
 
 - **Visual neon** com as cores da tela de abertura: fundo roxo escuro, velocímetro com borda violeta brilhante, botão INICIAR em degradê vermelho→rosa, cartões e botões roxos; o painel flutuante e a janela de reportar seguem a mesma paleta
 - **Tela de abertura** (2,5 s) com a arte do SpeedGuard (velocímetro e rastro de luz) e os créditos do autor
@@ -113,7 +113,7 @@ Para aparecer no Google: no [Google Search Console](https://search.google.com/se
 
 O GitHub Actions compila sozinho a cada push na `main` (ou manualmente em **Actions → Build APK → Run workflow**). O APK fica em **Actions → última execução → Artifacts → SpeedGuard-apk**.
 
-**Assinatura fixa (obrigatória):** o APK é assinado sempre com a mesma chave, guardada no segredo **`SPEEDGUARD_KEYSTORE`** do repositório (Settings → Secrets and variables → Actions), em base64. Sem esse segredo o build para com erro, de propósito: antes cada build saía com uma chave nova e o Android recusava instalar a versão nova por cima ("App não instalado"). Guarde uma cópia da chave fora do GitHub; se ela se perder, quem já tem o app terá de desinstalar para instalar de novo. A partir da 1.20.0 as atualizações instalam por cima normalmente.
+**Assinatura fixa (obrigatória):** o APK é assinado sempre com a mesma chave (CN=SpeedGuard). Ela fica no repositório **criptografada** em `android/signing.enc`; a senha vem do segredo **`SPEEDGUARD_KEYSTORE`** (Settings → Secrets and variables → Actions), que nunca sai do GitHub. Não apague nem troque esse segredo nem o arquivo: sem eles as atualizações deixam de instalar por cima. O build confere a chave e **para com erro** se ela estiver ilegível ou se o APK sair assinado com outra chave. Histórico: até a 1.23.1 o segredo estava corrompido e cada build saía com uma chave diferente — por isso aparecia "conflito com um pacote já existente". Na **1.23.2** é preciso **desinstalar uma última vez**; dali em diante as versões instalam por cima.
 
 O workflow roda `flutter create` para gerar os arquivos Android que não estão no repositório, sem sobrescrever o manifesto.
 

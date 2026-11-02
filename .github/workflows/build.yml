@@ -10,6 +10,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write   # para guardar a chave criptografada na 1ª vez
     steps:
       - uses: actions/checkout@v4
 
@@ -31,7 +33,10 @@ jobs:
         run: flutter pub get
 
       # Assinatura fixa: sem ela cada build sai com uma chave nova e o
-      # Android recusa instalar por cima da versão anterior.
+      # Android recusa instalar por cima ("conflito com pacote existente").
+      # A chave fica no repositório CRIPTOGRAFADA (android/signing.enc); a senha
+      # é derivada do segredo SPEEDGUARD_KEYSTORE, que nunca sai do GitHub.
+      # Na 1ª vez (arquivo ainda não existe) o build cria a chave e guarda.
       - name: Chave de assinatura fixa
         env:
           KS: ${{ secrets.SPEEDGUARD_KEYSTORE }}
@@ -40,11 +45,27 @@ jobs:
             echo "::error::Falta o segredo SPEEDGUARD_KEYSTORE (Settings > Secrets and variables > Actions)"
             exit 1
           fi
+          PASS=$(printf '%s' "$KS" | sha256sum | cut -d' ' -f1)
+          if [ ! -f android/signing.enc ]; then
+            keytool -genkeypair -keystore /tmp/ks.p12 -storetype PKCS12 \
+              -alias androiddebugkey -storepass android -keypass android \
+              -keyalg RSA -keysize 2048 -validity 20000 \
+              -dname "CN=SpeedGuard, O=tecsattv, C=BE"
+            openssl enc -aes-256-cbc -pbkdf2 -salt -in /tmp/ks.p12 \
+              -out android/signing.enc -pass "pass:$PASS"
+            rm /tmp/ks.p12
+            git config user.name "SpeedGuard build"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add android/signing.enc
+            git commit -m "Chave de assinatura fixa (criptografada) [skip ci]"
+            git push
+          fi
           mkdir -p ~/.android
-          echo "$KS" | base64 -d > ~/.android/debug.keystore
-          # Impressão digital da chave: deve ser sempre a mesma em todo build.
-          ls -l ~/.android/debug.keystore
-          keytool -list -v -keystore ~/.android/debug.keystore -storepass android 2>&1 | grep -E "Alias|SHA256|Keystore type|error|Exception" | head -6 || true
+          openssl enc -d -aes-256-cbc -pbkdf2 -in android/signing.enc \
+            -out ~/.android/debug.keystore -pass "pass:$PASS"
+          # Chave ilegível = build para aqui (antes saía com chave aleatória).
+          keytool -list -v -keystore ~/.android/debug.keystore -storepass android \
+            | grep -m1 "SHA256" || { echo "::error::Chave de assinatura ilegível"; exit 1; }
 
       - name: Compilar APK
         run: flutter build apk --release
@@ -56,7 +77,9 @@ jobs:
       - name: Conferir assinatura do APK
         run: |
           AS=$(ls -d $ANDROID_HOME/build-tools/*/ | sort -V | tail -1)apksigner
-          $AS verify --print-certs SpeedGuard.apk | grep -E "SHA-256|DN" || true
+          $AS verify --print-certs SpeedGuard.apk | grep -E "SHA-256|DN"
+          # Tem que ser a nossa chave (CN=SpeedGuard), não uma gerada na hora.
+          $AS verify --print-certs SpeedGuard.apk | grep -q "CN=SpeedGuard" || { echo "::error::APK assinado com chave errada"; exit 1; }
 
       - uses: actions/upload-artifact@v4
         with:
