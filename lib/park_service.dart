@@ -4,6 +4,8 @@ import 'dart:math' as math;
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 
+import 'route_service.dart';
+
 /// Park (área de descanso, área de serviço ou estacionamento de caminhão).
 class Park {
   final String id;
@@ -40,8 +42,10 @@ class Park {
 class ParkAhead {
   final Park park;
   final double distance;
-  final String? side; // 'direita' / 'esquerda' (só quando está perto)
-  const ParkAhead(this.park, this.distance, this.side);
+  final String? side; // 'direita' / 'esquerda'
+  /// true = distância pela estrada (rota); false = em linha reta.
+  final bool road;
+  const ParkAhead(this.park, this.distance, this.side, {this.road = false});
 }
 
 /// Busca os parks em volta no OpenStreetMap e diz quais estão à frente.
@@ -82,52 +86,122 @@ class ParkService {
         'nwr["amenity"="parking"]["parking"="truck_stop"]($a);'
         ');out center tags;';
     try {
-      for (final url in _urls) {
-        try {
-          final res = await http
-              .post(Uri.parse(url),
-                  headers: {'User-Agent': _ua}, body: {'data': q})
-              .timeout(const Duration(seconds: 30));
-          if (res.statusCode != 200) continue;
-          final data = jsonDecode(utf8.decode(res.bodyBytes)) as Map;
-          final els = data['elements'];
-          final remark = data['remark']?.toString().toLowerCase() ?? '';
-          if (els is! List || remark.contains('error')) continue;
-          final list = <Park>[];
-          for (final e in els) {
-            final m = e as Map;
-            final c = m['center'] as Map?;
-            final la = ((m['lat'] ?? c?['lat']) as num?)?.toDouble();
-            final lo = ((m['lon'] ?? c?['lon']) as num?)?.toDouble();
-            if (la == null || lo == null) continue;
-            final raw = m['tags'];
-            final tags = <String, String>{
-              if (raw is Map)
-                for (final en in raw.entries)
-                  en.key.toString(): en.value.toString()
-            };
-            final hw = tags['highway'];
-            final kind = hw == 'services'
-                ? 'services'
-                : hw == 'rest_area'
-                    ? 'rest_area'
-                    : 'parking';
-            list.add(Park('${m['type']}${m['id']}', tags['name'] ?? '', la,
-                lo, kind, tags));
-          }
-          _parks = _dedupe(list);
-          _lat = lat;
-          _lon = lon;
-          _lastFail = null;
-          return;
-        } catch (_) {
-          // tenta o próximo servidor
-        }
+      final list = await _fetch(q);
+      if (list == null) {
+        _lastFail = DateTime.now();
+        return;
       }
-      _lastFail = DateTime.now();
+      _parks = _dedupe(list);
+      _lat = lat;
+      _lon = lon;
+      _lastFail = null;
     } finally {
       _busy = false;
     }
+  }
+
+  /// Faz a busca no Overpass (tenta os 3 servidores). null = falhou.
+  Future<List<Park>?> _fetch(String q, [int timeout = 30]) async {
+    for (final url in _urls) {
+      try {
+        final res = await http
+            .post(Uri.parse(url), headers: {'User-Agent': _ua}, body: {'data': q})
+            .timeout(Duration(seconds: timeout));
+        if (res.statusCode != 200) continue;
+        final data = jsonDecode(utf8.decode(res.bodyBytes)) as Map;
+        final els = data['elements'];
+        final remark = data['remark']?.toString().toLowerCase() ?? '';
+        if (els is! List || remark.contains('error')) continue;
+        final list = <Park>[];
+        for (final e in els) {
+          final m = e as Map;
+          final c = m['center'] as Map?;
+          final la = ((m['lat'] ?? c?['lat']) as num?)?.toDouble();
+          final lo = ((m['lon'] ?? c?['lon']) as num?)?.toDouble();
+          if (la == null || lo == null) continue;
+          final raw = m['tags'];
+          final tags = <String, String>{
+            if (raw is Map)
+              for (final en in raw.entries) en.key.toString(): en.value.toString()
+          };
+          final hw = tags['highway'];
+          final kind = hw == 'services'
+              ? 'services'
+              : hw == 'rest_area'
+                  ? 'rest_area'
+                  : 'parking';
+          list.add(Park('${m['type']}${m['id']}', tags['name'] ?? '', la, lo,
+              kind, tags));
+        }
+        return list;
+      } catch (_) {
+        // tenta o próximo servidor
+      }
+    }
+    return null;
+  }
+
+  // ---------- Parks ao longo da rota (destino digitado em Navegar) ----------
+
+  /// Parks da rota com a distância pela estrada desde a partida (m) e o lado.
+  List<(Park, double, String)> _route = [];
+  bool routeLoading = false;
+  bool get hasRoute => _route.isNotEmpty;
+  int get routeCount => _route.length;
+
+  void clearRoute() => _route = [];
+
+  /// Busca os parks num corredor de 600 m em volta da rota (em trechos de
+  /// ~200 km) e guarda os que ficam no seu sentido. Devolve quantos achou,
+  /// ou null se a busca falhou.
+  Future<int?> loadRoute(RouteService route, {String? country}) async {
+    routeLoading = true;
+    try {
+      final pts = route.sample(1000);
+      final found = <Park>[];
+      for (var i = 0; i < pts.length - 1; i += 200) {
+        final part = pts.sublist(i, math.min(i + 201, pts.length));
+        final line = part
+            .map((p) => '${p.$1.toStringAsFixed(5)},${p.$2.toStringAsFixed(5)}')
+            .join(',');
+        final a = 'around:600,$line';
+        final q = '[out:json][timeout:60];('
+            'nwr["highway"~"^(rest_area|services)\$"]($a);'
+            'nwr["amenity"="parking"]["hgv"~"^(yes|designated)\$"]($a);'
+            'nwr["amenity"="parking"]["parking"="truck_stop"]($a);'
+            ');out center tags;';
+        final list = await _fetch(q, 70);
+        if (list == null) return null;
+        found.addAll(list);
+      }
+      final leftHand =
+          const {'gb', 'ie', 'mt', 'cy'}.contains(country?.toLowerCase());
+      final out = <(Park, double, String)>[];
+      for (final p in _dedupe(found)) {
+        final (i, d, side) = route.nearest(p.lat, p.lon);
+        if (d > 600) continue;
+        final right = side > 0;
+        // Área de autoestrada do outro lado: é da pista contrária.
+        final wrong = leftHand ? right : !right;
+        if (wrong && p.kind != 'parking' && d < 500) continue;
+        out.add((p, route.cum[i], right ? 'direita' : 'esquerda'));
+      }
+      out.sort((a, b) => a.$2.compareTo(b.$2));
+      _route = out;
+      return out.length;
+    } finally {
+      routeLoading = false;
+    }
+  }
+
+  /// Parks da rota que ainda estão à frente, com a distância pela estrada.
+  /// [max] = 0 devolve todos.
+  List<ParkAhead> alongRoute(double progress, {int max = 3}) {
+    final out = [
+      for (final (p, at, side) in _route)
+        if (at > progress + 100) ParkAhead(p, at - progress, side, road: true)
+    ];
+    return max <= 0 ? out : out.take(max).toList();
   }
 
   /// O mesmo park às vezes vem como área + estacionamento: junta os que

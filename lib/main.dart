@@ -31,6 +31,7 @@ import 'vehicle_icon.dart';
 import 'gps_filter.dart';
 import 'park_service.dart';
 import 'road_limit.dart';
+import 'route_service.dart';
 import 'speed_watch.dart';
 import 'speed_picker.dart';
 
@@ -107,6 +108,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   final _gps = GpsFilter();
   final _roads = RoadLimitService();
   final _parks = ParkService();
+  final _route = RouteService();
   /// Parks à frente (área de descanso/serviço, estacionamento de caminhão).
   List<ParkAhead> _parksAhead = const [];
   bool _showParks = true;
@@ -497,11 +499,48 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       return;
     }
     _parks.update(pos.latitude, pos.longitude);
-    _parksAhead = _parks.ahead(pos.latitude, pos.longitude,
-        pos.speed > 2.5 ? pos.heading : -1,
-        country: _country);
+    final prog = _routeProgress(pos);
+    _parksAhead = prog != null
+        ? _parks.alongRoute(prog)
+        : _parks.ahead(pos.latitude, pos.longitude,
+            pos.speed > 2.5 ? pos.heading : -1,
+            country: _country);
     final say = _parks.announce(_parksAhead);
     if (say != null && _voice) _tts.speak(say);
+  }
+
+  /// Quanto já andou na rota (m), ou null sem rota / fora dela.
+  /// Chegou ao destino: encerra a rota.
+  double? _routeProgress(Position pos) {
+    if (!_route.active || !_parks.hasRoute) return null;
+    final prog = _route.progress(pos.latitude, pos.longitude);
+    if (prog != null && _route.total - prog < 300) {
+      _route.clear();
+      _parks.clearRoute();
+      return null;
+    }
+    return prog;
+  }
+
+  /// Calcula a rota até o destino digitado e busca os parks nela.
+  Future<void> _planRoute(String dest) async {
+    final pos = _pos ?? await _currentPos();
+    if (pos == null) return;
+    _route.clear();
+    _parks.clearRoute();
+    final err = await _route.plan(pos.latitude, pos.longitude, dest);
+    if (err != null) {
+      _snack('$err Os parks seguem pelo seu sentido.');
+      return;
+    }
+    if (mounted) setState(() {});
+    final n = await _parks.loadRoute(_route, country: _country);
+    if (!mounted) return;
+    setState(() {});
+    _snack(n == null
+        ? 'Não consegui buscar os parks da rota. Toque no P para tentar de novo.'
+        : '$n parks na rota até ${_route.destName} '
+            '(${_km(_route.total)}). Toque no P para ver.');
   }
 
   static String _km(double m) => m < 1000
@@ -585,92 +624,136 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       _snack('Aguardando o sinal do GPS…');
       return;
     }
+    // Rota calculada mas a busca dos parks falhou: tenta de novo.
+    if (_route.active && !_parks.hasRoute && !_parks.routeLoading) {
+      _parks.loadRoute(_route, country: _country);
+    }
     final load = _parks.update(pos.latitude, pos.longitude);
     await showModalBottomSheet<void>(
       context: context,
-      builder: (ctx) => FutureBuilder<void>(
-        future: load,
-        builder: (ctx, snap) {
-          final waiting = snap.connectionState != ConnectionState.done;
-          var list = _parks.ahead(pos.latitude, pos.longitude,
-              pos.speed > 2.5 ? pos.heading : -1,
-              country: _country);
-          final noDir = !_parks.hasHeading;
-          if (noDir) list = _parks.nearest(pos.latitude, pos.longitude);
-          return Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(noDir ? 'Parks mais perto' : 'Parks à frente',
-                    style: const TextStyle(
-                        fontSize: 20, fontWeight: FontWeight.bold)),
-                if (noDir)
-                  Text('Comece a andar para ver só os do seu sentido.',
-                      style: TextStyle(color: SG.textSoft, fontSize: 12)),
-                const SizedBox(height: 8),
-                if (waiting && list.isEmpty)
-                  const Padding(
-                    padding: EdgeInsets.all(24),
-                    child: Center(child: CircularProgressIndicator()),
-                  )
-                else if (list.isEmpty)
-                  Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: Text(
-                        'Nenhum park encontrado à frente (até 60 km).',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: SG.textSoft)),
-                  )
-                else
-                  for (final a in list)
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      onTap: () {
-                        Navigator.pop(ctx);
-                        _navigateTo(a.park);
-                      },
-                      leading: Container(
-                        width: 40,
-                        height: 40,
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                            color: const Color(0xFF1565C0),
-                            borderRadius: BorderRadius.circular(8)),
-                        child: const Text('P',
-                            style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 24,
-                                fontWeight: FontWeight.w900)),
-                      ),
-                      title: Text(
-                          a.park.name.isNotEmpty
-                              ? a.park.name
-                              : a.park.kindLabel,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontWeight: FontWeight.w600)),
-                      subtitle: Text([
-                        _km(a.distance),
-                        if (a.park.name.isNotEmpty) a.park.kindLabel,
-                        if (a.side != null) 'à ${a.side}',
-                        ...a.park.features,
-                      ].join(' · ')),
-                      // Compartilhar (separado) e rota.
-                      trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-                        IconButton(
-                          tooltip: 'Compartilhar',
-                          icon: const Icon(Icons.share),
-                          onPressed: () => _sharePark(a.park),
-                        ),
-                        const Icon(Icons.directions, color: Color(0xFF1A73E8)),
-                      ]),
+      isScrollControlled: true,
+      constraints: BoxConstraints(
+          maxHeight: MediaQuery.sizeOf(context).height * 0.8),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheet) => FutureBuilder<void>(
+          future: load,
+          builder: (ctx, snap) {
+            final waiting = snap.connectionState != ConnectionState.done;
+            final routing = _route.active;
+            String title, hint = '';
+            List<ParkAhead> list;
+            if (routing && _parks.hasRoute) {
+              final prog =
+                  _route.progress(pos.latitude, pos.longitude) ?? 0;
+              list = _parks.alongRoute(prog, max: 0); // todos da rota
+              title = 'Parks da rota até ${_route.destName}';
+              hint = '${list.length} parks · distância pela estrada';
+            } else {
+              list = _parks.ahead(pos.latitude, pos.longitude,
+                  pos.speed > 2.5 ? pos.heading : -1,
+                  country: _country);
+              final noDir = !_parks.hasHeading;
+              if (noDir) list = _parks.nearest(pos.latitude, pos.longitude);
+              title = noDir ? 'Parks mais perto' : 'Parks à frente';
+              hint = routing && _parks.routeLoading
+                  ? 'Buscando os parks da rota… abra de novo em instantes.'
+                  : noDir
+                      ? 'Comece a andar para ver só os do seu sentido.'
+                      : 'Digite o destino em Navegar para ver todos os parks da rota.';
+            }
+            Widget tile(ParkAhead a) => ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _navigateTo(a.park);
+                  },
+                  leading: Container(
+                    width: 40,
+                    height: 40,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                        color: const Color(0xFF1565C0),
+                        borderRadius: BorderRadius.circular(8)),
+                    child: const Text('P',
+                        style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 24,
+                            fontWeight: FontWeight.w900)),
+                  ),
+                  title: Text(
+                      a.park.name.isNotEmpty ? a.park.name : a.park.kindLabel,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontWeight: FontWeight.w600)),
+                  subtitle: Text([
+                    _km(a.distance),
+                    if (a.park.name.isNotEmpty) a.park.kindLabel,
+                    if (a.side != null) 'à ${a.side}',
+                    ...a.park.features,
+                  ].join(' · ')),
+                  // Compartilhar (separado) e rota.
+                  trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                    IconButton(
+                      tooltip: 'Compartilhar',
+                      icon: const Icon(Icons.share),
+                      onPressed: () => _sharePark(a.park),
                     ),
-              ],
-            ),
-          );
-        },
+                    const Icon(Icons.directions, color: Color(0xFF1A73E8)),
+                  ]),
+                );
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          fontSize: 20, fontWeight: FontWeight.bold)),
+                  if (hint.isNotEmpty)
+                    Text(hint,
+                        style: TextStyle(color: SG.textSoft, fontSize: 12)),
+                  const SizedBox(height: 8),
+                  if (waiting && list.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.all(24),
+                      child: Center(child: CircularProgressIndicator()),
+                    )
+                  else if (list.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Text(
+                          routing && _parks.hasRoute
+                              ? 'Nenhum park à frente nesta rota.'
+                              : 'Nenhum park encontrado à frente (até 60 km).',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: SG.textSoft)),
+                    )
+                  else
+                    Flexible(
+                      child: ListView(
+                        shrinkWrap: true,
+                        children: [for (final a in list) tile(a)],
+                      ),
+                    ),
+                  if (routing)
+                    TextButton.icon(
+                      onPressed: () {
+                        _route.clear();
+                        _parks.clearRoute();
+                        setState(() {});
+                        Navigator.pop(ctx);
+                      },
+                      icon: const Icon(Icons.close),
+                      label: const Text('Encerrar rota'),
+                    ),
+                ],
+              ),
+            );
+          },
+        ),
       ),
     );
   }
@@ -1023,6 +1106,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     if (app == null) return;
     // Liga o monitoramento antes de sair, para avisar os radares no caminho.
     if (!_running) await _start();
+    // Calcula a mesma rota aqui, para listar os parks do caminho.
+    if (dest.isNotEmpty) _planRoute(dest);
     final q = Uri.encodeComponent(dest);
     final AndroidIntent intent;
     if (app == 'waze') {

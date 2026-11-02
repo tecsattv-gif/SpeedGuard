@@ -6,7 +6,7 @@ Autor: Luiz Alberto Cardoso
 
 **Site do app:** https://tecsattv-gif.github.io/SpeedGuard/ (recursos, vídeo tutorial e passo a passo)
 
-## Funções (versão 1.24.2)
+## Funções (versão 1.25.0)
 
 - **Visual neon** com as cores da tela de abertura: fundo roxo escuro, velocímetro com borda violeta brilhante, botão INICIAR em degradê vermelho→rosa, cartões e botões roxos; o painel flutuante e a janela de reportar seguem a mesma paleta
 - **Tela de abertura** (2,5 s) com a arte do SpeedGuard (velocímetro e rastro de luz) e os créditos do autor
@@ -28,6 +28,7 @@ Autor: Luiz Alberto Cardoso
 - **Parks à frente** (1.24.0), em Configurações (ligado por padrão): mostra num card azul, em cima dos botões Opções/Navegar, o **próximo park no seu sentido** — áreas de descanso (`highway=rest_area`), áreas de serviço (`highway=services`) e estacionamentos de caminhão (`amenity=parking` com `hgv=yes/designated` ou `parking=truck_stop`) do OpenStreetMap, num raio de 60 km (baixados de novo a cada 25 km). Mostra distância, nome, tipo, lado (perto) e o que tem marcado no mapa: WC, chuveiro, combustível, restaurante, vagas, pago/grátis. Toque no card para ver os **3 próximos**; o botão de rota abre o **Google Maps** (ou o Waze) até o park. Aviso de voz a 2 km: "Park a 2 quilômetros, à direita." Áreas de autoestrada do lado contrário (outra pista) são ignoradas. O painel flutuante mostra "P 12 km". A distância é em linha reta (pela estrada pode ser um pouco mais)
   - **Botão P** (1.24.1), ao lado de Navegar: abre a janela **Parks à frente** com os 3 próximos parks no seu sentido (nome, distância, tipo, lado e o que oferecem). Um toque no park abre a rota no **Google Maps** (ou no Waze, se não houver Google Maps). Funciona também com o monitoramento parado; parado sem direção, mostra os 3 mais perto
   - **Compartilhar park** (1.24.2): botão separado ao lado da rota, na janela do P e no card. Envia por WhatsApp, SMS, e-mail etc. o nome, o tipo, o que o park oferece e o link do Google Maps
+  - **Parks da rota** (1.25.0): ao digitar um destino em **Navegar**, o SpeedGuard calcula a mesma rota (OSRM, do OpenStreetMap; o Google Maps não deixa outros apps lerem a rota dele) e busca os parks num corredor de 600 m em volta dela, só do seu sentido. O botão P passa a mostrar **todos os parks da rota**, com a **distância pela estrada**, antes mesmo de sair; os que ficam para trás saem da lista, e o card e o aviso de 2 km usam o próximo da rota. Se você sair da rota, volta a mostrar os parks à frente pelo rumo. Ao chegar ao destino (ou no botão **Encerrar rota**) a rota é apagada. O destino é procurado no Nominatim (OpenStreetMap). A rota é de carro e pode diferir da do Google se ele desviar por trânsito
 - **Aviso de velocidade excedida** (1.23.0), em Configurações (ligado por padrão):
   - **Caminhão** (veículo escolhido em Configurações): funciona como o limitador — passou de **90 km/h** (ou 80, escolhido em Configurações → Limitador do caminhão), o app fala na hora "Limite de 90 excedido.", **aos 20 s** "Atenção. Você só tem 10 segundos para voltar aos 90." e **aos 30 s** "Velocidade excedida. Volte para os 90.", que se repete a cada 30 s enquanto continuar acima. Voltou para 90 ou menos, a contagem zera. Se a via tiver limite menor que o do caminhão, avisa uma vez "Limite da via 70."
   - **Carro, moto e seta**: a mesma contagem, usando o limite da via
@@ -83,6 +84,7 @@ Autor: Luiz Alberto Cardoso
 |---|---|
 | `lib/main.dart` | Telas, mapa, GPS e voz |
 | `lib/park_service.dart` | Parks à frente: busca no OpenStreetMap, filtro pelo sentido e aviso a 2 km |
+| `lib/route_service.dart` | Rota até o destino digitado (Nominatim + OSRM) e posição do veículo na rota |
 | `lib/road_limit.dart` | Limite de velocidade da via onde o veículo está (OpenStreetMap) e máximos de caminhão por país |
 | `lib/speed_watch.dart` | Contagem dos 30 s acima do limite e frases de aviso |
 | `lib/gps_filter.dart` | Filtro leve do GPS: descarta leituras de antena/Wi‑Fi e estima a posição só para os avisos quando o GPS atrasa |
