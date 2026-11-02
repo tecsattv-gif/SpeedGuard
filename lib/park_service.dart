@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 
 import 'overpass_gate.dart';
 import 'route_service.dart';
+import 'tile_store.dart';
 
 /// Park (área de descanso, área de serviço ou estacionamento de caminhão).
 class Park {
@@ -103,7 +104,10 @@ class ParkService {
         '${(lat + dLat).toStringAsFixed(4)},'
         '${(lon + dLon).toStringAsFixed(4)}']);
     try {
-      final list = await _fetch(q);
+      // Base própria primeiro; Overpass só se ela não estiver disponível.
+      final list = await _fromTiles(
+              TileStore.keysAround(lat, lon, _radius)) ??
+          await _fetch(q);
       if (list == null) {
         _lastFail = DateTime.now();
         return;
@@ -115,6 +119,30 @@ class ParkService {
     } finally {
       _busy = false;
     }
+  }
+
+  /// Parks dos pedaços da base própria. null = pedaço indisponível.
+  static Future<List<Park>?> _fromTiles(List<String> keys) async {
+    final items = await TileStore.getAll('parks', keys);
+    if (items == null) return null;
+    final out = <Park>[];
+    for (final e in items) {
+      final m = e as Map;
+      final raw = m['t'];
+      final tags = <String, String>{
+        if (raw is Map)
+          for (final en in raw.entries) en.key.toString(): en.value.toString()
+      };
+      final hw = tags['highway'];
+      final kind = hw == 'services'
+          ? 'services'
+          : hw == 'rest_area'
+              ? 'rest_area'
+              : 'parking';
+      out.add(Park(m['i'].toString(), tags['name'] ?? '',
+          (m['a'] as num).toDouble(), (m['o'] as num).toDouble(), kind, tags));
+    }
+    return out;
   }
 
   /// Faz a busca no Overpass (tenta os 3 servidores). null = falhou.
@@ -242,8 +270,15 @@ class ParkService {
       routeChunksDone = 0;
       for (var i = 0; i < boxes.length; i += 4) {
         if (!identical(route.pts, _routeOf)) return null; // rota trocada
-        final list = await _fetch(
-            query(boxes.sublist(i, math.min(i + 4, boxes.length))), 20);
+        final part = boxes.sublist(i, math.min(i + 4, boxes.length));
+        final keys = <String>{
+          for (final b in part)
+            ...() {
+              final v = b.split(',').map(double.parse).toList();
+              return TileStore.keysFor(v[0], v[1], v[2], v[3]);
+            }()
+        }.toList();
+        final list = await _fromTiles(keys) ?? await _fetch(query(part), 20);
         routeChunksDone++;
         if (list == null) continue;
         ok++;

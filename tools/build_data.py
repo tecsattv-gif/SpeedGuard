@@ -132,6 +132,13 @@ def main(files):
         out["parks"].setdefault(key(p["a"], p["o"]), []).append(p)
     for r in radars.values():
         out["radars"].setdefault(key(r["lat"], r["lon"]), []).append(r)
+    # Todo pedaço coberto ganha os dois arquivos (lista vazia se não tiver
+    # nada): no app, "não existe" (404) quer dizer "fora da base" e ele usa
+    # o Overpass; lista vazia quer dizer "coberto, sem nada aqui".
+    covered = set(out["parks"]) | set(out["radars"])
+    for kind in out:
+        for k in covered:
+            out[kind].setdefault(k, [])
     for kind, tiles in out.items():
         os.makedirs(f"out/{kind}", exist_ok=True)
         for k, items in tiles.items():

@@ -1,7 +1,7 @@
 name: speedguard
 description: SpeedGuard - alerta de radares para o mundo todo.
 publish_to: 'none'
-version: 1.25.4+45
+version: 1.26.0+46
 
 environment:
   sdk: '>=3.4.0 <4.0.0'
@@ -20,6 +20,7 @@ dependencies:
   android_intent_plus: '>=5.0.0 <7.0.0'
   audioplayers: ^6.1.0
   video_player: ^2.9.2
+  path_provider: ^2.1.4
 
 dev_dependencies:
   flutter_test:

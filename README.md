@@ -6,7 +6,7 @@ Autor: Luiz Alberto Cardoso
 
 **Site do app:** https://tecsattv-gif.github.io/SpeedGuard/ (recursos, vídeo tutorial e passo a passo)
 
-## Funções (versão 1.25.4)
+## Funções (versão 1.26.0)
 
 - **Visual neon** com as cores da tela de abertura: fundo roxo escuro, velocímetro com borda violeta brilhante, botão INICIAR em degradê vermelho→rosa, cartões e botões roxos; o painel flutuante e a janela de reportar seguem a mesma paleta
 - **Tela de abertura** (2,5 s) com a arte do SpeedGuard (velocímetro e rastro de luz) e os créditos do autor
@@ -41,6 +41,7 @@ Autor: Luiz Alberto Cardoso
 - **GPS** (1.22.1): usa o provedor normal do Android (*fused*), como até a 1.21.0 — a velocidade e a posição na tela são as do GPS, sem atraso. Um filtro leve só descarta leituras de antena/Wi‑Fi que chegam no meio de leituras boas (jogavam o veículo para uma rua ao lado com 0 km/h) e saltos impossíveis. Se o GPS ficar de 2 a 6 s sem mandar leitura acima de 30 km/h, **só os avisos de radar** seguem o veículo pela última velocidade e direção. (A 1.22.0 forçava o chip de GPS e corrigia a velocidade; em alguns celulares isso deixou tudo lento e foi desfeito.)
 - **Sentido do radar**: no OpenStreetMap uns marcam o sentido do trânsito e outros para onde a câmera aponta. Desde a 1.22.1 o radar só é ignorado quando está atravessado em relação à via (antes radares marcados "ao contrário" não avisavam)
 - **Radares de semáforo** (1.23.1): o app passou a ler também as **relações de fiscalização** do OpenStreetMap (`type=enforcement`), que é como a maioria dos radares de semáforo e muitos de velocidade estão marcados — a câmera é o membro `device` (ou `from`) e o tipo/limite vêm da relação. Também reconhece radar de semáforo marcado em `speed_camera`, `camera:type` ou `surveillance:type` (`traffic_signals`/`red_light`). Avisam como os outros: "Radar de semáforo a 1000 metros." e depois as distâncias. Na 1ª abertura da 1.23.1 os radares da região são baixados de novo
+- **Base própria de parks e radares** (1.26.0): toda segunda-feira o GitHub (workflow `data.yml` + `tools/build_data.py`) baixa os mapas oficiais de cada país da Europa no **Geofabrik**, separa com o `osmium` os parks (áreas de descanso/serviço e estacionamentos de caminhão) e os radares (inclusive os das relações de fiscalização, como os de semáforo) e publica em pedaços de 2° × 2° no ramo **`data`** do repositório (sem histórico; cada semana substitui a anterior). O app baixa só os pedaços perto de onde está (`raw.githubusercontent.com`), guarda no celular e usa por 7 dias — **funciona offline e não depende dos servidores Overpass**, que às vezes caem todos juntos (aconteceu em 02/11/2026: 502, 504 e sem resposta). Região fora da base (fora da Europa) ou sem internet e sem cópia guardada: o app usa o Overpass como antes. O limite de velocidade da via continua vindo do Overpass. Para gerar a base na hora: Actions → "Base de parks e radares" → Run workflow (dá para escolher só alguns países)
 - **Base mundial de radares** baixada automaticamente do OpenStreetMap num raio de 30 km, atualizada a cada 6 h ou a cada 15 km rodados, e guardada para uso offline. Usa três servidores Overpass (overpass-api.de, private.coffee e mail.ru): se um estiver fora do ar, ocupado ou estourar o tempo, tenta o próximo. Resposta com erro interno do servidor não apaga os radares já salvos, e depois de uma falha o app espera 90 s antes de tentar de novo (antes pedia a cada leitura do GPS e o servidor bloqueava). Configurações → **Atualizar radares agora** força o download na hora
 - **Ver radares de outra região**: arraste o mapa para qualquer lugar do mundo e aproxime o zoom; 1 segundo depois de soltar, o app baixa os radares da área que está na tela (com uma margem em volta) e mostra o símbolo girando enquanto carrega. Esses radares são só para ver no mapa; os avisos continuam usando os radares em volta de você
 - **Avisos a 1000, 800, 500, 400, 300 e 100 m** do radar (desde a 1.22.0; antes eram de 500 a 100 m), com vibração. O radar aparece na tela a partir de 1100 m. Em Configurações → **Alertas sonoros** dá para escolher:
@@ -88,6 +89,8 @@ Autor: Luiz Alberto Cardoso
 |---|---|
 | `lib/main.dart` | Telas, mapa, GPS e voz |
 | `lib/park_service.dart` | Parks à frente: busca no OpenStreetMap, filtro pelo sentido e aviso a 2 km |
+| `lib/tile_store.dart` | Base própria: baixa e guarda no celular os pedaços de parks e radares |
+| `tools/build_data.py` | Gera a base própria a partir dos mapas do Geofabrik (roda no GitHub) |
 | `lib/overpass_gate.dart` | Fila única das buscas no Overpass (evita o erro 429) |
 | `lib/route_service.dart` | Rota até o destino digitado (Nominatim + OSRM) e posição do veículo na rota |
 | `lib/road_limit.dart` | Limite de velocidade da via onde o veículo está (OpenStreetMap) e máximos de caminhão por país |

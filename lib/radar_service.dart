@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'models.dart';
 import 'overpass_gate.dart';
+import 'tile_store.dart';
 
 /// Busca radares no OpenStreetMap, guarda em cache e mantém os
 /// radares reportados pelo usuário.
@@ -22,7 +23,7 @@ class RadarService {
   static const double refetchDistance = 15000; // rebaixa após 15 km
   static const Duration cacheLife = Duration(hours: 6);
   static const Duration retryAfterFail = Duration(seconds: 90);
-  static const _queryVersion = 2;
+  static const _queryVersion = 3; // 1.26.0: base própria
 
   List<Radar> _osm = [];
   List<Radar> _user = [];
@@ -80,6 +81,25 @@ class RadarService {
       }
     }
     return null;
+  }
+
+  /// Radares dos pedaços da base própria (só os até [radiusMeters] do
+  /// ponto, se for dado). null = pedaço indisponível.
+  static Future<List<Radar>?> _fromTiles(List<String> keys,
+      [double? lat, double? lon]) async {
+    final items = await TileStore.getAll('radars', keys);
+    if (items == null) return null;
+    final out = <Radar>[];
+    for (final e in items) {
+      final r = Radar.fromOsm((e as Map).cast<String, dynamic>());
+      if (r == null) continue;
+      if (lat != null &&
+          Geolocator.distanceBetween(lat, lon!, r.lat, r.lon) > radiusMeters) {
+        continue;
+      }
+      out.add(r);
+    }
+    return out;
   }
 
   /// Junta nós e relações de fiscalização numa lista de radares.
@@ -142,7 +162,10 @@ class RadarService {
   /// Retorna quantos encontrou, ou null se falhou.
   Future<int?> fetchArea(
       double south, double west, double north, double east) async {
-    final list = await _query('$south,$west,$north,$east');
+    // Base própria primeiro (até 9 pedaços); senão, Overpass.
+    final keys = TileStore.keysFor(south, west, north, east);
+    var list = keys.length <= 9 ? await _fromTiles(keys) : null;
+    list ??= await _query('$south,$west,$north,$east');
     if (list == null) return null;
     _area = list;
     return _area.length;
@@ -191,8 +214,11 @@ class RadarService {
 
   /// Baixa os radares ao redor. Retorna quantos encontrou, ou null se falhou.
   Future<int?> refresh(double lat, double lon) async {
-    final list =
-        await _query('around:${radiusMeters.toInt()},$lat,$lon');
+    // Base própria (raw.githubusercontent.com); se não houver internet nem
+    // cópia guardada, tenta o Overpass como antes.
+    var list = await _fromTiles(
+        TileStore.keysAround(lat, lon, radiusMeters), lat, lon);
+    list ??= await _query('around:${radiusMeters.toInt()},$lat,$lon');
     if (list == null) {
       _lastFail = DateTime.now();
       return null;
