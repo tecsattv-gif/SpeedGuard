@@ -6,7 +6,7 @@ Autor: Luiz Alberto Cardoso
 
 **Site do app:** https://tecsattv-gif.github.io/SpeedGuard/ (recursos, vídeo tutorial e passo a passo)
 
-## Funções (versão 1.19.0)
+## Funções (versão 1.20.0)
 
 - **Visual neon** com as cores da tela de abertura: fundo roxo escuro, velocímetro com borda violeta brilhante, botão INICIAR em degradê vermelho→rosa, cartões e botões roxos; o painel flutuante e a janela de reportar seguem a mesma paleta
 - **Tela de abertura** (2,5 s) com a arte do SpeedGuard (velocímetro e rastro de luz) e os créditos do autor
@@ -25,7 +25,7 @@ Autor: Luiz Alberto Cardoso
 - **Cores do app** em Configurações: **Roxo** (padrão), **Azul**, **Verde**, **Laranja**, **Vermelho** ou **Grafite**. Troca na hora o app inteiro (fundos, bordas, botões, velocímetro e o painel flutuante); as cores de alerta (vermelho e laranja dos radares) continuam as mesmas para não confundir
 - **Aparência** em Configurações: **Auto** (segue o modo claro/escuro do celular), **Claro** ou **Escuro**. No modo escuro o mapa também fica escurecido para não ofuscar à noite. A tela de abertura e o painel flutuante continuam sempre escuros
 - **Duas telas no app aberto**, como no CamSam: o botão ao lado de Configurações alterna entre o **Mapa** e a **Tela de alerta** (sem mapa). A tela de alerta mostra **5 faixas verdes** (setas para cima) com o caminho livre. Com radar à frente aparecem a placa do limite, a distância e o tipo do radar, e **a cada 100 m uma faixa fica vermelha, de baixo para cima** (500 m = 1 faixa … 100 m = as 5), junto com o aviso sonoro. Acima do limite aparece "REDUZA A VELOCIDADE". O app lembra a última tela escolhida
-- **Base mundial de radares** baixada automaticamente do OpenStreetMap num raio de 50 km, atualizada a cada 24 h ou a cada 30 km rodados, e guardada para uso offline
+- **Base mundial de radares** baixada automaticamente do OpenStreetMap num raio de 30 km, atualizada a cada 6 h ou a cada 15 km rodados, e guardada para uso offline. Usa três servidores Overpass (overpass-api.de, private.coffee e mail.ru): se um estiver fora do ar, ocupado ou estourar o tempo, tenta o próximo. Resposta com erro interno do servidor não apaga os radares já salvos, e depois de uma falha o app espera 90 s antes de tentar de novo (antes pedia a cada leitura do GPS e o servidor bloqueava). Configurações → **Atualizar radares agora** força o download na hora
 - **Ver radares de outra região**: arraste o mapa para qualquer lugar do mundo e aproxime o zoom; 1 segundo depois de soltar, o app baixa os radares da área que está na tela (com uma margem em volta) e mostra o símbolo girando enquanto carrega. Esses radares são só para ver no mapa; os avisos continuam usando os radares em volta de você
 - **Avisos a cada 100 m** do radar (500, 400, 300, 200 e 100 m), com vibração. Em Configurações → **Alertas sonoros** dá para escolher:
   - **Voz**: "Radar fixo a 500 metros. Limite 80.", depois "400 metros.", "300 metros.", "200 metros." e "100 metros. Limite 80."

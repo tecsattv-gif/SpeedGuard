@@ -9,18 +9,24 @@ import 'models.dart';
 /// Busca radares no OpenStreetMap, guarda em cache e mantém os
 /// radares reportados pelo usuário.
 class RadarService {
+  /// Servidores Overpass, testados em ordem. Se um falhar, ocupado (429)
+  /// ou estourar o tempo, tenta o próximo.
   static const _overpassUrls = [
     'https://overpass-api.de/api/interpreter',
-    'https://overpass.kumi.systems/api/interpreter',
+    'https://overpass.private.coffee/api/interpreter',
+    'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
   ];
-  static const _userAgent = 'SpeedGuard/1.0 (Android)';
-  static const double radiusMeters = 50000; // 50 km ao redor
-  static const double refetchDistance = 30000; // rebaixa após 30 km
+  static const _userAgent = 'SpeedGuard/1.20 (Android; tecsattv-gif/SpeedGuard)';
+  static const double radiusMeters = 30000; // 30 km ao redor
+  static const double refetchDistance = 15000; // rebaixa após 15 km
+  static const Duration cacheLife = Duration(hours: 6);
+  static const Duration retryAfterFail = Duration(seconds: 90);
 
   List<Radar> _osm = [];
   List<Radar> _user = [];
   double? _cacheLat, _cacheLon;
   DateTime? _cacheTime;
+  DateTime? _lastFail;
 
   List<Radar> get all => [..._osm, ..._user];
 
@@ -32,15 +38,14 @@ class RadarService {
     return [for (final r in _area) if (!ids.contains(r.id)) r];
   }
 
-  /// Baixa os radares do retângulo visível no mapa.
-  /// Retorna quantos encontrou, ou null se falhou.
-  Future<int?> fetchArea(
-      double south, double west, double north, double east) async {
-    final box = '$south,$west,$north,$east';
-    final query = '[out:json][timeout:25];('
-        'node["highway"="speed_camera"]($box);'
-        'node["enforcement"="maxspeed"]($box);'
-        'node["enforcement"="traffic_signals"]($box);'
+  /// Pergunta ao Overpass. Devolve a lista de radares ou null se todos os
+  /// servidores falharem. Resposta 200 com erro interno ("remark" de
+  /// timeout/memória) conta como falha, para não gravar uma lista vazia.
+  Future<List<Radar>?> _query(String area) async {
+    final query = '[out:json][timeout:20];('
+        'node["highway"="speed_camera"]($area);'
+        'node["enforcement"="maxspeed"]($area);'
+        'node["enforcement"="traffic_signals"]($area);'
         ');out body;';
     for (final url in _overpassUrls) {
       try {
@@ -48,23 +53,40 @@ class RadarService {
             .post(Uri.parse(url),
                 headers: {'User-Agent': _userAgent},
                 body: {'data': query})
-            .timeout(const Duration(seconds: 30));
+            .timeout(const Duration(seconds: 25));
         if (res.statusCode != 200) continue;
         final data = jsonDecode(utf8.decode(res.bodyBytes)) as Map;
-        final els = (data['elements'] as List?) ?? [];
+        final remark = data['remark']?.toString().toLowerCase() ?? '';
+        if (remark.contains('error') ||
+            remark.contains('timed out') ||
+            remark.contains('out of memory')) {
+          continue;
+        }
+        final els = data['elements'];
+        if (els is! List) continue;
         final seen = <String>{};
-        _area = els
+        return els
             .map((e) => Radar.fromOsm((e as Map).cast<String, dynamic>()))
             .whereType<Radar>()
             .where((r) => seen.add(r.id))
             .toList();
-        return _area.length;
       } catch (_) {
         // tenta o próximo servidor
       }
     }
     return null;
   }
+
+  /// Baixa os radares do retângulo visível no mapa.
+  /// Retorna quantos encontrou, ou null se falhou.
+  Future<int?> fetchArea(
+      double south, double west, double north, double east) async {
+    final list = await _query('$south,$west,$north,$east');
+    if (list == null) return null;
+    _area = list;
+    return _area.length;
+  }
+
   List<Radar> get userRadars => List.unmodifiable(_user);
 
   Future<void> load() async {
@@ -89,51 +111,38 @@ class RadarService {
   }
 
   bool needsRefresh(double lat, double lon) {
+    // Falhou há pouco: espera antes de tentar de novo, senão o app pede a
+    // cada leitura do GPS e o servidor bloqueia (429).
+    if (_lastFail != null &&
+        DateTime.now().difference(_lastFail!) < retryAfterFail) {
+      return false;
+    }
     if (_cacheLat == null || _cacheTime == null) return true;
-    if (DateTime.now().difference(_cacheTime!).inHours >= 24) return true;
+    if (DateTime.now().difference(_cacheTime!) >= cacheLife) return true;
     return Geolocator.distanceBetween(lat, lon, _cacheLat!, _cacheLon!) >
         refetchDistance;
   }
 
   /// Baixa os radares ao redor. Retorna quantos encontrou, ou null se falhou.
   Future<int?> refresh(double lat, double lon) async {
-    final r = radiusMeters.toInt();
-    final query = '[out:json][timeout:25];('
-        'node["highway"="speed_camera"](around:$r,$lat,$lon);'
-        'node["enforcement"="maxspeed"](around:$r,$lat,$lon);'
-        'node["enforcement"="traffic_signals"](around:$r,$lat,$lon);'
-        ');out body;';
-    for (final url in _overpassUrls) {
-      try {
-        final res = await http
-            .post(Uri.parse(url),
-                headers: {'User-Agent': _userAgent},
-                body: {'data': query})
-            .timeout(const Duration(seconds: 30));
-        if (res.statusCode != 200) continue;
-        final data = jsonDecode(utf8.decode(res.bodyBytes)) as Map;
-        final els = (data['elements'] as List?) ?? [];
-        final seen = <String>{};
-        _osm = els
-            .map((e) => Radar.fromOsm((e as Map).cast<String, dynamic>()))
-            .whereType<Radar>()
-            .where((r) => seen.add(r.id))
-            .toList();
-        _cacheLat = lat;
-        _cacheLon = lon;
-        _cacheTime = DateTime.now();
-        final p = await SharedPreferences.getInstance();
-        await p.setString(
-            'osm_radars', jsonEncode(_osm.map((e) => e.toJson()).toList()));
-        await p.setDouble('cache_lat', lat);
-        await p.setDouble('cache_lon', lon);
-        await p.setInt('cache_time', _cacheTime!.millisecondsSinceEpoch);
-        return _osm.length;
-      } catch (_) {
-        // tenta o próximo servidor
-      }
+    final list =
+        await _query('around:${radiusMeters.toInt()},$lat,$lon');
+    if (list == null) {
+      _lastFail = DateTime.now();
+      return null;
     }
-    return null;
+    _lastFail = null;
+    _osm = list;
+    _cacheLat = lat;
+    _cacheLon = lon;
+    _cacheTime = DateTime.now();
+    final p = await SharedPreferences.getInstance();
+    await p.setString(
+        'osm_radars', jsonEncode(_osm.map((e) => e.toJson()).toList()));
+    await p.setDouble('cache_lat', lat);
+    await p.setDouble('cache_lon', lon);
+    await p.setInt('cache_time', _cacheTime!.millisecondsSinceEpoch);
+    return _osm.length;
   }
 
   Future<void> addUserRadar(double lat, double lon, int? maxSpeed,
