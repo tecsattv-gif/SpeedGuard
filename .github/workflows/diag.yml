@@ -4,15 +4,17 @@ jobs:
   diag:
     runs-on: ubuntu-latest
     steps:
-      - name: Testar buscas de parks
+      - name: Testar buscas
+        shell: bash
         run: |
           B="50.75,5.20,51.20,5.90"
-          Q1='[out:json][timeout:15];(nw["highway"="rest_area"]('$B');nw["highway"="services"]('$B');nw["amenity"="parking"]["hgv"~"^(yes|designated|only)$"]('$B');nw["parking"="truck_stop"]('$B'););out center tags;'
-          for U in https://overpass-api.de/api/interpreter https://overpass.private.coffee/api/interpreter https://maps.mail.ru/osm/tools/overpass/api/interpreter; do
+          RADAR='[out:json][timeout:20];(node["highway"="speed_camera"](around:30000,50.97,5.55););out body;'
+          PARK='[out:json][timeout:15];(nw["highway"="rest_area"]('$B');nw["highway"="services"]('$B');nw["amenity"="parking"]["hgv"~"^(yes|designated|only)$"]('$B');nw["parking"="truck_stop"]('$B'););out center tags;'
+          PARKN='[out:json][timeout:15];(node["highway"="rest_area"]('$B');way["highway"="rest_area"]('$B');node["highway"="services"]('$B');way["highway"="services"]('$B');way["amenity"="parking"]["hgv"]('$B'););out center tags;'
+          t() { curl -s -o /tmp/o.json -w "  HTTP %{http_code} em %{time_total}s, %{size_download} bytes\n" -m 45 -A "SpeedGuard/1.25" --data-urlencode "data=$2" "$1" || echo "  falhou (curl $?)"; python3 -c "import json;d=json.load(open('/tmp/o.json'));print('  elementos:',len(d.get('elements',[])),'remark:',d.get('remark'))" 2>/dev/null || head -c 200 /tmp/o.json; echo; }
+          for U in https://overpass-api.de/api/interpreter https://overpass.private.coffee/api/interpreter https://maps.mail.ru/osm/tools/overpass/api/interpreter https://overpass.kumi.systems/api/interpreter; do
             echo "== $U"
-            curl -s -o /tmp/o.json -w "HTTP %{http_code} em %{time_total}s, %{size_download} bytes\n" -m 40 -A "SpeedGuard/1.25 (Android; tecsattv-gif/SpeedGuard)" --data-urlencode "data=$Q1" "$U"
-            head -c 300 /tmp/o.json; echo
-            python3 -c "import json;d=json.load(open('/tmp/o.json'));print('elementos:',len(d.get('elements',[])),'remark:',d.get('remark'))" 2>&1 | tail -1
+            echo " radar:"; t $U "$RADAR"
+            echo " park:";  t $U "$PARK"
+            echo " park2:"; t $U "$PARKN"
           done
-          echo "== sem User-Agent"
-          curl -s -o /tmp/o.json -w "HTTP %{http_code} em %{time_total}s\n" -m 40 --data-urlencode "data=$Q1" https://overpass-api.de/api/interpreter
