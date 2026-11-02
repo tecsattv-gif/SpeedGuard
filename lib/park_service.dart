@@ -162,21 +162,41 @@ class ParkService {
   Future<int?> loadRoute(RouteService route, {String? country}) async {
     routeLoading = true;
     try {
+      // A rota é dividida em trechos de ~15 km; cada trecho vira um
+      // retângulo (com 700 m de folga) e a busca é por retângulos, que o
+      // servidor responde rápido. (A busca em volta da linha da rota, da
+      // 1.25.0, demorava demais e a lista nunca aparecia.)
       final pts = route.sample(1000);
+      final boxes = <String>[];
+      for (var i = 0; i < pts.length; i += 15) {
+        final part = pts.sublist(i, math.min(i + 16, pts.length));
+        var s0 = 90.0, w0 = 180.0, n0 = -90.0, e0 = -180.0;
+        for (final p in part) {
+          s0 = math.min(s0, p.$1);
+          n0 = math.max(n0, p.$1);
+          w0 = math.min(w0, p.$2);
+          e0 = math.max(e0, p.$2);
+        }
+        const dLat = 0.0065;
+        final dLon = 0.0065 / math.cos(s0 * math.pi / 180);
+        boxes.add('${(s0 - dLat).toStringAsFixed(4)},'
+            '${(w0 - dLon).toStringAsFixed(4)},'
+            '${(n0 + dLat).toStringAsFixed(4)},'
+            '${(e0 + dLon).toStringAsFixed(4)}');
+      }
       final found = <Park>[];
-      for (var i = 0; i < pts.length - 1; i += 200) {
-        final part = pts.sublist(i, math.min(i + 201, pts.length));
-        final line = part
-            .map((p) => '${p.$1.toStringAsFixed(5)},${p.$2.toStringAsFixed(5)}')
-            .join(',');
-        final a = 'around:600,$line';
-        final q = '[out:json][timeout:60];('
-            'nwr["highway"~"^(rest_area|services)\$"]($a);'
-            'nwr["amenity"="parking"]["hgv"~"^(yes|designated|only)\$"]($a);'
-        'nwr["amenity"="parking"]["name"~"truck|camion|LKW|vrachtwagen|safe parking|Autohof",i]($a);'
-            'nwr["amenity"="parking"]["parking"="truck_stop"]($a);'
-            ');out center tags;';
-        final list = await _fetch(q, 70);
+      // Até 8 retângulos (~120 km de rota) por busca.
+      for (var i = 0; i < boxes.length; i += 8) {
+        final sb = StringBuffer('[out:json][timeout:25];(');
+        for (final b in boxes.sublist(i, math.min(i + 8, boxes.length))) {
+          sb
+            ..write('nwr["highway"~"^(rest_area|services)\$"]($b);')
+            ..write('nwr["amenity"="parking"]["hgv"~"^(yes|designated|only)\$"]($b);')
+            ..write('nwr["amenity"="parking"]["parking"="truck_stop"]($b);')
+            ..write('nwr["amenity"="parking"]["name"~"truck|camion|LKW|vrachtwagen|safe parking|Autohof",i]($b);');
+        }
+        sb.write(');out center tags;');
+        final list = await _fetch(sb.toString(), 35);
         if (list == null) return null;
         found.addAll(list);
       }
