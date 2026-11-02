@@ -43,13 +43,20 @@ jobs:
           mkdir -p ~/.android
           echo "$KS" | base64 -d > ~/.android/debug.keystore
           # Impressão digital da chave: deve ser sempre a mesma em todo build.
-          keytool -list -v -keystore ~/.android/debug.keystore -storepass android 2>/dev/null | grep -m1 "SHA256" || true
+          ls -l ~/.android/debug.keystore
+          keytool -list -v -keystore ~/.android/debug.keystore -storepass android 2>&1 | grep -E "Alias|SHA256|Keystore type|error|Exception" | head -6 || true
 
       - name: Compilar APK
         run: flutter build apk --release
 
       - name: Renomear APK
         run: cp build/app/outputs/flutter-apk/app-release.apk SpeedGuard.apk
+
+      # Mostra com qual chave o APK saiu (precisa ser a mesma em todo build).
+      - name: Conferir assinatura do APK
+        run: |
+          AS=$(ls -d $ANDROID_HOME/build-tools/*/ | sort -V | tail -1)apksigner
+          $AS verify --print-certs SpeedGuard.apk | grep -E "SHA-256|DN" || true
 
       - uses: actions/upload-artifact@v4
         with:
