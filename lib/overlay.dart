@@ -55,6 +55,7 @@ class _OverlayBubbleState extends State<OverlayBubble> {
   double? _dist;
   int? _limit;
   bool _over = false;
+  int? _road; // limite da via
   bool _ask = false;
   bool _picker = false;
   bool _sent = false;
@@ -77,6 +78,7 @@ class _OverlayBubbleState extends State<OverlayBubble> {
           _dist = (m['dist'] as num?)?.toDouble();
           _limit = (m['limit'] as num?)?.toInt();
           _over = m['over'] == true;
+          _road = (m['road'] as num?)?.toInt();
           _ask = m['ask'] == true;
           if (m['scale'] is num) _scale = (m['scale'] as num).toDouble();
           if (m['land'] is bool) _land = m['land'] as bool;
@@ -253,6 +255,10 @@ class _OverlayBubbleState extends State<OverlayBubble> {
                     color: SG.violetLight,
                     fontSize: 13,
                     fontWeight: FontWeight.bold)),
+            if (_road != null) ...[
+              const SizedBox(height: 2),
+              SpeedSign(label: '$_road', size: 26),
+            ],
           ],
         ),
       ),

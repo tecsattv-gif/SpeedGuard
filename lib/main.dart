@@ -29,6 +29,8 @@ import 'theme.dart';
 import 'tutorial_page.dart';
 import 'vehicle_icon.dart';
 import 'gps_filter.dart';
+import 'road_limit.dart';
+import 'speed_watch.dart';
 import 'speed_picker.dart';
 
 Future<void> main() async {
@@ -102,6 +104,16 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   StreamSubscription<Position>? _sub;
   Position? _pos;
   final _gps = GpsFilter();
+  final _roads = RoadLimitService();
+  final _watch = SpeedWatch();
+  /// Aviso de velocidade excedida ligado (Configurações).
+  bool _speedWarn = true;
+  /// Velocidade máxima do caminhão (limitador), em km/h.
+  int _truckMax = 90;
+  /// Limite da via atual, se conhecido.
+  int? _roadLimit;
+  /// Limite da via já avisado ao caminhão (para não repetir).
+  int? _roadWarned;
   Timer? _predictTimer;
   bool _running = false;
   bool _follow = true;
@@ -182,6 +194,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   Future<void> _init() async {
     final p = await SharedPreferences.getInstance();
     _voice = p.getBool('voice') ?? true;
+    _speedWarn = p.getBool('speed_warn') ?? true;
+    _truckMax = p.getInt('truck_max') ?? 90;
     _sound = p.getString('sound') ?? 'voice';
     try {
       // Bipes abaixam a música/navegação por um instante, sem pausar.
@@ -316,7 +330,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       'speed': pos == null ? 0 : (pos.speed.clamp(0, 400) * 3.6).round(),
       'dist': show ? a.distance : null,
       'limit': show ? a.radar!.maxSpeed : null,
-      'over': a.overLimit,
+      'over': a.overLimit || _watch.seconds != null,
+      'road': _running && _speedWarn ? _shownLimit : null,
       'ask': _ask != null,
       'scale': _bubbleScale,
       'land': _bubbleLand,
@@ -461,7 +476,48 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       });
     }
     _runAlerts(pos);
+    _checkSpeedLimit(pos);
     _checkAsk(pos);
+  }
+
+  bool get _isTruck => _vehicle == VehicleIcon.truck;
+
+  /// Limite usado para a contagem de 30 s: caminhão = limitador (90),
+  /// outros veículos = limite da via.
+  int? get _watchLimit => _isTruck ? _truckMax : _roadLimit;
+
+  /// Limite mostrado na placa em cima da velocidade.
+  int? get _shownLimit {
+    if (!_isTruck) return _roadLimit;
+    final r = _roadLimit;
+    return r == null ? _truckMax : (r < _truckMax ? r : _truckMax);
+  }
+
+  void _checkSpeedLimit(Position pos) {
+    _roads.update(pos.latitude, pos.longitude);
+    _roadLimit = _roads.limitAt(pos.latitude, pos.longitude,
+        pos.speed > 2.5 ? pos.heading : -1,
+        truck: _isTruck, country: _country);
+    final speed = (pos.speed.clamp(0, 400) * 3.6).round();
+    if (!_speedWarn || _rule.mode == RadarMode.disabled) {
+      _watch.reset();
+      return;
+    }
+    String? say = _watch.update(speed: speed, limit: _watchLimit);
+    // Caminhão numa via com limite menor que o do limitador: avisa uma vez.
+    final road = _roadLimit;
+    if (_isTruck && road != null && road < _truckMax) {
+      if (speed > road + 2 && _roadWarned != road) {
+        _roadWarned = road;
+        say ??= 'Limite da via $road.';
+      } else if (speed <= road) {
+        _roadWarned = null;
+      }
+    }
+    if (say != null) {
+      HapticFeedback.heavyImpact();
+      if (_voice) _tts.speak(say);
+    }
   }
 
   /// Calcula o radar à frente e toca os avisos.
@@ -987,6 +1043,42 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             mainAxisSize: MainAxisSize.min,
             children: [
               SwitchListTile(
+                title: const Text('Aviso de velocidade excedida'),
+                subtitle: Text(_isTruck
+                    ? 'Caminhão: passou de $_truckMax, avisa na hora, aos 20 s '
+                        '("só tem 10 segundos") e aos 30 s. Mostra o limite da via'
+                    : 'Passou do limite da via, avisa na hora, aos 20 s e aos 30 s'),
+                value: _speedWarn,
+                onChanged: (v) async {
+                  final p = await SharedPreferences.getInstance();
+                  await p.setBool('speed_warn', v);
+                  _watch.reset();
+                  setSheet(() => _speedWarn = v);
+                  setState(() {});
+                },
+              ),
+              if (_speedWarn && _isTruck)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                  child: Row(children: [
+                    const Expanded(child: Text('Limitador do caminhão')),
+                    SegmentedButton<int>(
+                      segments: const [
+                        ButtonSegment(value: 80, label: Text('80')),
+                        ButtonSegment(value: 90, label: Text('90')),
+                      ],
+                      selected: {_truckMax},
+                      onSelectionChanged: (v) async {
+                        final p = await SharedPreferences.getInstance();
+                        await p.setInt('truck_max', v.first);
+                        _watch.reset();
+                        setSheet(() => _truckMax = v.first);
+                        setState(() {});
+                      },
+                    ),
+                  ]),
+                ),
+              SwitchListTile(
                 title: const Text('Alertas sonoros'),
                 subtitle: const Text('Avisos a 1000, 800, 500, 400, 300 e 100 m do radar'),
                 value: _voice,
@@ -1350,6 +1442,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     Theme.of(context);
     final pos = _pos;
     final speed = pos == null ? 0 : (pos.speed.clamp(0, 400) * 3.6).round();
+    final overSecs = _running ? _watch.seconds : null;
+    final roadSign = _running && _speedWarn ? _shownLimit : null;
     final showRadars = _rule.mode == RadarMode.full;
     final a = _alert;
 
@@ -1435,7 +1529,34 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   if (_presence.world != null) _onlineCards(),
                   Row(
                     children: [
-                      _SpeedBox(speed: speed, over: a.overLimit),
+                      Column(mainAxisSize: MainAxisSize.min, children: [
+                        // Placa com o limite da via (caminhão: no máximo o
+                        // do limitador) em cima da velocidade.
+                        if (roadSign != null) ...[
+                          SpeedSign(label: '$roadSign', size: 40),
+                          const SizedBox(height: 4),
+                        ],
+                        _SpeedBox(
+                            speed: speed,
+                            over: a.overLimit || overSecs != null),
+                        // Contagem dos 30 s acima do limite.
+                        if (overSecs != null)
+                          Container(
+                            margin: const EdgeInsets.only(top: 4),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                                color: SG.red,
+                                borderRadius: BorderRadius.circular(10)),
+                            child: Text(
+                                overSecs >= 30
+                                    ? 'EXCEDIDA'
+                                    : '${30 - overSecs} s',
+                                style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold)),
+                          ),
+                      ]),
                       const SizedBox(width: 10),
                       Expanded(
                         // Card só aparece com radar à frente, parado, sem GPS

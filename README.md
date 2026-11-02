@@ -6,7 +6,7 @@ Autor: Luiz Alberto Cardoso
 
 **Site do app:** https://tecsattv-gif.github.io/SpeedGuard/ (recursos, vídeo tutorial e passo a passo)
 
-## Funções (versão 1.22.1)
+## Funções (versão 1.23.0)
 
 - **Visual neon** com as cores da tela de abertura: fundo roxo escuro, velocímetro com borda violeta brilhante, botão INICIAR em degradê vermelho→rosa, cartões e botões roxos; o painel flutuante e a janela de reportar seguem a mesma paleta
 - **Tela de abertura** (2,5 s) com a arte do SpeedGuard (velocímetro e rastro de luz) e os créditos do autor
@@ -25,6 +25,11 @@ Autor: Luiz Alberto Cardoso
 - **Cores do app** em Configurações: **Roxo** (padrão), **Azul**, **Verde**, **Laranja**, **Vermelho** ou **Grafite**. Troca na hora o app inteiro (fundos, bordas, botões, velocímetro e o painel flutuante); as cores de alerta (vermelho e laranja dos radares) continuam as mesmas para não confundir
 - **Aparência** em Configurações: **Auto** (segue o modo claro/escuro do celular), **Claro** ou **Escuro**. No modo escuro o mapa também fica escurecido para não ofuscar à noite. A tela de abertura e o painel flutuante continuam sempre escuros
 - **Duas telas no app aberto**, como no CamSam: o botão ao lado de Configurações alterna entre o **Mapa** e a **Tela de alerta** (sem mapa). A tela de alerta mostra **6 faixas verdes** (setas para cima) com o caminho livre. Com radar à frente aparecem a placa do limite, a distância e o tipo do radar, e **a cada aviso uma faixa fica vermelha, de baixo para cima** (1000 m = 1 faixa, 800 m = 2, 500 m = 3, 400 m = 4, 300 m = 5, 100 m = as 6), junto com o aviso sonoro. Acima do limite aparece "REDUZA A VELOCIDADE". O app lembra a última tela escolhida
+- **Aviso de velocidade excedida** (1.23.0), em Configurações (ligado por padrão):
+  - **Caminhão** (veículo escolhido em Configurações): funciona como o limitador — passou de **90 km/h** (ou 80, escolhido em Configurações → Limitador do caminhão), o app fala na hora "Limite de 90 excedido.", **aos 20 s** "Atenção. Você só tem 10 segundos para voltar aos 90." e **aos 30 s** "Velocidade excedida. Volte para os 90.", que se repete a cada 30 s enquanto continuar acima. Voltou para 90 ou menos, a contagem zera. Se a via tiver limite menor que o do caminhão, avisa uma vez "Limite da via 70."
+  - **Carro, moto e seta**: a mesma contagem, usando o limite da via
+  - Em cima do velocímetro aparece a **placa com o limite da via** (no caminhão, no máximo o do limitador) e, acima do limite, o velocímetro fica vermelho com a **contagem regressiva dos 30 s** (depois mostra "EXCEDIDA"). O painel flutuante também mostra a placa
+  - O limite da via vem do OpenStreetMap (`maxspeed`; no caminhão `maxspeed:hgv`, ou o menor entre o limite da via e o máximo de caminhão do país: Bélgica 90 em autoestrada e 60 nas outras vias, Alemanha/Holanda/Áustria 80, França/Espanha/Portugal/Itália/Luxemburgo 90) — vias baixadas num raio de 2,5 km, de novo a cada 1,8 km rodados. Via sem limite no mapa: não mostra placa (o caminhão continua com o limitador)
 - **GPS** (1.22.1): usa o provedor normal do Android (*fused*), como até a 1.21.0 — a velocidade e a posição na tela são as do GPS, sem atraso. Um filtro leve só descarta leituras de antena/Wi‑Fi que chegam no meio de leituras boas (jogavam o veículo para uma rua ao lado com 0 km/h) e saltos impossíveis. Se o GPS ficar de 2 a 6 s sem mandar leitura acima de 30 km/h, **só os avisos de radar** seguem o veículo pela última velocidade e direção. (A 1.22.0 forçava o chip de GPS e corrigia a velocidade; em alguns celulares isso deixou tudo lento e foi desfeito.)
 - **Sentido do radar**: no OpenStreetMap uns marcam o sentido do trânsito e outros para onde a câmera aponta. Desde a 1.22.1 o radar só é ignorado quando está atravessado em relação à via (antes radares marcados "ao contrário" não avisavam)
 - **Base mundial de radares** baixada automaticamente do OpenStreetMap num raio de 30 km, atualizada a cada 6 h ou a cada 15 km rodados, e guardada para uso offline. Usa três servidores Overpass (overpass-api.de, private.coffee e mail.ru): se um estiver fora do ar, ocupado ou estourar o tempo, tenta o próximo. Resposta com erro interno do servidor não apaga os radares já salvos, e depois de uma falha o app espera 90 s antes de tentar de novo (antes pedia a cada leitura do GPS e o servidor bloqueava). Configurações → **Atualizar radares agora** força o download na hora
@@ -73,6 +78,8 @@ Autor: Luiz Alberto Cardoso
 | Arquivo | O que faz |
 |---|---|
 | `lib/main.dart` | Telas, mapa, GPS e voz |
+| `lib/road_limit.dart` | Limite de velocidade da via onde o veículo está (OpenStreetMap) e máximos de caminhão por país |
+| `lib/speed_watch.dart` | Contagem dos 30 s acima do limite e frases de aviso |
 | `lib/gps_filter.dart` | Filtro leve do GPS: descarta leituras de antena/Wi‑Fi e estima a posição só para os avisos quando o GPS atrasa |
 | `lib/alert_engine.dart` | Decide quando e o que avisar |
 | `lib/radar_service.dart` | Baixa radares (Overpass/OSM), cache, radares do usuário, detecção do país |
