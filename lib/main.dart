@@ -158,6 +158,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         if (m['answer'] is bool) _answer(m['answer'] as bool);
         // Usuário fechou o painel segurando o dedo nele.
         if (m['closed'] == true) _overlayShown = false;
+        if (m['event'] is String) {
+          final l = Layer.values.where((x) => x.name == m['event']);
+          if (l.isNotEmpty && l.first.isEvent) {
+            _submitEvent(l.first, fromBubble: true);
+          }
+        }
         if (m['report'] == true) {
           _submitReport(
             mobile: m['mobile'] != false,
@@ -757,14 +763,26 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   }
 
   /// Reporta fila, acidente, obra, perigo ou polícia aqui (some após 6 h).
-  Future<void> _submitEvent(Layer l) async {
+  /// Reporta um aviso de trânsito (pelo app ou pelo painel flutuante).
+  /// Vindo do painel, o app está em segundo plano: avisa por voz.
+  Future<void> _submitEvent(Layer l, {bool fromBubble = false}) async {
+    void tell(String text) {
+      if (fromBubble) {
+        _say(text);
+      } else {
+        _snack(text);
+      }
+    }
+
     final pos = _pos;
     if (pos == null) {
-      _snack('Aguarde o sinal do GPS para reportar.');
+      tell(fromBubble
+          ? 'Sem sinal de GPS. Aviso não salvo.'
+          : 'Aguarde o sinal do GPS para reportar.');
       return;
     }
     if (!communityEnabled) {
-      _snack('Avisos precisam do Firebase configurado.');
+      tell('Avisos precisam do Firebase configurado.');
       return;
     }
     final dir = pos.speed > 2.5 ? pos.heading : null;
@@ -775,7 +793,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       await _community.confirm(dup, true);
       if (!mounted) return;
       setState(() {});
-      _snack('${l.label}: já reportado aqui. Confirmado por mais 6 h.');
+      tell(fromBubble
+          ? '${l.label} já reportado. Confirmado, obrigado!'
+          : '${l.label}: já reportado aqui. Confirmado por mais 6 h.');
       return;
     }
     final ok = await _community.report(
@@ -787,8 +807,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     );
     if (!mounted) return;
     setState(() {});
-    _snack(ok
-        ? '${l.label} reportado para todos. Some em 6 h.'
+    tell(ok
+        ? (fromBubble
+            ? '${l.label} reportado. Obrigado!'
+            : '${l.label} reportado para todos. Some em 6 h.')
         : 'Sem conexão: não foi possível reportar.');
   }
 
@@ -808,44 +830,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             mainAxisSize: MainAxisSize.min,
             children: [
               // Avisos de trânsito: um toque já reporta (somem em 6 h).
-              Container(
-                padding: const EdgeInsets.all(10),
-                margin: const EdgeInsets.only(bottom: 8),
-                decoration: BoxDecoration(
-                  color: SG.surfaceHigh.withValues(alpha: 0.96),
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(color: SG.outline),
-                ),
-                child: Row(
-                  children: [
-                    for (final l in Layer.events)
-                      Expanded(
-                        child: InkWell(
-                          borderRadius: BorderRadius.circular(12),
-                          onTap: () => Navigator.pop(ctx, l),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 6),
-                            child: Column(children: [
-                              CircleAvatar(
-                                radius: 20,
-                                backgroundColor: l.color,
-                                child: Icon(l.icon, color: Colors.white),
-                              ),
-                              const SizedBox(height: 4),
-                              FittedBox(
-                                fit: BoxFit.scaleDown,
-                                child: Text(l.label,
-                                    maxLines: 1,
-                                    style: const TextStyle(
-                                        color: Colors.white, fontSize: 12)),
-                              ),
-                            ]),
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
+              EventBar(onSelected: (l) => Navigator.pop(ctx, l)),
               SpeedPicker(
                 onSelected: (c) => Navigator.pop(ctx, c),
                 onCancel: () => Navigator.pop(ctx),

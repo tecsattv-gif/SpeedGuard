@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_overlay_window/flutter_overlay_window.dart';
 
 import 'alert_view.dart';
+import 'layers.dart';
 import 'speed_picker.dart';
 import 'theme.dart';
 
@@ -15,7 +16,7 @@ import 'theme.dart';
 const double kBaseW = 64, kBaseH = 250; // vertical (retrato)
 const double kLandW = 240, kLandH = 72; // horizontal (paisagem)
 const int kPickerW = 300;
-const int kPickerH = 370;
+const int kPickerH = 470; // avisos de trânsito + placas
 
 /// Tamanhos que o usuário escolhe em Configurações.
 const Map<String, double> kPanelScales = {
@@ -169,12 +170,17 @@ class _OverlayBubbleState extends State<OverlayBubble> {
     await _resizeToPanel();
   }
 
-  Future<void> _choose(SpeedChoice c) async {
-    FlutterOverlayWindow.shareData(jsonEncode({
-      'report': true,
-      'mobile': c.mobile,
-      'limit': c.limit,
-    }));
+  Future<void> _choose(SpeedChoice c) => _send({
+        'report': true,
+        'mobile': c.mobile,
+        'limit': c.limit,
+      });
+
+  /// Aviso de trânsito (fila, acidente, obra, perigo, polícia).
+  Future<void> _chooseEvent(Layer l) => _send({'event': l.name});
+
+  Future<void> _send(Map<String, Object?> data) async {
+    FlutterOverlayWindow.shareData(jsonEncode(data));
     await _closePicker();
     if (!mounted) return;
     setState(() => _sent = true);
@@ -197,7 +203,13 @@ class _OverlayBubbleState extends State<OverlayBubble> {
               alignment: Alignment.topLeft,
               child: SizedBox(
                 width: kPickerW.toDouble(),
-                child: SpeedPicker(onSelected: _choose, onCancel: _closePicker),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    EventBar(onSelected: _chooseEvent),
+                    SpeedPicker(onSelected: _choose, onCancel: _closePicker),
+                  ],
+                ),
               ),
             )
           : Align(

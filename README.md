@@ -6,7 +6,7 @@ Autor: Luiz Alberto Cardoso
 
 **Site do app:** https://tecsattv-gif.github.io/SpeedGuard/ (recursos, vídeo tutorial e passo a passo)
 
-## Funções (versão 1.20.0)
+## Funções (versão 1.21.0)
 
 - **Visual neon** com as cores da tela de abertura: fundo roxo escuro, velocímetro com borda violeta brilhante, botão INICIAR em degradê vermelho→rosa, cartões e botões roxos; o painel flutuante e a janela de reportar seguem a mesma paleta
 - **Tela de abertura** (2,5 s) com a arte do SpeedGuard (velocímetro e rastro de luz) e os créditos do autor
@@ -44,6 +44,7 @@ Autor: Luiz Alberto Cardoso
   - O tamanho é convertido para pixels e conferido pelo próprio painel ao abrir, para ficar certo em qualquer tela
 
   - **Toque duplo no painel**: abre o SpeedGuard direto em tela cheia (o painel some e volta quando você sair do app). Desde a 1.6.4 não aparece mais a janela "Completar ação usando" pedindo para escolher outro app
+  - **Reportar pelo painel** (botão + do painel): a janela traz em cima os avisos **Fila, Acidente, Obras, Perigo e Polícia** e embaixo Móvel/Fixo com as placas de velocidade, igual à janela do app em tela cheia (desde a 1.21.0; antes o painel só reportava radares). Um toque já envia para todos; o app confirma por voz ("Obras reportado. Obrigado!")
   - **Fechar o painel**: toque no **✕** no canto de cima, ou segure o dedo parado sobre ele por meio segundo (vibra e fecha na hora, mesmo com o app em segundo plano). O monitoramento e a voz continuam; o painel volta da próxima vez que você sair do SpeedGuard
 
   Conteúdo do painel:

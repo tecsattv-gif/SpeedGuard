@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'layers.dart';
 import 'theme.dart';
 
 /// Limites prontos para reportar um radar (km/h).
@@ -151,6 +152,55 @@ class SpeedSign extends StatelessWidget {
                 fontSize: size * 0.34,
                 fontWeight: FontWeight.w900,
                 color: Colors.black)),
+      ),
+    );
+  }
+}
+
+/// Barra de avisos de trânsito (Filas, Acidentes, Obras, Perigos, Polícia).
+/// Um toque já reporta. Usada no app e no painel flutuante.
+class EventBar extends StatelessWidget {
+  final ValueChanged<Layer> onSelected;
+  const EventBar({super.key, required this.onSelected});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: SG.surfaceHigh.withValues(alpha: 0.96),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: SG.outline),
+      ),
+      child: Row(
+        children: [
+          for (final l in Layer.events)
+            Expanded(
+              child: InkWell(
+                borderRadius: BorderRadius.circular(12),
+                onTap: () => onSelected(l),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  child: Column(children: [
+                    CircleAvatar(
+                      radius: 20,
+                      backgroundColor: l.color,
+                      child: Icon(l.icon, color: Colors.white),
+                    ),
+                    const SizedBox(height: 4),
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(l.label,
+                          maxLines: 1,
+                          style: const TextStyle(
+                              color: Colors.white, fontSize: 12)),
+                    ),
+                  ]),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
