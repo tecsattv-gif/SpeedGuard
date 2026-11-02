@@ -6,7 +6,7 @@ Autor: Luiz Alberto Cardoso
 
 **Site do app:** https://tecsattv-gif.github.io/SpeedGuard/ (recursos, vídeo tutorial e passo a passo)
 
-## Funções (versão 1.24.0)
+## Funções (versão 1.24.1)
 
 - **Visual neon** com as cores da tela de abertura: fundo roxo escuro, velocímetro com borda violeta brilhante, botão INICIAR em degradê vermelho→rosa, cartões e botões roxos; o painel flutuante e a janela de reportar seguem a mesma paleta
 - **Tela de abertura** (2,5 s) com a arte do SpeedGuard (velocímetro e rastro de luz) e os créditos do autor
@@ -26,6 +26,7 @@ Autor: Luiz Alberto Cardoso
 - **Aparência** em Configurações: **Auto** (segue o modo claro/escuro do celular), **Claro** ou **Escuro**. No modo escuro o mapa também fica escurecido para não ofuscar à noite. A tela de abertura e o painel flutuante continuam sempre escuros
 - **Duas telas no app aberto**, como no CamSam: o botão ao lado de Configurações alterna entre o **Mapa** e a **Tela de alerta** (sem mapa). A tela de alerta mostra **6 faixas verdes** (setas para cima) com o caminho livre. Com radar à frente aparecem a placa do limite, a distância e o tipo do radar, e **a cada aviso uma faixa fica vermelha, de baixo para cima** (1000 m = 1 faixa, 800 m = 2, 500 m = 3, 400 m = 4, 300 m = 5, 100 m = as 6), junto com o aviso sonoro. Acima do limite aparece "REDUZA A VELOCIDADE". O app lembra a última tela escolhida
 - **Parks à frente** (1.24.0), em Configurações (ligado por padrão): mostra num card azul, em cima dos botões Opções/Navegar, o **próximo park no seu sentido** — áreas de descanso (`highway=rest_area`), áreas de serviço (`highway=services`) e estacionamentos de caminhão (`amenity=parking` com `hgv=yes/designated` ou `parking=truck_stop`) do OpenStreetMap, num raio de 60 km (baixados de novo a cada 25 km). Mostra distância, nome, tipo, lado (perto) e o que tem marcado no mapa: WC, chuveiro, combustível, restaurante, vagas, pago/grátis. Toque no card para ver os **3 próximos**; o botão de rota abre o **Google Maps** (ou o Waze) até o park. Aviso de voz a 2 km: "Park a 2 quilômetros, à direita." Áreas de autoestrada do lado contrário (outra pista) são ignoradas. O painel flutuante mostra "P 12 km". A distância é em linha reta (pela estrada pode ser um pouco mais)
+  - **Botão P** (1.24.1), ao lado de Navegar: abre a janela **Parks à frente** com os 3 próximos parks no seu sentido (nome, distância, tipo, lado e o que oferecem). Um toque no park abre a rota no **Google Maps** (ou no Waze, se não houver Google Maps). Funciona também com o monitoramento parado; parado sem direção, mostra os 3 mais perto
 - **Aviso de velocidade excedida** (1.23.0), em Configurações (ligado por padrão):
   - **Caminhão** (veículo escolhido em Configurações): funciona como o limitador — passou de **90 km/h** (ou 80, escolhido em Configurações → Limitador do caminhão), o app fala na hora "Limite de 90 excedido.", **aos 20 s** "Atenção. Você só tem 10 segundos para voltar aos 90." e **aos 30 s** "Velocidade excedida. Volte para os 90.", que se repete a cada 30 s enquanto continuar acima. Voltou para 90 ou menos, a contagem zera. Se a via tiver limite menor que o do caminhão, avisa uma vez "Limite da via 70."
   - **Carro, moto e seta**: a mesma contagem, usando o limite da via

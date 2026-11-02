@@ -189,6 +189,18 @@ class ParkService {
     return out.take(max).toList();
   }
 
+  /// Os parks mais perto em qualquer direção (quando ainda não há rumo).
+  List<ParkAhead> nearest(double lat, double lon, {int max = 3}) {
+    final out = [
+      for (final p in _parks)
+        ParkAhead(p, Geolocator.distanceBetween(lat, lon, p.lat, p.lon), null)
+    ]..sort((a, b) => a.distance.compareTo(b.distance));
+    return out.take(max).toList();
+  }
+
+  /// Já sabe para onde o veículo vai (teve rumo do GPS)?
+  bool get hasHeading => _lastHeading >= 0;
+
   /// Frase de aviso quando o próximo park fica a 2 km (uma vez por park).
   String? announce(List<ParkAhead> list) {
     if (list.isEmpty) return null;

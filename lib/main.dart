@@ -534,6 +534,130 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     }
   }
 
+  /// Botão "P" ao lado de Navegar: abre a lista dos 3 parks à frente.
+  Widget _parkButton() => Material(
+        color: const Color(0xFF1565C0),
+        shape: CircleBorder(side: BorderSide(color: SG.outline, width: 1.5)),
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: _parksSheet,
+          child: const SizedBox(
+            width: 46,
+            height: 46,
+            child: Center(
+              child: Text('P',
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 24,
+                      fontWeight: FontWeight.w900)),
+            ),
+          ),
+        ),
+      );
+
+  /// Janela "Parks à frente": os 3 próximos no seu sentido; toque abre a
+  /// rota no Google Maps.
+  Future<void> _parksSheet() async {
+    final pos = _pos ?? await _currentPos();
+    if (!mounted) return;
+    if (pos == null) {
+      _snack('Aguardando o sinal do GPS…');
+      return;
+    }
+    final load = _parks.update(pos.latitude, pos.longitude);
+    await showModalBottomSheet<void>(
+      context: context,
+      builder: (ctx) => FutureBuilder<void>(
+        future: load,
+        builder: (ctx, snap) {
+          final waiting = snap.connectionState != ConnectionState.done;
+          var list = _parks.ahead(pos.latitude, pos.longitude,
+              pos.speed > 2.5 ? pos.heading : -1,
+              country: _country);
+          final noDir = !_parks.hasHeading;
+          if (noDir) list = _parks.nearest(pos.latitude, pos.longitude);
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(noDir ? 'Parks mais perto' : 'Parks à frente',
+                    style: const TextStyle(
+                        fontSize: 20, fontWeight: FontWeight.bold)),
+                if (noDir)
+                  Text('Comece a andar para ver só os do seu sentido.',
+                      style: TextStyle(color: SG.textSoft, fontSize: 12)),
+                const SizedBox(height: 8),
+                if (waiting && list.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.all(24),
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                else if (list.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Text(
+                        'Nenhum park encontrado à frente (até 60 km).',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: SG.textSoft)),
+                  )
+                else
+                  for (final a in list)
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      onTap: () {
+                        Navigator.pop(ctx);
+                        _navigateTo(a.park);
+                      },
+                      leading: Container(
+                        width: 40,
+                        height: 40,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                            color: const Color(0xFF1565C0),
+                            borderRadius: BorderRadius.circular(8)),
+                        child: const Text('P',
+                            style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 24,
+                                fontWeight: FontWeight.w900)),
+                      ),
+                      title: Text(
+                          a.park.name.isNotEmpty
+                              ? a.park.name
+                              : a.park.kindLabel,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontWeight: FontWeight.w600)),
+                      subtitle: Text([
+                        _km(a.distance),
+                        if (a.park.name.isNotEmpty) a.park.kindLabel,
+                        if (a.side != null) 'à ${a.side}',
+                        ...a.park.features,
+                      ].join(' · ')),
+                      trailing: const Icon(Icons.directions,
+                          color: Color(0xFF1A73E8)),
+                    ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  /// Posição atual quando o monitoramento está parado.
+  Future<Position?> _currentPos() async {
+    try {
+      if (!await _ensurePermission()) return null;
+      return await Geolocator.getCurrentPosition()
+          .timeout(const Duration(seconds: 10));
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// Card "Parks à frente", em cima dos botões Opções/Navegar.
   Widget _parkCard() {
     final list = _parkOpen ? _parksAhead : _parksAhead.take(1).toList();
@@ -1739,6 +1863,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               _pill(Icons.tune, 'Opções', _mapOptions),
               const SizedBox(width: 8),
               _pill(Icons.navigation, 'Navegar', _navigate),
+              const SizedBox(width: 8),
+              _parkButton(),
             ]),
           ),
 
