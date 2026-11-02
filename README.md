@@ -6,7 +6,7 @@ Autor: Luiz Alberto Cardoso
 
 **Site do app:** https://tecsattv-gif.github.io/SpeedGuard/ (recursos, vídeo tutorial e passo a passo)
 
-## Funções (versão 1.25.2)
+## Funções (versão 1.25.3)
 
 - **Visual neon** com as cores da tela de abertura: fundo roxo escuro, velocímetro com borda violeta brilhante, botão INICIAR em degradê vermelho→rosa, cartões e botões roxos; o painel flutuante e a janela de reportar seguem a mesma paleta
 - **Tela de abertura** (2,5 s) com a arte do SpeedGuard (velocímetro e rastro de luz) e os créditos do autor
@@ -31,6 +31,7 @@ Autor: Luiz Alberto Cardoso
   - **Parks da rota** (1.25.0): ao digitar um destino em **Navegar**, o SpeedGuard calcula a mesma rota (OSRM, do OpenStreetMap; o Google Maps não deixa outros apps lerem a rota dele) e busca os parks a até 600 m dela, só do seu sentido. O botão P passa a mostrar **todos os parks da rota**, com a **distância pela estrada**, antes mesmo de sair; os que ficam para trás saem da lista, e o card e o aviso de 2 km usam o próximo da rota. Se você sair da rota, volta a mostrar os parks à frente pelo rumo. Ao chegar ao destino (ou no botão **Encerrar rota**) a rota é apagada. O destino é procurado no Nominatim (OpenStreetMap). A rota é de carro e pode diferir da do Google se ele desviar por trânsito
   - **1.25.1**: as buscas no OpenStreetMap (radares, limite da via, parks, parks da rota) entram numa **fila única** — antes iam juntas, o servidor recusava (erro 429) e a lista de parks ficava vazia. Estacionamentos de caminhão também são reconhecidos por `hgv=only` e pelo nome (truck, camion, LKW, vrachtwagen, safe parking, Autohof). A janela do P se atualiza sozinha enquanto busca, e o botão Encerrar rota não fica mais embaixo da barra do Android
   - **1.25.2**: a busca dos parks da rota é feita por **retângulos de ~15 km** ao longo do caminho (até 8 por busca, ~120 km), filtrando depois pela distância até a rota. A busca "em volta da linha da rota" da 1.25.0 era lenta demais no servidor e a lista ficava carregando para sempre
+  - **1.25.3**: a rota é buscada **trecho a trecho** (~60 km por vez, começando pelo mais perto). A lista do P já mostra os primeiros parks enquanto o resto carrega ("12 parks até agora · buscando o resto da rota (2/7)…"); trecho que falhar é pulado; radares e limite da via não ficam mais esperando a rota inteira
 - **Aviso de velocidade excedida** (1.23.0), em Configurações (ligado por padrão):
   - **Caminhão** (veículo escolhido em Configurações): funciona como o limitador — passou de **90 km/h** (ou 80, escolhido em Configurações → Limitador do caminhão), o app fala na hora "Limite de 90 excedido.", **aos 20 s** "Atenção. Você só tem 10 segundos para voltar aos 90." e **aos 30 s** "Velocidade excedida. Volte para os 90.", que se repete a cada 30 s enquanto continuar acima. Voltou para 90 ou menos, a contagem zera. Se a via tiver limite menor que o do caminhão, avisa uma vez "Limite da via 70."
   - **Carro, moto e seta**: a mesma contagem, usando o limite da via

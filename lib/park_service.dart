@@ -151,16 +151,30 @@ class ParkService {
   /// Parks da rota com a distância pela estrada desde a partida (m) e o lado.
   List<(Park, double, String)> _route = [];
   bool routeLoading = false;
-  bool get hasRoute => _route.isNotEmpty;
+  /// Já tem pelo menos um trecho da rota buscado (mesmo sem parks).
+  bool routeReady = false;
+  bool get hasRoute => routeReady;
+  /// Progresso da busca: trechos prontos / total.
+  int routeChunks = 0, routeChunksDone = 0;
+  /// Chamado a cada trecho buscado (para a tela se atualizar).
+  void Function()? onRouteUpdate;
+  Object? _routeOf; // rota que está sendo buscada
   int get routeCount => _route.length;
 
-  void clearRoute() => _route = [];
+  void clearRoute() {
+    _route = [];
+    routeReady = false;
+    _routeOf = null;
+  }
 
   /// Busca os parks num corredor de 600 m em volta da rota (em trechos de
   /// ~200 km) e guarda os que ficam no seu sentido. Devolve quantos achou,
   /// ou null se a busca falhou.
   Future<int?> loadRoute(RouteService route, {String? country}) async {
     routeLoading = true;
+    routeReady = false;
+    _route = [];
+    _routeOf = route.pts;
     try {
       // A rota é dividida em trechos de ~15 km; cada trecho vira um
       // retângulo (com 700 m de folga) e a busca é por retângulos, que o
@@ -184,37 +198,51 @@ class ParkService {
             '${(n0 + dLat).toStringAsFixed(4)},'
             '${(e0 + dLon).toStringAsFixed(4)}');
       }
+      // Busca trecho a trecho (4 retângulos, ~60 km por vez), começando
+      // pelo mais perto. Cada trecho entra na fila do Overpass sozinho, então
+      // radares e limite da via não ficam esperando a rota inteira, e a lista
+      // já aparece com os primeiros parks enquanto o resto carrega.
+      // Trecho que falhar é pulado (a rota não fica travada por causa dele).
+      final leftHand =
+          const {'gb', 'ie', 'mt', 'cy'}.contains(country?.toLowerCase());
       final found = <Park>[];
-      // Até 8 retângulos (~120 km de rota) por busca.
-      for (var i = 0; i < boxes.length; i += 8) {
-        final sb = StringBuffer('[out:json][timeout:25];(');
-        for (final b in boxes.sublist(i, math.min(i + 8, boxes.length))) {
+      var ok = 0;
+      routeChunks = (boxes.length + 3) ~/ 4;
+      routeChunksDone = 0;
+      for (var i = 0; i < boxes.length; i += 4) {
+        if (!identical(route.pts, _routeOf)) return null; // rota trocada
+        final sb = StringBuffer('[out:json][timeout:20];(');
+        for (final b in boxes.sublist(i, math.min(i + 4, boxes.length))) {
           sb
             ..write('nwr["highway"~"^(rest_area|services)\$"]($b);')
             ..write('nwr["amenity"="parking"]["hgv"~"^(yes|designated|only)\$"]($b);')
             ..write('nwr["amenity"="parking"]["parking"="truck_stop"]($b);')
-            ..write('nwr["amenity"="parking"]["name"~"truck|camion|LKW|vrachtwagen|safe parking|Autohof",i]($b);');
+            ..write('nwr["amenity"="parking"]["name"~"[Tt]ruck|[Cc]amion|LKW|[Vv]rachtwagen|[Ss]afe [Pp]arking|Autohof"]($b);');
         }
         sb.write(');out center tags;');
-        final list = await _fetch(sb.toString(), 35);
-        if (list == null) return null;
+        final list = await _fetch(sb.toString(), 25);
+        routeChunksDone++;
+        if (list == null) continue;
+        ok++;
         found.addAll(list);
+        // Mostra o que já tem.
+        final out = <(Park, double, String)>[];
+        for (final p in _dedupe([...found])) {
+          final (k, d, side) = route.nearest(p.lat, p.lon);
+          if (d > 600) continue;
+          final right = side > 0;
+          // Área de autoestrada do outro lado: é da pista contrária.
+          final wrong = leftHand ? right : !right;
+          if (wrong && p.kind != 'parking' && d < 500) continue;
+          out.add((p, route.cum[k], right ? 'direita' : 'esquerda'));
+        }
+        out.sort((a, b) => a.$2.compareTo(b.$2));
+        _route = out;
+        routeReady = true;
+        onRouteUpdate?.call();
       }
-      final leftHand =
-          const {'gb', 'ie', 'mt', 'cy'}.contains(country?.toLowerCase());
-      final out = <(Park, double, String)>[];
-      for (final p in _dedupe(found)) {
-        final (i, d, side) = route.nearest(p.lat, p.lon);
-        if (d > 600) continue;
-        final right = side > 0;
-        // Área de autoestrada do outro lado: é da pista contrária.
-        final wrong = leftHand ? right : !right;
-        if (wrong && p.kind != 'parking' && d < 500) continue;
-        out.add((p, route.cum[i], right ? 'direita' : 'esquerda'));
-      }
-      out.sort((a, b) => a.$2.compareTo(b.$2));
-      _route = out;
-      return out.length;
+      if (ok == 0) return null;
+      return _route.length;
     } finally {
       routeLoading = false;
     }

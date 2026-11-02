@@ -524,6 +524,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   /// Calcula a rota até o destino digitado e busca os parks nela.
   Future<void> _planRoute(String dest) async {
+    _parks.onRouteUpdate = () {
+      if (mounted) setState(() {});
+    };
     final pos = _pos ?? await _currentPos();
     if (pos == null) return;
     _route.clear();
@@ -647,7 +650,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   _route.progress(pos.latitude, pos.longitude) ?? 0;
               list = _parks.alongRoute(prog, max: 0); // todos da rota
               title = 'Parks da rota até ${_route.destName}';
-              hint = '${list.length} parks · distância pela estrada';
+              hint = _parks.routeLoading
+                  ? '${list.length} parks até agora · buscando o resto da rota '
+                      '(${_parks.routeChunksDone}/${_parks.routeChunks})…'
+                  : '${list.length} parks · distância pela estrada';
             } else {
               list = _parks.ahead(pos.latitude, pos.longitude,
                   pos.speed > 2.5 ? pos.heading : -1,
