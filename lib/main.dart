@@ -192,9 +192,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     _vehicle = VehicleIcon.fromName(p.getString('vehicle'));
     final saved = p.getStringList('layers');
     if (saved != null) {
+      // Camadas novas (ex.: acidente) vêm ligadas para quem já tinha opções salvas.
+      final known = p.getStringList('layersKnown') ??
+          const ['fixos', 'semaforo', 'moveis', 'fila', 'obra', 'perigo', 'policia'];
       _layers = {
         for (final l in Layer.values)
-          if (saved.contains(l.name)) l
+          if (saved.contains(l.name) || !known.contains(l.name)) l
       };
     }
     _country = p.getString('country');
@@ -675,6 +678,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     Future<void> save() async {
       final p = await SharedPreferences.getInstance();
       await p.setStringList('layers', [for (final l in _layers) l.name]);
+      await p.setStringList('layersKnown', [for (final l in Layer.values) l.name]);
     }
 
     Widget item(Layer l, StateSetter setSheet) => SwitchListTile(
@@ -752,7 +756,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     );
   }
 
-  /// Reporta fila, obra, perigo ou polícia aqui (some após 6 h).
+  /// Reporta fila, acidente, obra, perigo ou polícia aqui (some após 6 h).
   Future<void> _submitEvent(Layer l) async {
     final pos = _pos;
     if (pos == null) {
@@ -828,9 +832,13 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                                 child: Icon(l.icon, color: Colors.white),
                               ),
                               const SizedBox(height: 4),
-                              Text(l.label,
-                                  style: const TextStyle(
-                                      color: Colors.white, fontSize: 12)),
+                              FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text(l.label,
+                                    maxLines: 1,
+                                    style: const TextStyle(
+                                        color: Colors.white, fontSize: 12)),
+                              ),
                             ]),
                           ),
                         ),
@@ -1244,7 +1252,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               ),
               const ListTile(
                 leading: Icon(Icons.info_outline),
-                title: Text('SpeedGuard 1.18.2'),
+                title: Text('SpeedGuard 1.19.0'),
                 subtitle: Text('Dados de radares: © colaboradores do '
                     'OpenStreetMap. Respeite sempre os limites de velocidade.'),
               ),
@@ -1274,7 +1282,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   Widget _radarIcon(Radar r) {
     if (r.isEvent) {
-      // Fila, obra, perigo ou polícia: bolinha colorida com o símbolo.
+      // Fila, acidente, obra, perigo ou polícia: bolinha colorida com o símbolo.
       final l = Layer.of(r);
       return GestureDetector(
         onTap: () => _showRadar(r),

@@ -13,8 +13,10 @@ enum Layer {
       Icons.speed),
   fila('Filas', 'Trânsito parado ou lento', Color(0xFFFF7A2F),
       Icons.directions_car_filled),
+  acidente('Acidentes', 'Acidente na via', Color(0xFFFF2846),
+      Icons.car_crash),
   obra('Obras', 'Obras na pista', Color(0xFFFF7A2F), Icons.construction),
-  perigo('Perigos', 'Acidente, obstáculo, avaria, pista escorregadia',
+  perigo('Perigos', 'Obstáculo, avaria, pista escorregadia',
       Color(0xFFFF7A2F), Icons.warning_amber_rounded),
   policia('Polícia', 'Polícia na via', Color(0xFF3D7BFF), Icons.local_police);
 
@@ -25,7 +27,7 @@ enum Layer {
   const Layer(this.label, this.subtitle, this.color, this.icon);
 
   /// Avisos reportados pelos motoristas que somem sozinhos depois de 6 h.
-  static const events = [fila, obra, perigo, policia];
+  static const events = [fila, acidente, obra, perigo, policia];
   static const eventLife = Duration(hours: 6);
 
   bool get isEvent => events.contains(this);
@@ -39,6 +41,8 @@ enum Layer {
         return moveis;
       case 'fila':
         return fila;
+      case 'acidente':
+        return acidente;
       case 'obra':
         return obra;
       case 'perigo':

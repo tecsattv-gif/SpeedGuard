@@ -12,7 +12,7 @@ import 'models.dart';
 class CommunityService {
   static const checkInterval = Duration(hours: 48);
 
-  /// Filas, obras, perigos e polícia somem sozinhos depois de 6 h.
+  /// Filas, acidentes, obras, perigos e polícia somem sozinhos depois de 6 h.
   static const eventLife = Duration(hours: 6);
 
   List<Radar> _radars = [];
@@ -224,11 +224,11 @@ class CommunityService {
     }
   }
 
-  /// Apaga do Firebase os avisos (fila, obra, perigo, polícia) com mais
+  /// Apaga do Firebase os avisos (fila, acidente, obra, perigo, polícia) com mais
   /// de 6 h. Qualquer celular que baixar a região faz a limpeza; as regras
   /// do Firestore só permitem apagar aviso já vencido.
   void _deleteExpired(List items) {
-    const events = {'fila', 'obra', 'perigo', 'policia'};
+    const events = {'fila', 'acidente', 'obra', 'perigo', 'policia'};
     final now = DateTime.now().millisecondsSinceEpoch;
     for (final item in items) {
       final doc = (item as Map)['document'] as Map?;
@@ -265,7 +265,7 @@ class CommunityService {
     final type =
         (f['type'] as Map?)?['stringValue']?.toString() ?? 'comunidade';
     // Aviso de trânsito com mais de 6 h: já expirou, não mostra.
-    const events = {'fila', 'obra', 'perigo', 'policia'};
+    const events = {'fila', 'acidente', 'obra', 'perigo', 'policia'};
     if (events.contains(type) &&
         check < DateTime.now().millisecondsSinceEpoch) {
       return null;

@@ -6,7 +6,7 @@ Autor: Luiz Alberto Cardoso
 
 **Site do app:** https://tecsattv-gif.github.io/SpeedGuard/ (recursos, vídeo tutorial e passo a passo)
 
-## Funções (versão 1.18.2)
+## Funções (versão 1.19.0)
 
 - **Visual neon** com as cores da tela de abertura: fundo roxo escuro, velocímetro com borda violeta brilhante, botão INICIAR em degradê vermelho→rosa, cartões e botões roxos; o painel flutuante e a janela de reportar seguem a mesma paleta
 - **Tela de abertura** (2,5 s) com a arte do SpeedGuard (velocímetro e rastro de luz) e os créditos do autor
@@ -15,9 +15,9 @@ Autor: Luiz Alberto Cardoso
 - **Navegar** (botão ao lado de Opções): digite o destino e escolha **Google Maps** ou **Waze**; o app abre já navegando (campo vazio só abre o app). Se o monitoramento estiver parado, o SpeedGuard liga sozinho antes, e o painel flutuante (se ligado) avisa os radares por cima da navegação
 - **Opções do mapa** (botão **Opções** no canto de baixo à esquerda), como no CamSam: liga e desliga cada camada, com bolinha colorida. O que fica desligado some do mapa e não gera aviso:
   - 🔴 Radares fixos (inclui os reportados) · 🟠 Radares de semáforo · 🟣 Radares móveis
-  - 🟠 Filas · 🟠 Obras · 🟠 Perigos (acidente, obstáculo, avaria, pista escorregadia) · 🔵 Polícia
+  - 🟠 Filas · 🔴 Acidentes · 🟠 Obras · 🟠 Perigos (obstáculo, avaria, pista escorregadia) · 🔵 Polícia
   - Mais: **O mapa segue você**
-- **Avisos de trânsito reportados pelos motoristas**: no botão de reportar aparecem **Fila, Obras, Perigo e Polícia** acima das placas de velocidade; um toque já reporta para todos. Cada aviso **some sozinho depois de 6 horas** e é **apagado do Firebase automaticamente** pelo primeiro celular que baixar a região depois disso (as regras só permitem apagar aviso já vencido); se alguém reportar o mesmo aviso no mesmo lugar (até 150 m), ele não duplica e ganha mais 6 h. Os avisos usam os mesmos alertas de 500 a 100 m dos radares
+- **Avisos de trânsito reportados pelos motoristas**: no botão de reportar aparecem **Fila, Acidente, Obras, Perigo e Polícia** acima das placas de velocidade; um toque já reporta para todos. Cada aviso **some sozinho depois de 6 horas** e é **apagado do Firebase automaticamente** pelo primeiro celular que baixar a região depois disso (as regras só permitem apagar aviso já vencido); se alguém reportar o mesmo aviso no mesmo lugar (até 150 m), ele não duplica e ganha mais 6 h. Os avisos usam os mesmos alertas de 500 a 100 m dos radares
 - **Tutorial em vídeo** (Configurações → **Tutorial**): vídeo de 7 min, narrado, mostrando como configurar e usar o app. O vídeo vai dentro do app (`assets/tutorial.mp4`, ~11 MB) e funciona sem internet; tem play/pausa, voltar e avançar 10 s e barra para arrastar
 - **Pessoas conectadas**: dois cards pequenos, lado a lado no alto da tela (acima do círculo da velocidade), mostram quantas pessoas estão com o SpeedGuard conectado agora: 🌍 **no mundo** e com a bandeira do **país onde você está** (ex.: 🇫🇷 12 no país). Conta quem está com o app aberto ou monitorando; atualiza a cada minuto e quem fecha o app sai da contagem em até 4 minutos. Cada aparelho grava só o código do país e o horário na coleção `presence` do Firebase (sem dados pessoais). Os cards só aparecem depois que as regras da coleção `presence` (abaixo) forem publicadas no console
 - **Ícone no mapa** (Configurações → Ícone no mapa): **Seta**, **Carro**, **Caminhão** (cavalo com carreta) ou **Moto**, desenhados vistos de cima e girando conforme a direção
@@ -105,7 +105,7 @@ O workflow roda `flutter create` para gerar os arquivos Android que não estão 
 
 ## Radares compartilhados (Firebase)
 
-**Já ativado** desde a versão 1.6.3. Os radares reportados ficam no Cloud Firestore do projeto Firebase **SpeedGuard001** (ID `speedguard001`, plano Spark gratuito), na coleção `radars`; as pessoas conectadas ficam na coleção `presence`. O app acessa pela API REST, com o ID do projeto e a chave de API da Web em `lib/firebase_config.dart`. A chave não é secreta (vai dentro do app); quem protege os dados são as regras abaixo, já publicadas no console:
+**Já ativado** desde a versão 1.6.3. Os radares reportados ficam no Cloud Firestore do projeto Firebase **SpeedGuard001** (ID `speedguard001`, plano Spark gratuito), na coleção `radars`; as pessoas conectadas ficam na coleção `presence`. O app acessa pela API REST, com o ID do projeto e a chave de API da Web em `lib/firebase_config.dart`. A chave não é secreta (vai dentro do app); quem protege os dados são as regras abaixo, publicadas no console (na versão 1.19.0 entrou `'acidente'` na lista da regra de apagar; republique em **Firestore → Regras → Publicar**):
 
 ```
 rules_version = '2';
@@ -122,7 +122,7 @@ service cloud.firestore {
           .affectedKeys().hasOnly(['checkAfter']);
       // apaga radar móvel ("não está mais") ou aviso com mais de 6 h
       allow delete: if resource.data.type == 'movel'
-        || (resource.data.type in ['fila', 'obra', 'perigo', 'policia']
+        || (resource.data.type in ['fila', 'acidente', 'obra', 'perigo', 'policia']
             && resource.data.checkAfter < request.time.toMillis());
     }
     // pessoas conectadas: um documento por aparelho (país + horário)
