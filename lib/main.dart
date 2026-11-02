@@ -29,6 +29,7 @@ import 'theme.dart';
 import 'tutorial_page.dart';
 import 'vehicle_icon.dart';
 import 'gps_filter.dart';
+import 'park_service.dart';
 import 'road_limit.dart';
 import 'speed_watch.dart';
 import 'speed_picker.dart';
@@ -105,6 +106,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   Position? _pos;
   final _gps = GpsFilter();
   final _roads = RoadLimitService();
+  final _parks = ParkService();
+  /// Parks à frente (área de descanso/serviço, estacionamento de caminhão).
+  List<ParkAhead> _parksAhead = const [];
+  bool _showParks = true;
+  bool _parkOpen = false;
   final _watch = SpeedWatch();
   /// Aviso de velocidade excedida ligado (Configurações).
   bool _speedWarn = true;
@@ -195,6 +201,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     final p = await SharedPreferences.getInstance();
     _voice = p.getBool('voice') ?? true;
     _speedWarn = p.getBool('speed_warn') ?? true;
+    _showParks = p.getBool('show_parks') ?? true;
     _truckMax = p.getInt('truck_max') ?? 90;
     _sound = p.getString('sound') ?? 'voice';
     try {
@@ -332,6 +339,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       'limit': show ? a.radar!.maxSpeed : null,
       'over': a.overLimit || _watch.seconds != null,
       'road': _running && _speedWarn ? _shownLimit : null,
+      'park': _running && _showParks && _parksAhead.isNotEmpty
+          ? _km(_parksAhead.first.distance)
+          : null,
       'ask': _ask != null,
       'scale': _bubbleScale,
       'land': _bubbleLand,
@@ -477,7 +487,129 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     }
     _runAlerts(pos);
     _checkSpeedLimit(pos);
+    _checkParks(pos);
     _checkAsk(pos);
+  }
+
+  void _checkParks(Position pos) {
+    if (!_showParks) {
+      _parksAhead = const [];
+      return;
+    }
+    _parks.update(pos.latitude, pos.longitude);
+    _parksAhead = _parks.ahead(pos.latitude, pos.longitude,
+        pos.speed > 2.5 ? pos.heading : -1,
+        country: _country);
+    final say = _parks.announce(_parksAhead);
+    if (say != null && _voice) _tts.speak(say);
+  }
+
+  static String _km(double m) => m < 1000
+      ? '${(m / 50).round() * 50} m'
+      : m < 10000
+          ? '${(m / 1000).toStringAsFixed(1).replaceAll('.', ',')} km'
+          : '${(m / 1000).round()} km';
+
+  /// Abre o Google Maps (ou o Waze) com rota até o park.
+  Future<void> _navigateTo(Park p) async {
+    final ll = '${p.lat},${p.lon}';
+    try {
+      await AndroidIntent(
+        action: 'action_view',
+        data: 'google.navigation:q=$ll',
+        package: 'com.google.android.apps.maps',
+        flags: const [Flag.FLAG_ACTIVITY_NEW_TASK],
+      ).launch();
+    } catch (_) {
+      try {
+        await AndroidIntent(
+          action: 'action_view',
+          data: 'https://waze.com/ul?ll=$ll&navigate=yes',
+          package: 'com.waze',
+          flags: const [Flag.FLAG_ACTIVITY_NEW_TASK],
+        ).launch();
+      } catch (_) {
+        _snack('Não foi possível abrir o Google Maps nem o Waze.');
+      }
+    }
+  }
+
+  /// Card "Parks à frente", em cima dos botões Opções/Navegar.
+  Widget _parkCard() {
+    final list = _parkOpen ? _parksAhead : _parksAhead.take(1).toList();
+    Widget row(ParkAhead a) {
+      final p = a.park;
+      final title = p.name.isNotEmpty ? p.name : p.kindLabel;
+      final info = [
+        if (p.name.isNotEmpty) p.kindLabel,
+        if (a.side != null) 'à ${a.side}',
+        ...p.features,
+      ].join(' · ');
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Row(children: [
+          Container(
+            width: 34,
+            height: 34,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+                color: const Color(0xFF1565C0),
+                borderRadius: BorderRadius.circular(6)),
+            child: const Text('P',
+                style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w900)),
+          ),
+          const SizedBox(width: 10),
+          SizedBox(
+            width: 64,
+            child: Text(_km(a.distance),
+                style: const TextStyle(
+                    fontSize: 18, fontWeight: FontWeight.bold)),
+          ),
+          Expanded(
+            child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontWeight: FontWeight.w600)),
+                  if (info.isNotEmpty)
+                    Text(info,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 12, color: SG.textSoft)),
+                ]),
+          ),
+          IconButton(
+            tooltip: 'Ir até o park',
+            icon: const Icon(Icons.directions),
+            onPressed: () => _navigateTo(p),
+          ),
+        ]),
+      );
+    }
+
+    return GestureDetector(
+      onTap: () => setState(() => _parkOpen = !_parkOpen),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(10, 4, 4, 4),
+        decoration: BoxDecoration(
+          color: SG.card.withValues(alpha: 0.94),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFF1565C0), width: 2),
+        ),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          for (final a in list) row(a),
+          if (_parksAhead.length > 1)
+            Icon(_parkOpen ? Icons.expand_more : Icons.expand_less,
+                size: 18, color: SG.textSoft),
+        ]),
+      ),
+    );
   }
 
   bool get _isTruck => _vehicle == VehicleIcon.truck;
@@ -1043,6 +1175,19 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             mainAxisSize: MainAxisSize.min,
             children: [
               SwitchListTile(
+                title: const Text('Parks à frente'),
+                subtitle: const Text(
+                    'Áreas de descanso, de serviço e estacionamentos de caminhão '
+                    'no seu sentido, com aviso a 2 km'),
+                value: _showParks,
+                onChanged: (v) async {
+                  final p = await SharedPreferences.getInstance();
+                  await p.setBool('show_parks', v);
+                  setSheet(() => _showParks = v);
+                  setState(() {});
+                },
+              ),
+              SwitchListTile(
                 title: const Text('Aviso de velocidade excedida'),
                 subtitle: Text(_isTruck
                     ? 'Caminhão: passou de $_truckMax, avisa na hora, aos 20 s '
@@ -1581,6 +1726,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               ),
             ),
           ),
+
+          // Parks à frente, logo acima dos botões.
+          if (_running && _showParks && _parksAhead.isNotEmpty)
+            Positioned(left: 12, right: 12, bottom: 72, child: _parkCard()),
 
           // Botões "Opções" (camadas do mapa) e "Navegar" (Google/Waze).
           Positioned(

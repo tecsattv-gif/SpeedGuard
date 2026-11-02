@@ -56,6 +56,7 @@ class _OverlayBubbleState extends State<OverlayBubble> {
   int? _limit;
   bool _over = false;
   int? _road; // limite da via
+  String? _park; // distância do próximo park
   bool _ask = false;
   bool _picker = false;
   bool _sent = false;
@@ -79,6 +80,7 @@ class _OverlayBubbleState extends State<OverlayBubble> {
           _limit = (m['limit'] as num?)?.toInt();
           _over = m['over'] == true;
           _road = (m['road'] as num?)?.toInt();
+          _park = m['park'] as String?;
           _ask = m['ask'] == true;
           if (m['scale'] is num) _scale = (m['scale'] as num).toDouble();
           if (m['land'] is bool) _land = m['land'] as bool;
@@ -259,6 +261,12 @@ class _OverlayBubbleState extends State<OverlayBubble> {
               const SizedBox(height: 2),
               SpeedSign(label: '$_road', size: 26),
             ],
+            if (_park != null)
+              Text('P $_park',
+                  style: const TextStyle(
+                      color: Color(0xFF64B5F6),
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold)),
           ],
         ),
       ),
