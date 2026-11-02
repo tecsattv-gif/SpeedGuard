@@ -67,6 +67,43 @@ jobs:
           keytool -list -v -keystore ~/.android/debug.keystore -storepass android \
             | grep -m1 "SHA256" || { echo "::error::Chave de assinatura ilegível"; exit 1; }
 
+      # Força o Gradle a usar a nossa chave (sozinho ele criava outra).
+      - name: Usar a chave fixa no Gradle
+        run: |
+          F=android/app/build.gradle.kts
+          if [ -f "$F" ]; then
+            python3 - "$F" <<'PY'
+          import sys,os
+          f=sys.argv[1]; s=open(f).read()
+          ks=os.path.expanduser("~/.android/debug.keystore")
+          blk=("    signingConfigs {\n"
+               "        getByName(\"debug\") {\n"
+               f"            storeFile = file(\"{ks}\")\n"
+               "            storePassword = \"android\"\n"
+               "            keyAlias = \"androiddebugkey\"\n"
+               "            keyPassword = \"android\"\n"
+               "        }\n    }\n")
+          i=s.index("android {")+len("android {\n")
+          s=s[:i]+blk+s[i:]
+          open(f,"w").write(s)
+          PY
+          else
+            F=android/app/build.gradle
+            python3 - "$F" <<'PY'
+          import sys,os
+          f=sys.argv[1]; s=open(f).read()
+          ks=os.path.expanduser("~/.android/debug.keystore")
+          blk=("    signingConfigs {\n        debug {\n"
+               f"            storeFile file('{ks}')\n"
+               "            storePassword 'android'\n            keyAlias 'androiddebugkey'\n"
+               "            keyPassword 'android'\n        }\n    }\n")
+          i=s.index("android {")+len("android {\n")
+          s=s[:i]+blk+s[i:]
+          open(f,"w").write(s)
+          PY
+          fi
+          grep -n -A6 "signingConfigs" "$F" | head -12
+
       - name: Compilar APK
         run: flutter build apk --release
 
