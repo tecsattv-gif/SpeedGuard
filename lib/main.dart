@@ -510,6 +510,27 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           ? '${(m / 1000).toStringAsFixed(1).replaceAll('.', ',')} km'
           : '${(m / 1000).round()} km';
 
+  /// Compartilha o park (WhatsApp, SMS, e-mail…) com o link do Google Maps.
+  Future<void> _sharePark(Park p) async {
+    final title = p.name.isNotEmpty ? '${p.name} (${p.kindLabel})' : p.kindLabel;
+    final f = p.features;
+    final text = [
+      'Park: $title',
+      if (f.isNotEmpty) f.join(', '),
+      'https://www.google.com/maps/search/?api=1&query=${p.lat},${p.lon}',
+    ].join('\n');
+    try {
+      await AndroidIntent(
+        action: 'android.intent.action.SEND',
+        type: 'text/plain',
+        arguments: {'android.intent.extra.TEXT': text},
+      ).launchChooser('Compartilhar park');
+    } catch (_) {
+      await Clipboard.setData(ClipboardData(text: text));
+      _snack('Link do park copiado.');
+    }
+  }
+
   /// Abre o Google Maps (ou o Waze) com rota até o park.
   Future<void> _navigateTo(Park p) async {
     final ll = '${p.lat},${p.lon}';
@@ -636,8 +657,15 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                         if (a.side != null) 'à ${a.side}',
                         ...a.park.features,
                       ].join(' · ')),
-                      trailing: const Icon(Icons.directions,
-                          color: Color(0xFF1A73E8)),
+                      // Compartilhar (separado) e rota.
+                      trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                        IconButton(
+                          tooltip: 'Compartilhar',
+                          icon: const Icon(Icons.share),
+                          onPressed: () => _sharePark(a.park),
+                        ),
+                        const Icon(Icons.directions, color: Color(0xFF1A73E8)),
+                      ]),
                     ),
               ],
             ),
@@ -707,6 +735,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(fontSize: 12, color: SG.textSoft)),
                 ]),
+          ),
+          IconButton(
+            tooltip: 'Compartilhar',
+            icon: const Icon(Icons.share, size: 20),
+            onPressed: () => _sharePark(p),
           ),
           IconButton(
             tooltip: 'Ir até o park',
