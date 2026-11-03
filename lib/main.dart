@@ -2005,6 +2005,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               ListTile(
                 leading: const Icon(Icons.system_update),
                 title: const Text('Procurar atualização do app'),
+                // 1.28.9: mostra a versão instalada (muda a cada atualização).
+                subtitle: FutureBuilder<String>(
+                  future: UpdateService.installed(),
+                  builder: (_, s) =>
+                      Text('Versão instalada: ${s.data ?? '…'}'),
+                ),
                 onTap: () {
                   Navigator.pop(ctx);
                   UpdateService.manualCheck(context);
@@ -2015,10 +2021,14 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 title: Text('País: ${_rule.name}'),
                 subtitle: Text(_modeLabel(_rule.mode)),
               ),
-              const ListTile(
-                leading: Icon(Icons.info_outline),
-                title: Text('SpeedGuard 1.19.0'),
-                subtitle: Text('Dados de radares: © colaboradores do '
+              ListTile(
+                leading: const Icon(Icons.info_outline),
+                // Versão real do app instalado (antes fixa em "1.19.0").
+                title: FutureBuilder<String>(
+                  future: UpdateService.installed(),
+                  builder: (_, s) => Text('SpeedGuard ${s.data ?? ''}'.trim()),
+                ),
+                subtitle: const Text('Dados de radares: © colaboradores do '
                     'OpenStreetMap. Respeite sempre os limites de velocidade.'),
               ),
             ],
