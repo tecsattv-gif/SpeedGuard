@@ -137,6 +137,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   String _sound = 'voice';
   /// Aviso de velocidade excedida: 'voice' ou 'beep' (1.27.2).
   String _speedSound = 'voice';
+  /// Volume dos avisos (voz e bipes), 0.1 a 1.0 (1.27.3).
+  double _volume = 1.0;
   /// Mostra o card "N radares carregados" só alguns segundos após atualizar.
   bool _showCount = false;
   Timer? _countTimer;
@@ -214,6 +216,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     _truckMax = p.getInt('truck_max') ?? 90;
     _sound = p.getString('sound') ?? 'voice';
     _speedSound = p.getString('speed_sound') ?? 'voice';
+    _volume = p.getDouble('volume') ?? 1.0;
     try {
       // Bipes abaixam a música/navegação por um instante, sem pausar.
       await _player.setAudioContext(AudioContext(
@@ -244,6 +247,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     await _service.load();
     await _tts.setLanguage('pt-BR');
     await _tts.setSpeechRate(0.5);
+    await _tts.setVolume(_volume);
     await _tts.awaitSpeakCompletion(false);
     if (mounted) setState(() {});
     _presenceTick();
@@ -456,7 +460,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     final file = n >= AlertEngine.overBeep ? 'beep_fast' : 'step$n';
     try {
       await _player.stop();
-      await _player.play(AssetSource('sounds/$file.wav'));
+      await _player.play(AssetSource('sounds/$file.wav'), volume: _volume);
     } catch (_) {}
   }
 
@@ -1600,6 +1604,45 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                     },
                   ),
                 ),
+              // Volume dos avisos (voz e bipes de radar e de velocidade).
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+                child: Row(children: [
+                  const Icon(Icons.volume_down),
+                  Expanded(
+                    child: Slider(
+                      value: _volume,
+                      min: 0.1,
+                      max: 1.0,
+                      divisions: 9,
+                      label: '${(_volume * 100).round()}%',
+                      onChanged: (v) => setSheet(() => _volume = v),
+                      onChangeEnd: (v) async {
+                        final p = await SharedPreferences.getInstance();
+                        await p.setDouble('volume', v);
+                        await _tts.setVolume(v);
+                        // Amostra no volume novo.
+                        if (_sound == 'beep') {
+                          _beep(3);
+                        } else {
+                          _tts.speak('Volume ${(v * 100).round()} por cento.');
+                        }
+                      },
+                    ),
+                  ),
+                  const Icon(Icons.volume_up),
+                  SizedBox(
+                      width: 44,
+                      child: Text('${(_volume * 100).round()}%',
+                          textAlign: TextAlign.right)),
+                ]),
+              ),
+              const Padding(
+                padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
+                child: Text(
+                    'Volume dos avisos (voz e bipes). 100% = volume do celular',
+                    style: TextStyle(fontSize: 12)),
+              ),
               SwitchListTile(
                 title: const Text('Modo discreto'),
                 subtitle: const Text('Na voz, fala só a distância ("500 metros")'),
