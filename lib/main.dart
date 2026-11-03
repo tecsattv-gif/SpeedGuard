@@ -1009,7 +1009,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       }
     }
     if (ev != null || say != null) {
-      HapticFeedback.heavyImpact();
+      // 1.28.8: o aviso de velocidade não vibra mais (só tela e som).
       if (ev?.step == 3) setState(() {}); // card "VELOCIDADE EXCEDIDA"
       // Mudo: sem som, mas o aviso visual (velocímetro vermelho, contagem
       // dos 30 s e "VELOCIDADE EXCEDIDA") continua igual.
