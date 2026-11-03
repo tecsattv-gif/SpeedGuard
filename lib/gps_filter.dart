@@ -23,9 +23,48 @@ class GpsFilter {
   int _rejected = 0; // rejeitadas em sequência
 
   void reset() {
+    _hist.clear();
     _last = null;
     _lastAt = null;
     _rejected = 0;
+  }
+
+  /// Posições recentes (para saber se o veículo está parado).
+  final List<(DateTime, double, double)> _hist = [];
+
+  /// Parado = 0 km/h (1.28.5). Parado, o GPS do celular "anda" sozinho e
+  /// marcava 1, 3 e até 11 km/h. Considera parado quando o GPS diz menos de
+  /// 4 km/h, ou quando em 3 s ou mais o veículo andou menos de 6 m
+  /// (menos de ~7 km/h de verdade).
+  Position _still(Position p) {
+    final now = DateTime.now();
+    _hist.add((now, p.latitude, p.longitude));
+    _hist.removeWhere((h) => now.difference(h.$1).inMilliseconds > 6000);
+    var stopped = p.speed * 3.6 < 4;
+    if (!stopped) {
+      final old = _hist.first;
+      final secs = now.difference(old.$1).inMilliseconds / 1000;
+      if (secs >= 3) {
+        final moved = Geolocator.distanceBetween(
+            old.$2, old.$3, p.latitude, p.longitude);
+        stopped = moved < 6;
+      }
+    }
+    if (!stopped) return p;
+    return Position(
+      latitude: p.latitude,
+      longitude: p.longitude,
+      timestamp: p.timestamp,
+      accuracy: p.accuracy,
+      altitude: p.altitude,
+      altitudeAccuracy: p.altitudeAccuracy,
+      heading: p.heading,
+      headingAccuracy: p.headingAccuracy,
+      speed: 0,
+      speedAccuracy: p.speedAccuracy,
+      floor: p.floor,
+      isMocked: p.isMocked,
+    );
   }
 
   /// Devolve a leitura (igual à do GPS), ou null se ela deve ser ignorada.
@@ -48,9 +87,10 @@ class GpsFilter {
       }
     }
     _rejected = 0;
-    _last = p;
+    final out = _still(p);
+    _last = out;
     _lastAt = DateTime.now();
-    return p;
+    return out;
   }
 
   /// Posição estimada agora, só para os avisos de radar, quando o GPS está
