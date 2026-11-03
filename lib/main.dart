@@ -135,6 +135,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   bool _voice = true;
   /// Tipo de aviso sonoro: 'voice' (fala a distância) ou 'beep' (bipes).
   String _sound = 'voice';
+  /// Aviso de velocidade excedida: 'voice' ou 'beep' (1.27.2).
+  String _speedSound = 'voice';
   /// Mostra o card "N radares carregados" só alguns segundos após atualizar.
   bool _showCount = false;
   Timer? _countTimer;
@@ -211,6 +213,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     _showParks = p.getBool('show_parks') ?? true;
     _truckMax = p.getInt('truck_max') ?? 90;
     _sound = p.getString('sound') ?? 'voice';
+    _speedSound = p.getString('speed_sound') ?? 'voice';
     try {
       // Bipes abaixam a música/navegação por um instante, sem pausar.
       await _player.setAudioContext(AudioContext(
@@ -915,20 +918,34 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       _watch.reset();
       return;
     }
-    String? say = _watch.update(speed: speed, limit: _watchLimit);
+    final ev = _watch.update(speed: speed, limit: _watchLimit);
+    String? say = ev?.text;
+    var beep = ev == null
+        ? 0
+        : (ev.step == 1 ? 3 : (ev.step == 2 ? AlertEngine.overBeep : 0));
     // Caminhão numa via com limite menor que o do limitador: avisa uma vez.
     final road = _roadLimit;
     if (_isTruck && road != null && road < _truckMax) {
       if (speed > road + 2 && _roadWarned != road) {
         _roadWarned = road;
-        say ??= 'Limite da via $road.';
+        if (say == null) {
+          say = 'Limite da via $road.';
+          beep = 2;
+        }
       } else if (speed <= road) {
         _roadWarned = null;
       }
     }
-    if (say != null) {
+    if (ev != null || say != null) {
       HapticFeedback.heavyImpact();
-      if (_voice) _tts.speak(say);
+      if (ev?.step == 3) setState(() {}); // card "VELOCIDADE EXCEDIDA"
+      if (_voice && say != null) {
+        if (_speedSound == 'beep') {
+          if (beep > 0) _beep(beep);
+        } else {
+          _tts.speak(say);
+        }
+      }
     }
   }
 
@@ -1473,9 +1490,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               SwitchListTile(
                 title: const Text('Aviso de velocidade excedida'),
                 subtitle: Text(_isTruck
-                    ? 'Caminhão: passou de $_truckMax, avisa na hora, aos 20 s '
-                        '("só tem 10 segundos") e aos 30 s. Mostra o limite da via'
-                    : 'Passou do limite da via, avisa na hora, aos 20 s e aos 30 s'),
+                    ? 'Caminhão: passou de $_truckMax, avisa na hora e aos 20 s '
+                        '("só tem 10 segundos"); aos 30 s o velocímetro mostra '
+                        '"Velocidade excedida". Mostra o limite da via'
+                    : 'Passou do limite da via, avisa na hora e aos 20 s; aos 30 s '
+                        'o velocímetro mostra "Velocidade excedida"'),
                 value: _speedWarn,
                 onChanged: (v) async {
                   final p = await SharedPreferences.getInstance();
@@ -1485,6 +1504,41 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   setState(() {});
                 },
               ),
+              if (_speedWarn)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                    const Text('Som do aviso de velocidade'),
+                    const SizedBox(height: 6),
+                    SegmentedButton<String>(
+                      showSelectedIcon: false,
+                      segments: const [
+                        ButtonSegment(
+                            value: 'voice',
+                            icon: Icon(Icons.record_voice_over),
+                            label: Text('Voz')),
+                        ButtonSegment(
+                            value: 'beep',
+                            icon: Icon(Icons.notifications_active),
+                            label: Text('Bipe')),
+                      ],
+                      selected: {_speedSound},
+                      onSelectionChanged: (v) async {
+                        final p = await SharedPreferences.getInstance();
+                        await p.setString('speed_sound', v.first);
+                        setSheet(() => _speedSound = v.first);
+                        // Amostra de como vai soar.
+                        if (v.first == 'beep') {
+                          _beep(3);
+                        } else {
+                          _tts.speak('Limite de ${_watchLimit ?? _truckMax} excedido.');
+                        }
+                      },
+                    ),
+                  ]),
+                ),
               if (_speedWarn && _isTruck)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
@@ -1987,10 +2041,13 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                                 borderRadius: BorderRadius.circular(10)),
                             child: Text(
                                 overSecs >= 30
-                                    ? 'EXCEDIDA'
+                                    ? 'VELOCIDADE\nEXCEDIDA'
                                     : '${30 - overSecs} s',
-                                style: const TextStyle(
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
                                     color: Colors.white,
+                                    fontSize: overSecs >= 30 ? 11 : 14,
+                                    height: 1.1,
                                     fontWeight: FontWeight.bold)),
                           ),
                       ]),
