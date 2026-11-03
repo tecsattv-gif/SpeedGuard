@@ -943,7 +943,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     if (ev != null || say != null) {
       HapticFeedback.heavyImpact();
       if (ev?.step == 3) setState(() {}); // card "VELOCIDADE EXCEDIDA"
-      if (_voice && say != null) {
+      // Mudo: sem som, mas o aviso visual (velocímetro vermelho, contagem
+      // dos 30 s e "VELOCIDADE EXCEDIDA") continua igual.
+      if (_voice && say != null && _speedSound != 'mute') {
         if (_speedSound == 'beep') {
           if (beep > 0) _beep(beep);
         } else {
@@ -1514,7 +1516,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                    const Text('Som do aviso de velocidade'),
+                    const Text('Som do aviso de velocidade (Mudo: só o aviso na tela)'),
                     const SizedBox(height: 6),
                     SegmentedButton<String>(
                       showSelectedIcon: false,
@@ -1527,6 +1529,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                             value: 'beep',
                             icon: Icon(Icons.notifications_active),
                             label: Text('Bipe')),
+                        ButtonSegment(
+                            value: 'mute',
+                            icon: Icon(Icons.volume_off),
+                            label: Text('Mudo')),
                       ],
                       selected: {_speedSound},
                       onSelectionChanged: (v) async {
@@ -1536,7 +1542,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                         // Amostra de como vai soar.
                         if (v.first == 'beep') {
                           _beep(3);
-                        } else {
+                        } else if (v.first == 'voice') {
                           _tts.speak('Limite de ${_watchLimit ?? _truckMax} excedido.');
                         }
                       },
