@@ -177,6 +177,40 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           if (_layers.contains(Layer.of(r))) r
       ];
 
+  /// Radares a desenhar no mapa: só os da área da tela (com margem) e no
+  /// máximo [_maxMarkers], os mais perto do centro (1.28.3). Com o raio de
+  /// 60 km, em cidade grande eram mais de 1.000 marcadores redesenhados a
+  /// cada leitura do GPS, o que travava o velocímetro e o ícone do veículo.
+  static const _maxMarkers = 250;
+  List<Radar> _visibleRadars() {
+    final all = [
+      ..._allRadars,
+      for (final r in _service.area)
+        if (_layers.contains(Layer.of(r))) r
+    ];
+    LatLngBounds? b;
+    try {
+      b = _map.camera.visibleBounds;
+    } catch (_) {}
+    if (b == null) return all.length > _maxMarkers ? all.sublist(0, _maxMarkers) : all;
+    final mLat = (b.north - b.south) * 0.2;
+    final mLon = (b.east - b.west) * 0.2;
+    final inView = [
+      for (final r in all)
+        if (r.lat >= b.south - mLat &&
+            r.lat <= b.north + mLat &&
+            r.lon >= b.west - mLon &&
+            r.lon <= b.east + mLon)
+          r
+    ];
+    if (inView.length <= _maxMarkers) return inView;
+    final cLat = (b.north + b.south) / 2, cLon = (b.east + b.west) / 2;
+    double d2(Radar r) =>
+        (r.lat - cLat) * (r.lat - cLat) + (r.lon - cLon) * (r.lon - cLon);
+    inView.sort((x, y) => d2(x).compareTo(d2(y)));
+    return inView.sublist(0, _maxMarkers);
+  }
+
   @override
   void initState() {
     super.initState();
@@ -2036,11 +2070,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               if (showRadars)
                 MarkerLayer(
                   markers: [
-                    for (final r in [
-                      ..._allRadars,
-                      for (final r in _service.area)
-                        if (_layers.contains(Layer.of(r))) r
-                    ])
+                    for (final r in _visibleRadars())
                       Marker(
                         point: LatLng(r.lat, r.lon),
                         width: 34,
