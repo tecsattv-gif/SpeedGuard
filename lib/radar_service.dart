@@ -19,11 +19,16 @@ class RadarService {
     'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
   ];
   static const _userAgent = 'SpeedGuard/1.20 (Android; tecsattv-gif/SpeedGuard)';
-  static const double radiusMeters = 30000; // 30 km ao redor
-  static const double refetchDistance = 15000; // rebaixa após 15 km
+  /// Raio dos radares em volta (base própria). 1.26.3: 60 km (antes 30),
+  /// para ver o outro lado da fronteira sem arrastar o mapa.
+  static const double radiusMeters = 60000;
+  /// Raio quando a base própria não está disponível e o app usa o Overpass
+  /// (mais pesado para o servidor).
+  static const double overpassRadius = 30000;
+  static const double refetchDistance = 20000; // rebaixa após 20 km
   static const Duration cacheLife = Duration(hours: 6);
   static const Duration retryAfterFail = Duration(seconds: 90);
-  static const _queryVersion = 3; // 1.26.0: base própria
+  static const _queryVersion = 4; // 1.26.3: raio de 60 km
 
   List<Radar> _osm = [];
   List<Radar> _user = [];
@@ -213,12 +218,13 @@ class RadarService {
   }
 
   /// Baixa os radares ao redor. Retorna quantos encontrou, ou null se falhou.
-  Future<int?> refresh(double lat, double lon) async {
+  Future<int?> refresh(double lat, double lon, {bool force = false}) async {
+    if (force) TileStore.forceRefresh();
     // Base própria (raw.githubusercontent.com); se não houver internet nem
     // cópia guardada, tenta o Overpass como antes.
     var list = await _fromTiles(
         TileStore.keysAround(lat, lon, radiusMeters), lat, lon);
-    list ??= await _query('around:${radiusMeters.toInt()},$lat,$lon');
+    list ??= await _query('around:${overpassRadius.toInt()},$lat,$lon');
     if (list == null) {
       _lastFail = DateTime.now();
       return null;

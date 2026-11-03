@@ -1032,9 +1032,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     }
   }
 
-  Future<void> _refresh(Position pos) async {
+  Future<void> _refresh(Position pos, {bool force = false}) async {
     setState(() => _loading = true);
-    final n = await _service.refresh(pos.latitude, pos.longitude);
+    final n =
+        await _service.refresh(pos.latitude, pos.longitude, force: force);
     if (!mounted) return;
     setState(() {
       _loading = false;
@@ -1766,7 +1767,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 onTap: () {
                   Navigator.pop(ctx);
                   if (_pos != null) {
-                    _refresh(_pos!);
+                    _areaBounds = null;
+                    _refresh(_pos!, force: true);
                     _community.refresh(_pos!.latitude, _pos!.longitude);
                   }
                 },
