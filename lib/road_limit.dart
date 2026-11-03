@@ -126,6 +126,71 @@ class RoadLimitService {
     return (best, bearing);
   }
 
+  /// "Identidade" de uma via: os números (ref, ex.: "E 40;A 2") ou, sem
+  /// número, o nome. Vazio = via sem número nem nome.
+  static Set<String> _ids(_Way w) {
+    String norm(String v) => v.toUpperCase().replaceAll(RegExp(r'[\s-]'), '');
+    final ref = w.tags['ref'] ?? w.tags['int_ref'] ?? '';
+    final out = <String>{
+      for (final r in ref.split(';'))
+        if (r.trim().isNotEmpty) 'R:${norm(r)}'
+    };
+    final intRef = w.tags['int_ref'];
+    if (intRef != null) {
+      for (final r in intRef.split(';')) {
+        if (r.trim().isNotEmpty) out.add('R:${norm(r)}');
+      }
+    }
+    if (out.isEmpty) {
+      final name = w.tags['name'];
+      if (name != null && name.trim().isNotEmpty) out.add('N:${norm(name)}');
+    }
+    return out;
+  }
+
+  final Map<String, bool?> _onRoadCache = {};
+  _Way? _cacheWay;
+  List<_Way>? _cacheWays;
+
+  /// O radar está na via onde o veículo está? (1.28.0)
+  /// true/false; null = não dá para saber (vias ainda não baixadas, via
+  /// atual desconhecida ou sem número/nome, radar fora da área baixada) —
+  /// aí o app avisa como antes.
+  bool? onCurrentRoad(String id, double lat, double lon) {
+    final cur = _current;
+    if (cur == null || _ways.isEmpty) return null;
+    if (!identical(cur, _cacheWay) || !identical(_ways, _cacheWays)) {
+      _onRoadCache.clear();
+      _cacheWay = cur;
+      _cacheWays = _ways;
+    }
+    return _onRoadCache.putIfAbsent(id, () => _check(cur, lat, lon));
+  }
+
+  bool? _check(_Way cur, double lat, double lon) {
+    final mine = _ids(cur);
+    if (mine.isEmpty) return null;
+    if (_lat != null &&
+        Geolocator.distanceBetween(lat, lon, _lat!, _lon!) > _radius - 100) {
+      return null; // radar perto da borda da área baixada
+    }
+    // Vias perto do radar (até 40 m).
+    double? nearestAny, nearestMine;
+    for (final w in _ways) {
+      final (d, _) = _near(w, lat, lon);
+      if (d > 40) continue;
+      if (nearestAny == null || d < nearestAny) nearestAny = d;
+      final same = identical(w, cur) || _ids(w).intersection(mine).isNotEmpty;
+      if (same && (nearestMine == null || d < nearestMine)) nearestMine = d;
+    }
+    if (nearestAny == null) return null; // nenhuma via perto: não sabe
+    if (nearestMine == null) return false; // só outras vias perto
+    // A minha via é a mais perto do radar, ou está bem colada nele
+    // (radar marcado ao lado da pista). Radar numa rua que cruza ou corre
+    // ao lado fica mais perto da outra via e é ignorado.
+    return nearestMine <= nearestAny + 3 || nearestMine <= 12;
+  }
+
   /// Limite da via onde o veículo está, em km/h (null se não souber).
   /// [heading] < 0 quando o GPS não sabe a direção.
   int? limitAt(double lat, double lon, double heading,

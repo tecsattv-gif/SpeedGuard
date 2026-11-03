@@ -44,6 +44,9 @@ class AlertEngine {
     required Position pos,
     required List<Radar> radars,
     required RadarMode mode,
+    /// Diz se o radar está na via onde o veículo está (true/false) ou se não
+    /// dá para saber (null). false = radar de rua ao lado/que cruza: ignora.
+    bool? Function(Radar r)? onRoad,
   }) {
     if (mode == RadarMode.disabled) return const AlertState();
 
@@ -86,6 +89,9 @@ class AlertEngine {
           final diff = _angleDiff(pos.heading, r.direction!);
           if (diff > 70 && diff < 110) continue;
         }
+        // Só os radares da via onde o veículo está (1.28.0). Bem perto
+        // (< 60 m) não filtra, para não perder radar por erro de GPS.
+        if (onRoad != null && d > 60 && onRoad(r) == false) continue;
       }
       if (d < bestDist) {
         best = r;

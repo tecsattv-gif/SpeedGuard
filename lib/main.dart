@@ -137,6 +137,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   String _sound = 'voice';
   /// Aviso de velocidade excedida: 'voice' ou 'beep' (1.27.2).
   String _speedSound = 'voice';
+  /// Só avisar radares da via onde o veículo está (1.28.0).
+  bool _sameRoad = true;
   /// Volume dos avisos (voz e bipes), 0.1 a 1.0 (1.27.3).
   double _volume = 1.0;
   /// Mostra o card "N radares carregados" só alguns segundos após atualizar.
@@ -216,6 +218,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     _truckMax = p.getInt('truck_max') ?? 90;
     _sound = p.getString('sound') ?? 'voice';
     _speedSound = p.getString('speed_sound') ?? 'voice';
+    _sameRoad = p.getBool('same_road') ?? true;
     _volume = p.getDouble('volume') ?? 1.0;
     try {
       // Bipes abaixam a música/navegação por um instante, sem pausar.
@@ -960,7 +963,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   /// Calcula o radar à frente e toca os avisos.
   void _runAlerts(Position pos) {
     final st = _engine.update(
-        pos: pos, radars: _allRadars, mode: _rule.mode);
+        pos: pos, radars: _allRadars, mode: _rule.mode,
+        onRoad: _sameRoad
+            ? (r) => _roads.onCurrentRoad(r.id, r.lat, r.lon)
+            : null);
     if (st.speak != null || st.beeps > 0) {
       HapticFeedback.heavyImpact();
       if (_voice) {
@@ -1492,6 +1498,19 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   final p = await SharedPreferences.getInstance();
                   await p.setBool('show_parks', v);
                   setSheet(() => _showParks = v);
+                  setState(() {});
+                },
+              ),
+              SwitchListTile(
+                title: const Text('Só radares da minha via'),
+                subtitle: const Text(
+                    'Avisa só os radares da rodovia/rua onde você está. Radares '
+                    'de ruas ao lado ou que cruzam são ignorados'),
+                value: _sameRoad,
+                onChanged: (v) async {
+                  final p = await SharedPreferences.getInstance();
+                  await p.setBool('same_road', v);
+                  setSheet(() => _sameRoad = v);
                   setState(() {});
                 },
               ),
