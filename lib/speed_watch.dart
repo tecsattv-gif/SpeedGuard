@@ -1,9 +1,10 @@
 /// Vigia a velocidade acima do limite e decide o que avisar.
 ///
 /// Igual ao limitador do caminhão: passou do limite, o motorista tem
-/// 30 segundos para voltar. Desde a 1.27.2 são só dois avisos sonoros:
-/// ao passar ("Limite de 90 excedido.") e aos 20 s ("Atenção."). Aos 30 s não fala mais nada: o velocímetro fica vermelho
-/// com "VELOCIDADE EXCEDIDA" embaixo até voltar ao limite.
+/// 30 segundos para voltar. Desde a 1.28.7: ao passar só o aviso na tela
+/// (velocímetro vermelho e contagem), aos 20 s "Atenção." e aos 30 s
+/// "Velocidade excedida. Tempo excedido." (uma vez); o velocímetro fica
+/// vermelho com "VELOCIDADE EXCEDIDA" até voltar ao limite.
 class SpeedWatch {
   DateTime? _since; // desde quando está acima
   int _step = 0; // 0 nada, 1 avisou ao passar, 2 aos 20 s, 3 aos 30 s
@@ -21,7 +22,7 @@ class SpeedWatch {
   }
 
   /// Chamado a cada leitura. Devolve o aviso de agora (ou null):
-  /// 1 = passou do limite, 2 = aos 20 s, 3 = aos 30 s (só vibra, sem som).
+  /// 1 = passou do limite (sem som), 2 = aos 20 s, 3 = aos 30 s.
   SpeedEvent? update({required int speed, required int? limit}) {
     if (limit == null || speed <= limit) {
       reset();
@@ -33,7 +34,8 @@ class SpeedWatch {
     // Espera 2 s acima antes do 1º aviso (evita aviso por oscilação do GPS).
     if (_step == 0 && s >= 2) {
       _step = 1;
-      return SpeedEvent(1, 'Limite de $limit excedido.');
+      // 1.28.7: ao passar não fala nada (só o aviso na tela).
+      return const SpeedEvent(1, null);
     }
     if (_step == 1 && s >= 20) {
       _step = 2;
@@ -42,7 +44,7 @@ class SpeedWatch {
     }
     if (_step == 2 && s >= 30) {
       _step = 3;
-      return const SpeedEvent(3, null);
+      return const SpeedEvent(3, 'Velocidade excedida. Tempo excedido.');
     }
     return null;
   }

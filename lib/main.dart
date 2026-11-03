@@ -994,7 +994,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     String? say = ev?.text;
     var beep = ev == null
         ? 0
-        : (ev.step == 1 ? 3 : (ev.step == 2 ? AlertEngine.overBeep : 0));
+        : (ev.step == 2 ? 3 : (ev.step == 3 ? AlertEngine.overBeep : 0));
     // Caminhão numa via com limite menor que o do limitador: avisa uma vez.
     final road = _roadLimit;
     if (_isTruck && road != null && road < _truckMax) {
@@ -1587,11 +1587,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               SwitchListTile(
                 title: const Text('Aviso de velocidade excedida'),
                 subtitle: Text(_isTruck
-                    ? 'Caminhão: passou de $_truckMax, avisa na hora e aos 20 s '
-                        '("Atenção"); aos 30 s o velocímetro mostra '
-                        '"Velocidade excedida". Mostra o limite da via'
-                    : 'Passou do limite da via, avisa na hora e aos 20 s; aos 30 s '
-                        'o velocímetro mostra "Velocidade excedida"'),
+                    ? 'Caminhão: passou de $_truckMax, o velocímetro fica vermelho '
+                        'com a contagem; aos 20 s "Atenção" e aos 30 s "Velocidade '
+                        'excedida. Tempo excedido". Mostra o limite da via'
+                    : 'Passou do limite da via: velocímetro vermelho com a contagem; '
+                        'aos 20 s "Atenção" e aos 30 s "Velocidade excedida"'),
                 value: _speedWarn,
                 onChanged: (v) async {
                   final p = await SharedPreferences.getInstance();
@@ -1634,7 +1634,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                         if (v.first == 'beep') {
                           _beep(3);
                         } else if (v.first == 'voice') {
-                          _tts.speak('Limite de ${_watchLimit ?? _truckMax} excedido.');
+                          _tts.speak('Atenção.');
                         }
                       },
                     ),
