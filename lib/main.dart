@@ -524,24 +524,53 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     if (pos != null) _onPosition(pos);
   }
 
+  /// Último erro de cálculo (Configurações → Diagnóstico). Um erro numa
+  /// etapa não pode mais congelar a tela (1.28.4).
+  String? _lastError;
+  Future<void> _logError(String where, Object e, StackTrace st) async {
+    final lines = st.toString().split('\n').take(4).join('\n');
+    _lastError = '${DateTime.now().toIso8601String().substring(0, 19)} '
+        '$where: $e\n$lines';
+    try {
+      final p = await SharedPreferences.getInstance();
+      await p.setString('last_error', _lastError!);
+    } catch (_) {}
+  }
+
+  void _safe(String where, void Function() f) {
+    try {
+      f();
+    } catch (e, st) {
+      _logError(where, e, st);
+    }
+  }
+
   Future<void> _onPosition(Position pos) async {
     _pos = pos;
-    if (_follow) {
-      _map.move(LatLng(pos.latitude, pos.longitude), _map.camera.zoom);
-    }
-    _checkCountry(pos);
-    if (!_loading && _service.needsRefresh(pos.latitude, pos.longitude)) {
-      _refresh(pos);
-    }
-    if (_community.needsRefresh(pos.latitude, pos.longitude)) {
-      _community.refresh(pos.latitude, pos.longitude).then((_) {
-        if (mounted) setState(() {});
-      });
-    }
-    _runAlerts(pos);
-    _checkSpeedLimit(pos);
-    _checkParks(pos);
-    _checkAsk(pos);
+    // Velocidade e posição na tela primeiro, aconteça o que acontecer depois.
+    if (mounted) setState(() {});
+    _safe('mapa', () {
+      if (_follow) {
+        _map.move(LatLng(pos.latitude, pos.longitude), _map.camera.zoom);
+      }
+    });
+    _safe('país', () => _checkCountry(pos));
+    _safe('radares', () {
+      if (!_loading && _service.needsRefresh(pos.latitude, pos.longitude)) {
+        _refresh(pos);
+      }
+    });
+    _safe('comunidade', () {
+      if (_community.needsRefresh(pos.latitude, pos.longitude)) {
+        _community.refresh(pos.latitude, pos.longitude).then((_) {
+          if (mounted) setState(() {});
+        });
+      }
+    });
+    _safe('avisos', () => _runAlerts(pos));
+    _safe('velocidade', () => _checkSpeedLimit(pos));
+    _safe('parks', () => _checkParks(pos));
+    _safe('pergunta', () => _checkAsk(pos));
   }
 
   void _checkParks(Position pos) {
@@ -999,7 +1028,14 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     final st = _engine.update(
         pos: pos, radars: _allRadars, mode: _rule.mode,
         onRoad: _sameRoad
-            ? (r) => _roads.onCurrentRoad(r.id, r.lat, r.lon, pos.heading)
+            ? (r) {
+                try {
+                  return _roads.onCurrentRoad(r.id, r.lat, r.lon, pos.heading);
+                } catch (e, st) {
+                  _logError('via do radar', e, st);
+                  return null;
+                }
+              }
             : null);
     if (st.speak != null || st.beeps > 0) {
       HapticFeedback.heavyImpact();
@@ -1934,6 +1970,36 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                     _refresh(_pos!, force: true);
                     _community.refresh(_pos!.latitude, _pos!.longitude);
                   }
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.bug_report_outlined),
+                title: const Text('Diagnóstico (último erro)'),
+                onTap: () async {
+                  final p = await SharedPreferences.getInstance();
+                  final err = _lastError ?? p.getString('last_error');
+                  if (!ctx.mounted) return;
+                  showDialog(
+                    context: ctx,
+                    builder: (d) => AlertDialog(
+                      title: const Text('Último erro'),
+                      content: SingleChildScrollView(
+                          child: SelectableText(err ?? 'Nenhum erro registrado.')),
+                      actions: [
+                        if (err != null)
+                          TextButton(
+                              onPressed: () async {
+                                await p.remove('last_error');
+                                _lastError = null;
+                                if (d.mounted) Navigator.pop(d);
+                              },
+                              child: const Text('Apagar')),
+                        TextButton(
+                            onPressed: () => Navigator.pop(d),
+                            child: const Text('Fechar')),
+                      ],
+                    ),
+                  );
                 },
               ),
               ListTile(
