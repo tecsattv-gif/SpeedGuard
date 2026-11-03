@@ -2,8 +2,7 @@
 ///
 /// Igual ao limitador do caminhão: passou do limite, o motorista tem
 /// 30 segundos para voltar. Desde a 1.27.2 são só dois avisos sonoros:
-/// ao passar ("Limite de 90 excedido.") e aos 20 s ("só tem 10
-/// segundos"). Aos 30 s não fala mais nada: o velocímetro fica vermelho
+/// ao passar ("Limite de 90 excedido.") e aos 20 s ("Atenção."). Aos 30 s não fala mais nada: o velocímetro fica vermelho
 /// com "VELOCIDADE EXCEDIDA" embaixo até voltar ao limite.
 class SpeedWatch {
   DateTime? _since; // desde quando está acima
@@ -38,8 +37,8 @@ class SpeedWatch {
     }
     if (_step == 1 && s >= 20) {
       _step = 2;
-      return SpeedEvent(
-          2, 'Atenção. Você só tem 10 segundos para voltar aos $limit.');
+      // 1.28.6: aos 20 s fala só "Atenção." (antes a frase dos 10 segundos).
+      return const SpeedEvent(2, 'Atenção.');
     }
     if (_step == 2 && s >= 30) {
       _step = 3;

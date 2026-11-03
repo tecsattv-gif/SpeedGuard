@@ -1588,7 +1588,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 title: const Text('Aviso de velocidade excedida'),
                 subtitle: Text(_isTruck
                     ? 'Caminhão: passou de $_truckMax, avisa na hora e aos 20 s '
-                        '("só tem 10 segundos"); aos 30 s o velocímetro mostra '
+                        '("Atenção"); aos 30 s o velocímetro mostra '
                         '"Velocidade excedida". Mostra o limite da via'
                     : 'Passou do limite da via, avisa na hora e aos 20 s; aos 30 s '
                         'o velocímetro mostra "Velocidade excedida"'),
