@@ -352,6 +352,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       'dist': show ? a.distance : null,
       'limit': show ? a.radar!.maxSpeed : null,
       'over': a.overLimit || _watch.seconds != null,
+      // Segundos acima do limite (contagem dos 30 s e pop-up na bolha).
+      'overSecs': _running && _speedWarn ? _watch.seconds : null,
       'road': _running && _speedWarn ? _shownLimit : null,
       'park': _running && _showParks && _parksAhead.isNotEmpty
           ? _km(_parksAhead.first.distance)

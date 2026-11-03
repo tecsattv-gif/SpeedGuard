@@ -18,6 +18,10 @@ const double kLandW = 240, kLandH = 72; // horizontal (paisagem)
 const int kPickerW = 300;
 const int kPickerH = 470; // avisos de trânsito + placas
 
+/// Pop-up "VELOCIDADE EXCEDIDA" (1.27.5).
+const int kExcW = 260;
+const int kExcH = 120;
+
 /// Tamanhos que o usuário escolhe em Configurações.
 const Map<String, double> kPanelScales = {
   'Pequeno': 0.8,
@@ -56,6 +60,10 @@ class _OverlayBubbleState extends State<OverlayBubble> {
   int? _limit;
   bool _over = false;
   int? _road; // limite da via
+  int? _overSecs; // segundos acima do limite (null = dentro)
+  bool _excPopup = false; // pop-up "VELOCIDADE EXCEDIDA" aberto
+  bool _excShown = false; // já mostrou neste excesso
+  Timer? _excTimer;
   String? _park; // distância do próximo park
   bool _ask = false;
   bool _picker = false;
@@ -80,6 +88,7 @@ class _OverlayBubbleState extends State<OverlayBubble> {
           _limit = (m['limit'] as num?)?.toInt();
           _over = m['over'] == true;
           _road = (m['road'] as num?)?.toInt();
+          _overSecs = (m['overSecs'] as num?)?.toInt();
           _park = m['park'] as String?;
           _ask = m['ask'] == true;
           if (m['scale'] is num) _scale = (m['scale'] as num).toDouble();
@@ -89,6 +98,15 @@ class _OverlayBubbleState extends State<OverlayBubble> {
           }
           _gotConfig = true;
         });
+        // Passou dos 30 s acima do limite: pop-up uma vez por excesso.
+        final secs = _overSecs;
+        if (secs == null) {
+          _excShown = false;
+          if (_excPopup) _closeExc();
+        } else if (secs >= 30 && !_excShown && !_picker) {
+          _excShown = true;
+          _openExc();
+        }
       } catch (_) {}
     });
   }
@@ -98,6 +116,7 @@ class _OverlayBubbleState extends State<OverlayBubble> {
     _sub?.cancel();
     _pickerTimer?.cancel();
     _sentTimer?.cancel();
+    _excTimer?.cancel();
     super.dispose();
   }
 
@@ -168,6 +187,58 @@ class _OverlayBubbleState extends State<OverlayBubble> {
     _pickerTimer = Timer(const Duration(seconds: 20), _closePicker);
   }
 
+  Future<void> _openExc() async {
+    await FlutterOverlayWindow.resizeOverlay(overlayUnits(kExcW, _unitsPerDp),
+        overlayUnits(kExcH, _unitsPerDp), false);
+    if (!mounted) return;
+    setState(() => _excPopup = true);
+    // Fecha sozinho em 6 s (ou com um toque); o painel continua vermelho
+    // com "EXCEDIDA" até voltar ao limite.
+    _excTimer?.cancel();
+    _excTimer = Timer(const Duration(seconds: 6), _closeExc);
+  }
+
+  Future<void> _closeExc() async {
+    _excTimer?.cancel();
+    if (!_excPopup) return;
+    if (mounted) setState(() => _excPopup = false);
+    await _resizeToPanel();
+  }
+
+  Widget _excBox() => GestureDetector(
+        onTap: _closeExc,
+        child: Container(
+          width: kExcW.toDouble(),
+          height: kExcH.toDouble(),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+                colors: [SG.red, SG.pink],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: Colors.white, width: 3),
+            boxShadow: SG.glow(SG.red, 16),
+          ),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            const Icon(Icons.warning_amber_rounded,
+                color: Colors.white, size: 30),
+            const Text('VELOCIDADE\nEXCEDIDA',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 22,
+                    height: 1.05,
+                    fontWeight: FontWeight.w900)),
+            Text('$_speed km/h',
+                style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold)),
+          ]),
+        ),
+      );
+
   Future<void> _closePicker() async {
     _pickerTimer?.cancel();
     if (mounted) setState(() => _picker = false);
@@ -202,7 +273,9 @@ class _OverlayBubbleState extends State<OverlayBubble> {
     }
     return Material(
       color: Colors.transparent,
-      child: _picker
+      child: _excPopup && !_picker
+          ? Align(alignment: Alignment.topLeft, child: _excBox())
+          : _picker
           ? Align(
               alignment: Alignment.topLeft,
               child: SizedBox(
@@ -257,6 +330,21 @@ class _OverlayBubbleState extends State<OverlayBubble> {
                     color: SG.violetLight,
                     fontSize: 13,
                     fontWeight: FontWeight.bold)),
+            // Contagem dos 30 s acima do limite; depois "EXCEDIDA".
+            if (_overSecs != null) ...[
+              const SizedBox(height: 2),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                decoration: BoxDecoration(
+                    color: SG.red, borderRadius: BorderRadius.circular(8)),
+                child: Text(
+                    _overSecs! >= 30 ? 'EXCEDIDA' : '${30 - _overSecs!} s',
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold)),
+              ),
+            ],
             if (_road != null) ...[
               const SizedBox(height: 2),
               SpeedSign(label: '$_road', size: 26),
