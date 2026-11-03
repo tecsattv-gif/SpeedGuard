@@ -89,9 +89,9 @@ class AlertEngine {
           final diff = _angleDiff(pos.heading, r.direction!);
           if (diff > 70 && diff < 110) continue;
         }
-        // Só os radares da via onde o veículo está (1.28.0). Bem perto
-        // (< 60 m) não filtra, para não perder radar por erro de GPS.
-        if (onRoad != null && d > 60 && onRoad(r) == false) continue;
+        // Só os radares da via e do sentido onde o veículo está (1.28.0).
+        // Colado no radar (< 20 m) não filtra, por causa do erro do GPS.
+        if (onRoad != null && d > 20 && onRoad(r) == false) continue;
       }
       if (d < bestDist) {
         best = r;

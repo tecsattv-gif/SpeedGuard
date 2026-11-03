@@ -965,7 +965,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     final st = _engine.update(
         pos: pos, radars: _allRadars, mode: _rule.mode,
         onRoad: _sameRoad
-            ? (r) => _roads.onCurrentRoad(r.id, r.lat, r.lon)
+            ? (r) => _roads.onCurrentRoad(r.id, r.lat, r.lon, pos.heading)
             : null);
     if (st.speak != null || st.beeps > 0) {
       HapticFeedback.heavyImpact();

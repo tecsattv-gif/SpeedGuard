@@ -152,43 +152,84 @@ class RoadLimitService {
   _Way? _cacheWay;
   List<_Way>? _cacheWays;
 
-  /// O radar está na via onde o veículo está? (1.28.0)
-  /// true/false; null = não dá para saber (vias ainda não baixadas, via
-  /// atual desconhecida ou sem número/nome, radar fora da área baixada) —
-  /// aí o app avisa como antes.
-  bool? onCurrentRoad(String id, double lat, double lon) {
+  /// Sentido único: 1 = na ordem dos pontos, -1 = ao contrário, 0 = mão
+  /// dupla. Autoestrada e alças são sentido único mesmo sem a tag.
+  static int _oneway(_Way w) {
+    final o = w.tags['oneway'];
+    if (o == '-1') return -1;
+    if (o == 'yes' || o == 'true' || o == '1') return 1;
+    if (o == 'no') return 0;
+    if (w.type == 'motorway' || w.type == 'motorway_link') return 1;
+    if (w.tags['junction'] == 'roundabout') return 1;
+    return 0;
+  }
+
+  /// A via (sentido único) vai no sentido contrário ao do veículo?
+  static bool _against(_Way w, double segBearing, double heading) {
+    final o = _oneway(w);
+    if (o == 0) return false;
+    final dir = o == 1 ? segBearing : (segBearing + 180) % 360;
+    return _angleDiff(heading, dir) > 110;
+  }
+
+  /// O radar está na via (e no sentido) onde o veículo está? (1.28.0/1.28.1)
+  /// true/false; null = não dá para saber (vias ainda não baixadas, radar
+  /// fora da área baixada) — aí o app avisa como antes.
+  bool? onCurrentRoad(String id, double lat, double lon, double heading) {
+    if (_ways.isEmpty) return null;
     final cur = _current;
-    if (cur == null || _ways.isEmpty) return null;
     if (!identical(cur, _cacheWay) || !identical(_ways, _cacheWays)) {
       _onRoadCache.clear();
       _cacheWay = cur;
       _cacheWays = _ways;
     }
-    return _onRoadCache.putIfAbsent(id, () => _check(cur, lat, lon));
+    final key = '${id}_${((heading % 360) / 30).round()}';
+    return _onRoadCache.putIfAbsent(key, () => _check(cur, lat, lon, heading));
   }
 
-  bool? _check(_Way cur, double lat, double lon) {
-    final mine = _ids(cur);
-    if (mine.isEmpty) return null;
+  bool? _check(_Way? cur, double lat, double lon, double heading) {
     if (_lat != null &&
         Geolocator.distanceBetween(lat, lon, _lat!, _lon!) > _radius - 100) {
       return null; // radar perto da borda da área baixada
     }
-    // Vias perto do radar (até 40 m).
-    double? nearestAny, nearestMine;
+    final mine = cur == null ? <String>{} : _ids(cur);
+    // Vias perto do radar (até 40 m). "Boa" = a minha via, no meu sentido.
+    double? nearestAny, nearestGood;
+    _Way? nearestWay;
+    var nearestAgainst = false;
     for (final w in _ways) {
-      final (d, _) = _near(w, lat, lon);
+      final (d, b) = _near(w, lat, lon);
       if (d > 40) continue;
-      if (nearestAny == null || d < nearestAny) nearestAny = d;
-      final same = identical(w, cur) || _ids(w).intersection(mine).isNotEmpty;
-      if (same && (nearestMine == null || d < nearestMine)) nearestMine = d;
+      final against = _against(w, b, heading);
+      if (nearestAny == null || d < nearestAny) {
+        nearestAny = d;
+        nearestWay = w;
+        nearestAgainst = against;
+      }
+      // Alça de entrada/saída (_link) não é a rodovia, mesmo com o mesmo
+      // número — e vice-versa.
+      final same = mine.isEmpty ||
+          identical(w, cur) ||
+          (_ids(w).intersection(mine).isNotEmpty &&
+              w.type.endsWith('_link') == cur!.type.endsWith('_link'));
+      if (same && !against && (nearestGood == null || d < nearestGood)) {
+        nearestGood = d;
+      }
     }
     if (nearestAny == null) return null; // nenhuma via perto: não sabe
-    if (nearestMine == null) return false; // só outras vias perto
-    // A minha via é a mais perto do radar, ou está bem colada nele
-    // (radar marcado ao lado da pista). Radar numa rua que cruza ou corre
-    // ao lado fica mais perto da outra via e é ignorado.
-    return nearestMine <= nearestAny + 3 || nearestMine <= 12;
+    // Radar na pista do outro sentido (autoestrada/via de mão única).
+    if (nearestAgainst && (nearestGood == null || nearestGood > nearestAny + 4)) {
+      return false;
+    }
+    if (mine.isEmpty) {
+      // Via atual sem número/nome ou desconhecida: só o sentido decide.
+      return nearestAgainst ? false : null;
+    }
+    if (nearestGood == null) return false; // só outras vias perto (alça, rua)
+    // A minha via (no meu sentido) tem de ser a mais perto do radar.
+    // Radar numa alça de entrada/saída, marginal ou rua que cruza fica mais
+    // perto da outra via e é ignorado.
+    return nearestGood <= nearestAny + 4 || identical(nearestWay, cur);
   }
 
   /// Limite da via onde o veículo está, em km/h (null se não souber).
