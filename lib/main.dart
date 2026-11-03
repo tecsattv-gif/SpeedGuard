@@ -1,3 +1,4 @@
+import 'update_service.dart';
 import 'dart:async';
 import 'dart:convert';
 
@@ -197,6 +198,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       } catch (_) {}
     });
     _init();
+    // Nova versão no GitHub? Pergunta (só com o monitoramento parado).
+    Future.delayed(const Duration(seconds: 5), () {
+      if (mounted && !_running) UpdateService.autoCheck(context);
+    });
   }
 
   Future<void> _init() async {
@@ -1771,6 +1776,14 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                     _refresh(_pos!, force: true);
                     _community.refresh(_pos!.latitude, _pos!.longitude);
                   }
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.system_update),
+                title: const Text('Procurar atualização do app'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  UpdateService.manualCheck(context);
                 },
               ),
               ListTile(

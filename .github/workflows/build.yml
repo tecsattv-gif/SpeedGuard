@@ -122,3 +122,18 @@ jobs:
         with:
           name: SpeedGuard-apk
           path: SpeedGuard.apk
+
+      # Publica o APK numa Release (v<versão>). O app procura a última
+      # Release para avisar que há atualização (1.27.0).
+      - name: Publicar Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VER=$(grep -m1 '^version:' pubspec.yaml | sed 's/version: *//; s/+.*//')
+          TAG="v$VER"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" SpeedGuard.apk --clobber
+          else
+            gh release create "$TAG" SpeedGuard.apk --title "SpeedGuard $VER" \
+              --notes "APK do SpeedGuard $VER. Veja as novidades no README." --latest
+          fi
