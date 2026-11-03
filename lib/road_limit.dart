@@ -11,7 +11,31 @@ class _Way {
   final String type; // highway=*
   final Map<String, String> tags;
   final List<(double, double)> pts; // lat, lon
-  _Way(this.type, this.tags, this.pts);
+  late final double minLat, maxLat, minLon, maxLon; // caixa da via
+  late final Set<String> ids = RoadLimitService._ids(this);
+  _Way(this.type, this.tags, this.pts) {
+    var a = 90.0, b = -90.0, c = 180.0, d = -180.0;
+    for (final p in pts) {
+      if (p.$1 < a) a = p.$1;
+      if (p.$1 > b) b = p.$1;
+      if (p.$2 < c) c = p.$2;
+      if (p.$2 > d) d = p.$2;
+    }
+    minLat = a;
+    maxLat = b;
+    minLon = c;
+    maxLon = d;
+  }
+
+  /// O ponto pode estar a menos de [m] metros da via? (teste rápido)
+  bool near(double lat, double lon, double m) {
+    final dLat = m / 110540;
+    final dLon = m / (111320 * math.cos(lat * math.pi / 180));
+    return lat >= minLat - dLat &&
+        lat <= maxLat + dLat &&
+        lon >= minLon - dLon &&
+        lon <= maxLon + dLon;
+  }
 }
 
 /// Descobre o limite de velocidade da via onde o veículo está,
@@ -148,9 +172,11 @@ class RoadLimitService {
     return out;
   }
 
-  final Map<String, bool?> _onRoadCache = {};
-  _Way? _cacheWay;
-  List<_Way>? _cacheWays;
+  /// Vias a até 40 m de cada radar (distância e rumo do trecho), calculadas
+  /// uma vez por radar a cada nova leva de vias (1.28.2: antes recalculava
+  /// tudo a cada leitura do GPS e atrasava o velocímetro).
+  final Map<String, List<(_Way, double, double)>> _radarNear = {};
+  List<_Way>? _nearFor;
 
   /// Sentido único: 1 = na ordem dos pontos, -1 = ao contrário, 0 = mão
   /// dupla. Autoestrada e alças são sentido único mesmo sem a tag.
@@ -177,29 +203,34 @@ class RoadLimitService {
   /// fora da área baixada) — aí o app avisa como antes.
   bool? onCurrentRoad(String id, double lat, double lon, double heading) {
     if (_ways.isEmpty) return null;
-    final cur = _current;
-    if (!identical(cur, _cacheWay) || !identical(_ways, _cacheWays)) {
-      _onRoadCache.clear();
-      _cacheWay = cur;
-      _cacheWays = _ways;
+    if (!identical(_ways, _nearFor)) {
+      _radarNear.clear();
+      _nearFor = _ways;
     }
-    final key = '${id}_${((heading % 360) / 30).round()}';
-    return _onRoadCache.putIfAbsent(key, () => _check(cur, lat, lon, heading));
-  }
-
-  bool? _check(_Way? cur, double lat, double lon, double heading) {
     if (_lat != null &&
         Geolocator.distanceBetween(lat, lon, _lat!, _lon!) > _radius - 100) {
       return null; // radar perto da borda da área baixada
     }
-    final mine = cur == null ? <String>{} : _ids(cur);
-    // Vias perto do radar (até 40 m). "Boa" = a minha via, no meu sentido.
+    final near = _radarNear.putIfAbsent(id, () {
+      final out = <(_Way, double, double)>[];
+      for (final w in _ways) {
+        if (!w.near(lat, lon, 40)) continue;
+        final (d, b) = _near(w, lat, lon);
+        if (d <= 40) out.add((w, d, b));
+      }
+      return out;
+    });
+    return _check(_current, near, heading);
+  }
+
+  static bool? _check(
+      _Way? cur, List<(_Way, double, double)> near, double heading) {
+    final mine = cur == null ? <String>{} : cur.ids;
+    // "Boa" = a minha via, no meu sentido.
     double? nearestAny, nearestGood;
     _Way? nearestWay;
     var nearestAgainst = false;
-    for (final w in _ways) {
-      final (d, b) = _near(w, lat, lon);
-      if (d > 40) continue;
+    for (final (w, d, b) in near) {
       final against = _against(w, b, heading);
       if (nearestAny == null || d < nearestAny) {
         nearestAny = d;
@@ -210,7 +241,7 @@ class RoadLimitService {
       // número — e vice-versa.
       final same = mine.isEmpty ||
           identical(w, cur) ||
-          (_ids(w).intersection(mine).isNotEmpty &&
+          (w.ids.intersection(mine).isNotEmpty &&
               w.type.endsWith('_link') == cur!.type.endsWith('_link'));
       if (same && !against && (nearestGood == null || d < nearestGood)) {
         nearestGood = d;
@@ -227,8 +258,6 @@ class RoadLimitService {
     }
     if (nearestGood == null) return false; // só outras vias perto (alça, rua)
     // A minha via (no meu sentido) tem de ser a mais perto do radar.
-    // Radar numa alça de entrada/saída, marginal ou rua que cruza fica mais
-    // perto da outra via e é ignorado.
     return nearestGood <= nearestAny + 4 || identical(nearestWay, cur);
   }
 
@@ -240,6 +269,7 @@ class RoadLimitService {
     _Way? best;
     var bestScore = double.infinity;
     for (final w in _ways) {
+      if (!w.near(lat, lon, 30)) continue; // longe: nem calcula
       final (d, b) = _near(w, lat, lon);
       if (d > 30) continue;
       var score = d;
