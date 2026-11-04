@@ -757,7 +757,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             if (routing && _parks.hasRoute) {
               final prog =
                   _route.progress(pos.latitude, pos.longitude) ?? 0;
-              list = _parks.alongRoute(prog, max: 20); // os 20 próximos
+              list = _parks.alongRoute(prog, max: 30); // os 30 próximos (1.29.8)
               title = 'Próximos parks até ${_route.destName}';
               hint = _parks.routeLoading
                   ? 'Buscando mais parks da rota…'
