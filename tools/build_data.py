@@ -116,7 +116,9 @@ class Pass2(osmium.SimpleHandler):
                              "lon": round(n.location.lon, 6), "tags": tags}
 
 
-def main(files):
+def main(args):
+    files = [a for a in args if not a.endswith(".json")]
+    road_files = [a for a in args if a.endswith(".roads.json")]
     parks, radars = {}, {}
     for f in files:
         t0 = time.time()
@@ -126,6 +128,28 @@ def main(files):
             Pass2(p1.rel_node, radars).apply_file(f, locations=True)
         print(f"{os.path.basename(f)}: {len(parks)} parks, {len(radars)} radares "
               f"no total ({time.time() - t0:.0f}s)", flush=True)
+
+    # Vias de cada radar/park (road_match.py, 1.29.0): "rd" = lista das vias
+    # mais perto (tipo, número, nome, mão única e rumo do trecho).
+    nr = npk = 0
+    for rf in road_files:
+        try:
+            with open(rf) as fh:
+                rd = json.load(fh)
+        except Exception as e:  # arquivo de um país que falhou
+            print(f"{rf}: ignorado ({e})")
+            continue
+        for rid, lst in rd.get("r", {}).items():
+            r = radars.get(int(rid))
+            if r is not None and lst:
+                r["rd"] = lst
+                nr += 1
+        for pid, lst in rd.get("p", {}).items():
+            p = parks.get(pid)
+            if p is not None and lst:
+                p["rd"] = lst
+                npk += 1
+    print(f"Vias: {nr} radares e {npk} parks com a via marcada")
 
     out = {"parks": {}, "radars": {}}
     for p in parks.values():

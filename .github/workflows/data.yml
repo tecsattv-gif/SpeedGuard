@@ -14,6 +14,11 @@ on:
         description: 'Só estes países (ids do Geofabrik, separados por espaço; vazio = todos)'
         required: false
         default: ''
+      publish:
+        description: 'Publicar no ramo data (desmarque para só testar)'
+        type: boolean
+        required: false
+        default: true
 
 jobs:
   filter:
@@ -24,10 +29,12 @@ jobs:
       matrix:
         region: [europe, north-america, central-america, south-america]
     steps:
+      - uses: actions/checkout@v4
+
       - name: Ferramentas
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq osmium-tool
+          sudo apt-get install -y -qq osmium-tool python3-pyosmium
           # Mais espaço em disco (mapas grandes como França e EUA).
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
           df -h / | tail -1
@@ -70,6 +77,20 @@ jobs:
               nwr/highway=rest_area,services nwr/amenity=parking nwr/parking=truck_stop \
               n/highway=speed_camera n/enforcement r/type=enforcement \
               -o "work/$ID.osm.pbf" --overwrite || echo "  filtro falhou em $ID"
+            # Via de cada radar/park (tipo, número, mão única e rumo), para o
+            # app avisar só os da via e do sentido do veículo (1.29.0).
+            # (pula mapas enormes, como os EUA, por memória/tempo do runner)
+            if [ -s "work/$ID.osm.pbf" ] && [ "$(stat -c%s map.osm.pbf)" -lt 6000000000 ]; then
+              osmium tags-filter map.osm.pbf \
+                w/highway=motorway,motorway_link,trunk,trunk_link,primary,primary_link,secondary,secondary_link,tertiary,tertiary_link,unclassified,residential,living_street \
+                -o roads.osm.pbf --overwrite < /dev/null \
+              && osmium add-locations-to-ways -i sparse_mem_array roads.osm.pbf \
+                -o roadsloc.osm.pbf --overwrite < /dev/null \
+              && python3 tools/road_match.py "work/$ID.osm.pbf" roadsloc.osm.pbf \
+                "work/$ID.roads.json" < /dev/null \
+              || echo "  vias falharam em $ID"
+              rm -f roads.osm.pbf roadsloc.osm.pbf
+            fi
             rm -f map.osm.pbf
             ls -la "work/$ID.osm.pbf" || true
           done < list.txt
@@ -78,7 +99,9 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: filtered-${{ matrix.region }}
-          path: work/*.osm.pbf
+          path: |
+            work/*.osm.pbf
+            work/*.roads.json
           if-no-files-found: ignore
           retention-days: 3
 
@@ -105,10 +128,22 @@ jobs:
       - name: Montar os pedaços
         run: |
           ls work
-          python3 tools/build_data.py work/*.osm.pbf
+          python3 tools/build_data.py work/*.osm.pbf work/*.roads.json
           du -sh out
 
+      - name: Amostra das vias (teste)
+        run: |
+          python3 - <<'PY2'
+          import json, glob
+          n = 0
+          for f in sorted(glob.glob('out/radars/*.json')):
+              for r in json.load(open(f)):
+                  if 'rd' in r and n < 8:
+                      print(r['id'], r['lat'], r['lon'], r['rd']); n += 1
+          PY2
+
       - name: Publicar no ramo data
+        if: github.event_name == 'schedule' || github.event.inputs.publish != 'false'
         run: |
           cd out
           git init -q -b data
