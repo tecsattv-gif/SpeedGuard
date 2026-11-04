@@ -22,6 +22,9 @@ const int kPickerH = 470; // avisos de trânsito + placas
 const int kExcW = 260;
 const int kExcH = 120;
 
+/// Círculo da contagem dos 30 s ao lado do painel (1.29.4): ~2 cm.
+const double kRingD = 120, kRingGap = 6;
+
 /// Tamanhos que o usuário escolhe em Configurações.
 const Map<String, double> kPanelScales = {
   'Pequeno': 0.8,
@@ -63,6 +66,7 @@ class _OverlayBubbleState extends State<OverlayBubble> {
   int? _overSecs; // segundos acima do limite (null = dentro)
   bool _excPopup = false; // pop-up "VELOCIDADE EXCEDIDA" aberto
   bool _excShown = false; // já mostrou neste excesso
+  bool _ringOn = false; // janela com o círculo da contagem
   Timer? _excTimer;
   String? _park; // distância do próximo park
   bool _ask = false;
@@ -98,6 +102,12 @@ class _OverlayBubbleState extends State<OverlayBubble> {
           }
           _gotConfig = true;
         });
+        // Círculo da contagem: aumenta/diminui a janela quando começa/acaba.
+        final ring = _overSecs != null;
+        if (ring != _ringOn) {
+          setState(() => _ringOn = ring);
+          if (!_excPopup && !_picker) _resizeToPanel();
+        }
         // Passou dos 30 s acima do limite: pop-up uma vez por excesso.
         final secs = _overSecs;
         if (secs == null) {
@@ -131,12 +141,20 @@ class _OverlayBubbleState extends State<OverlayBubble> {
   void _calibrate(double windowWidthDp) {
     if (_calibrated || windowWidthDp <= 0) return;
     _calibrated = true;
-    final want = panelDp(_land, _scale);
+    final want = _windowDp();
     if ((windowWidthDp - want.width).abs() > 3) _resizeToPanel();
   }
 
+  /// Tamanho da janela: o painel e, durante a contagem, o círculo ao lado.
+  Size _windowDp() {
+    final p = panelDp(_land, _scale);
+    if (!_ringOn) return p;
+    return Size(p.width + kRingGap + kRingD,
+        p.height > kRingD ? p.height : kRingD);
+  }
+
   Future<void> _resizeToPanel() {
-    final want = panelDp(_land, _scale);
+    final want = _windowDp();
     return _resize(want.width, want.height, true);
   }
 
@@ -327,16 +345,62 @@ class _OverlayBubbleState extends State<OverlayBubble> {
             )
           : Align(
               alignment: Alignment.topLeft,
-              child: SizedBox.fromSize(
-                size: panelDp(_land, _scale),
-                // Toque duplo abre o app; segurar o dedo fecha a janela.
-                child: GestureDetector(
-                  onDoubleTap: _openApp,
-                  onLongPress: _closeSelf,
-                  child: FittedBox(child: _panel()),
-                ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox.fromSize(
+                    size: panelDp(_land, _scale),
+                    // Toque duplo abre o app; segurar o dedo fecha a janela.
+                    child: GestureDetector(
+                      onDoubleTap: _openApp,
+                      onLongPress: _closeSelf,
+                      child: FittedBox(child: _panel()),
+                    ),
+                  ),
+                  if (_ringOn && _overSecs != null) ...[
+                    const SizedBox(width: kRingGap),
+                    _ring(_overSecs!),
+                  ],
+                ],
               ),
             ),
+    );
+  }
+
+  /// Círculo vermelho da contagem (fundo transparente): o anel vai
+  /// esvaziando e o número mostra os segundos que faltam; depois dos 30 s
+  /// mostra "EXCEDIDA" até voltar ao limite.
+  Widget _ring(int secs) {
+    final left = (30 - secs).clamp(0, 30);
+    const shadow = [Shadow(color: Colors.black, blurRadius: 4)];
+    return SizedBox(
+      width: kRingD,
+      height: kRingD,
+      child: Stack(alignment: Alignment.center, children: [
+        SizedBox.expand(
+          child: CircularProgressIndicator(
+            value: left / 30,
+            strokeWidth: 8,
+            color: SG.red,
+            backgroundColor: SG.red.withValues(alpha: 0.25),
+          ),
+        ),
+        left > 0
+            ? Text('$left',
+                style: const TextStyle(
+                    color: SG.red,
+                    fontSize: 54,
+                    height: 1,
+                    fontWeight: FontWeight.w900,
+                    shadows: shadow))
+            : const Text('EXCEDIDA',
+                style: TextStyle(
+                    color: SG.red,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w900,
+                    shadows: shadow)),
+      ]),
     );
   }
 
