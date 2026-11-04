@@ -1664,17 +1664,28 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 },
               ),
               if (_removed.mineCount > 0)
+                // 1.29.9: mesmo formato das outras opções (texto em largura
+                // total, botão embaixo); antes o botão ao lado espremia o texto.
                 ListTile(
-                  leading: const Icon(Icons.not_interested),
-                  title: Text('Radares que você escondeu: ${_removed.mineCount}'),
-                  subtitle: const Text('Marcados como "não existe mais"'),
-                  trailing: TextButton(
-                    child: const Text('Mostrar de novo'),
-                    onPressed: () async {
-                      await _removed.clearMine();
-                      setSheet(() {});
-                      setState(() {});
-                    },
+                  title: const Text('Radares escondidos'),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(_removed.mineCount == 1
+                          ? '1 radar marcado por você como "não existe mais"'
+                          : '${_removed.mineCount} radares marcados por você '
+                              'como "não existe mais"'),
+                      const SizedBox(height: 8),
+                      OutlinedButton.icon(
+                        icon: const Icon(Icons.visibility_outlined, size: 18),
+                        label: const Text('Mostrar de novo'),
+                        onPressed: () async {
+                          await _removed.clearMine();
+                          setSheet(() {});
+                          setState(() {});
+                        },
+                      ),
+                    ],
                   ),
                 ),
               SwitchListTile(
