@@ -252,6 +252,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     _speedWarn = p.getBool('speed_warn') ?? true;
     _showParks = p.getBool('show_parks') ?? true;
     _truckMax = p.getInt('truck_max') ?? 90;
+    if (![80, 90, 91, 92, 93, 94, 95].contains(_truckMax)) _truckMax = 90;
     _sound = p.getString('sound') ?? 'voice';
     _speedSound = p.getString('speed_sound') ?? 'voice';
     _sameRoad = p.getBool('same_road') ?? true;
@@ -983,15 +984,20 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   bool get _isTruck => _vehicle == VehicleIcon.truck;
 
-  /// Limite usado para a contagem de 30 s: caminhão = limitador (90),
+  /// Limite usado para a contagem de 30 s: caminhão = a partir de quanto o
+  /// limitador começa a contar (80, ou 90 a 95, escolhido nas Configurações),
   /// outros veículos = limite da via.
   int? get _watchLimit => _isTruck ? _truckMax : _roadLimit;
+
+  /// Limite legal do caminhão mostrado na placa (1.29.2): com o seletor em
+  /// 91–95 a placa continua 90; só a contagem começa mais acima.
+  int get _truckBase => _truckMax >= 90 ? 90 : _truckMax;
 
   /// Limite mostrado na placa em cima da velocidade.
   int? get _shownLimit {
     if (!_isTruck) return _roadLimit;
     final r = _roadLimit;
-    return r == null ? _truckMax : (r < _truckMax ? r : _truckMax);
+    return r == null ? _truckBase : (r < _truckBase ? r : _truckBase);
   }
 
   void _checkSpeedLimit(Position pos) {
@@ -1011,7 +1017,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         : (ev.step == 2 ? 3 : (ev.step == 3 ? AlertEngine.overBeep : 0));
     // Caminhão numa via com limite menor que o do limitador: avisa uma vez.
     final road = _roadLimit;
-    if (_isTruck && road != null && road < _truckMax) {
+    if (_isTruck && road != null && road < _truckBase) {
       if (speed > road + 2 && _roadWarned != road) {
         _roadWarned = road;
         if (say == null) {
@@ -1663,18 +1669,22 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
                   child: Row(children: [
-                    const Expanded(child: Text('Limitador do caminhão')),
-                    SegmentedButton<int>(
-                      segments: const [
-                        ButtonSegment(value: 80, label: Text('80')),
-                        ButtonSegment(value: 90, label: Text('90')),
-                      ],
-                      selected: {_truckMax},
-                      onSelectionChanged: (v) async {
+                    const Expanded(
+                        child: Text('Limitador do caminhão\n'
+                            'Começa a contar os 30 s acima de',
+                            style: TextStyle(height: 1.3))),
+                    DropdownButton<int>(
+                      value: _truckMax,
+                      items: const [80, 90, 91, 92, 93, 94, 95]
+                          .map((v) => DropdownMenuItem(
+                              value: v, child: Text('$v km/h')))
+                          .toList(),
+                      onChanged: (v) async {
+                        if (v == null) return;
                         final p = await SharedPreferences.getInstance();
-                        await p.setInt('truck_max', v.first);
+                        await p.setInt('truck_max', v);
                         _watch.reset();
-                        setSheet(() => _truckMax = v.first);
+                        setSheet(() => _truckMax = v);
                         setState(() {});
                       },
                     ),
