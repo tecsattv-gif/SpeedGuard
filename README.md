@@ -69,7 +69,8 @@ Autor: Luiz Alberto Cardoso
   - **Tamanho**: Pequeno, Médio (igual ao CamSam, 64 × 250 dp) ou Grande
   - **Formato**: Vertical (retrato) ou Horizontal (paisagem, 240 × 72 dp no Médio), com uma miniatura mostrando como fica
   - O tamanho é convertido para pixels e conferido pelo próprio painel ao abrir, para ficar certo em qualquer tela
-  - **Círculo da contagem** (1.29.4): passou do limite com a bolha em uso, aparece ao lado do painel, no topo, um círculo de ~2 cm com fundo transparente, anel vermelho que vai esvaziando e os segundos que faltam em vermelho (30 → 0). Depois dos 30 s mostra "EXCEDIDA" até você voltar ao limite; então some e a janela volta ao tamanho do painel
+  - **Círculo da contagem** (1.29.4): passou do limite com a bolha em uso, aparece ao lado do painel, no topo, um círculo de ~2 cm com fundo escuro (era transparente até a 1.29.4; o texto do app de baixo aparecia atrás do número), anel vermelho que vai esvaziando e os segundos que faltam em vermelho (30 → 0). Depois dos 30 s mostra "EXCEDIDA" até você voltar ao limite; então some e a janela volta ao tamanho do painel
+  - O fundo do painel é sólido desde a 1.29.5 (antes deixava ver um pouco do app de baixo)
   - Depois do pop-up "VELOCIDADE EXCEDIDA" e da janela do **+**, o painel volta ao tamanho certo e confere o tamanho real (desde a 1.29.3). Antes, a janela ficava ~2,5× maior que o painel, com uma área **invisível** que descia até o rodapé e roubava os toques nos botões de baixo da tela
 
   - **Toque duplo no painel**: abre o SpeedGuard direto em tela cheia (o painel some e volta quando você sair do app). Desde a 1.6.4 não aparece mais a janela "Completar ação usando" pedindo para escolher outro app

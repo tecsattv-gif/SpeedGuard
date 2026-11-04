@@ -368,7 +368,7 @@ class _OverlayBubbleState extends State<OverlayBubble> {
     );
   }
 
-  /// Círculo vermelho da contagem (fundo transparente): o anel vai
+  /// Círculo vermelho da contagem (fundo escuro desde a 1.29.5): o anel vai
   /// esvaziando e o número mostra os segundos que faltam; depois dos 30 s
   /// mostra "EXCEDIDA" até voltar ao limite.
   Widget _ring(int secs) {
@@ -378,6 +378,11 @@ class _OverlayBubbleState extends State<OverlayBubble> {
       width: kRingD,
       height: kRingD,
       child: Stack(alignment: Alignment.center, children: [
+        // 1.29.5: fundo escuro sólido, para o texto do app de baixo
+        // (ex.: "WhatsApp") não aparecer atrás do número.
+        Container(
+            decoration:
+                BoxDecoration(color: SG.bg, shape: BoxShape.circle)),
         SizedBox.expand(
           child: CircularProgressIndicator(
             value: left / 30,
@@ -497,8 +502,8 @@ class _OverlayBubbleState extends State<OverlayBubble> {
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            SG.palette.value.deepTop.withValues(alpha: 0.95),
-            SG.bg.withValues(alpha: 0.95)
+            SG.palette.value.deepTop,
+            SG.bg
           ],
           begin: _land ? Alignment.centerLeft : Alignment.topCenter,
           end: _land ? Alignment.centerRight : Alignment.bottomCenter,
