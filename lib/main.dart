@@ -33,6 +33,7 @@ import 'gps_filter.dart';
 import 'park_service.dart';
 import 'road_limit.dart';
 import 'route_service.dart';
+import 'removed_radars.dart';
 import 'section_watch.dart';
 import 'speed_watch.dart';
 import 'speed_picker.dart';
@@ -101,6 +102,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   final _engine = AlertEngine();
   final _tts = FlutterTts();
   final _community = CommunityService();
+  final _removed = RemovedRadars();
   /// Quantas pessoas estão conectadas (mundo e país).
   final _presence = PresenceService();
   Timer? _presenceTimer;
@@ -174,9 +176,14 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   CountryRule get _rule => ruleFor(_country);
 
   /// Radares e avisos das camadas ligadas (mapa e alertas usam esta lista).
-  List<Radar> get _allRadars => [
+  List<Radar> get _allRadars {
+    _removed.shared = _community.removed;
+    return _allRadarsRaw;
+  }
+
+  List<Radar> get _allRadarsRaw => [
         for (final r in [..._service.all, ..._community.radars])
-          if (_layers.contains(Layer.of(r))) r
+          if (_layers.contains(Layer.of(r)) && !_removed.hidden(r)) r
       ];
 
   /// Radares a desenhar no mapa: só os da área da tela (com margem) e no
@@ -188,7 +195,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     final all = [
       ..._allRadars,
       for (final r in _service.area)
-        if (_layers.contains(Layer.of(r))) r
+        if (_layers.contains(Layer.of(r)) && !_removed.hidden(r)) r
     ];
     LatLngBounds? b;
     try {
@@ -248,6 +255,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   Future<void> _init() async {
     final p = await SharedPreferences.getInstance();
+    await _removed.load();
     _voice = p.getBool('voice') ?? true;
     _speedWarn = p.getBool('speed_warn') ?? true;
     _showParks = p.getBool('show_parks') ?? true;
@@ -568,6 +576,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     _safe('comunidade', () {
       if (_community.needsRefresh(pos.latitude, pos.longitude)) {
         _community.refresh(pos.latitude, pos.longitude).then((_) {
+          _removed.shared = _community.removed;
           if (mounted) setState(() {});
         });
       }
@@ -1540,6 +1549,20 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     }
   }
 
+  /// "Este radar não existe mais" (1.29.7): esconde para você e avisa os
+  /// outros (radar móvel compartilhado é apagado direto, como no "Não").
+  Future<void> _radarGone(Radar r) async {
+    await _removed.hide(r);
+    if (mounted) setState(() {});
+    if (r.type == 'movel' && r.id.startsWith('cm_')) {
+      await _community.confirm(r, false);
+    } else {
+      await _community.reportRemoved(r);
+    }
+    _removed.shared = _community.removed;
+    _snack('Radar escondido. Obrigado pelo aviso!');
+  }
+
   void _showRadar(Radar r) {
     showModalBottomSheet(
       context: context,
@@ -1567,6 +1590,22 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   setState(() {});
                 },
               ),
+            ],
+            if (r.type != 'usuario' && !r.isEvent) ...[
+              const SizedBox(height: 16),
+              OutlinedButton.icon(
+                icon: const Icon(Icons.not_interested),
+                label: const Text('Este radar não existe mais'),
+                onPressed: () async {
+                  Navigator.pop(context);
+                  await _radarGone(r);
+                },
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                  'Some na hora para você. Para os outros motoristas, some '
+                  'quando 2 pessoas avisarem.',
+                  style: TextStyle(fontSize: 12, color: Colors.white60)),
             ],
           ],
         ),
@@ -1624,6 +1663,20 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   setState(() {});
                 },
               ),
+              if (_removed.mineCount > 0)
+                ListTile(
+                  leading: const Icon(Icons.not_interested),
+                  title: Text('Radares que você escondeu: ${_removed.mineCount}'),
+                  subtitle: const Text('Marcados como "não existe mais"'),
+                  trailing: TextButton(
+                    child: const Text('Mostrar de novo'),
+                    onPressed: () async {
+                      await _removed.clearMine();
+                      setSheet(() {});
+                      setState(() {});
+                    },
+                  ),
+                ),
               SwitchListTile(
                 title: const Text('Aviso de velocidade excedida'),
                 subtitle: Text(_isTruck

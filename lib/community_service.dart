@@ -16,6 +16,12 @@ class CommunityService {
   static const eventLife = Duration(hours: 6);
 
   List<Radar> _radars = [];
+
+  /// Avisos "este radar não existe mais" da região (1.29.7). Ficam na mesma
+  /// coleção, mas com a célula "x…": versões antigas do app não buscam
+  /// essas células, então não confundem o aviso com um radar.
+  List<(double, double)> removed = [];
+  static const removedLife = Duration(days: 90);
   DateTime? _lastFetch;
   double? _lastLat, _lastLon;
 
@@ -120,7 +126,8 @@ class CommunityService {
               'value': {
                 'arrayValue': {
                   'values': [
-                    for (final c in _cellsAround(lat, lon)) {'stringValue': c}
+                    for (final c in _cellsAround(lat, lon)) {'stringValue': c},
+                    for (final c in _cellsAround(lat, lon)) {'stringValue': 'x$c'},
                   ]
                 }
               }
@@ -137,11 +144,17 @@ class CommunityService {
       if (res.statusCode != 200) return false;
       final list = jsonDecode(utf8.decode(res.bodyBytes)) as List;
       _deleteExpired(list);
-      _radars = [
+      final docs = [
         for (final item in list)
           if ((item as Map)['document'] != null)
             _fromDoc((item['document'] as Map).cast<String, dynamic>())
-      ].whereType<Radar>().toList();
+      ].whereType<Radar>();
+      final now = DateTime.now().millisecondsSinceEpoch;
+      removed = [
+        for (final r in docs)
+          if (r.type == 'removido' && (r.checkAfter ?? 0) > now) (r.lat, r.lon)
+      ];
+      _radars = docs.where((r) => r.type != 'removido').toList();
       return true;
     } catch (_) {
       return false;
@@ -218,6 +231,34 @@ class CommunityService {
       final doc = jsonDecode(utf8.decode(res.bodyBytes)) as Map;
       final r = _fromDoc(doc.cast<String, dynamic>());
       if (r != null) _radars.add(r);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Avisa que o radar [r] não existe mais (vale 90 dias).
+  Future<bool> reportRemoved(Radar r) async {
+    if (!communityEnabled) return false;
+    final now = DateTime.now();
+    final fields = <String, dynamic>{
+      'lat': {'doubleValue': r.lat},
+      'lon': {'doubleValue': r.lon},
+      'cell': {'stringValue': 'x${cellOf(r.lat, r.lon)}'},
+      'type': {'stringValue': 'removido'},
+      'createdAt': {'integerValue': '${now.millisecondsSinceEpoch}'},
+      'checkAfter': {
+        'integerValue': '${now.add(removedLife).millisecondsSinceEpoch}'
+      },
+    };
+    try {
+      final res = await http
+          .post(Uri.parse('$_base/radars?key=$firebaseApiKey'),
+              headers: {'Content-Type': 'application/json'},
+              body: jsonEncode({'fields': fields}))
+          .timeout(const Duration(seconds: 20));
+      if (res.statusCode != 200) return false;
+      removed = [...removed, (r.lat, r.lon)];
       return true;
     } catch (_) {
       return false;
