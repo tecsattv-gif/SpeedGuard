@@ -72,6 +72,17 @@ class RouteService {
     }
   }
 
+  /// Rumo da rota no trecho [i] → [i]+1 (null fora da rota).
+  double? bearingAt(int i) {
+    if (i < 0 || i + 1 >= pts.length) return null;
+    final la1 = pts[i].$1 * math.pi / 180, la2 = pts[i + 1].$1 * math.pi / 180;
+    final dl = (pts[i + 1].$2 - pts[i].$2) * math.pi / 180;
+    final y = math.sin(dl) * math.cos(la2);
+    final x = math.cos(la1) * math.sin(la2) -
+        math.sin(la1) * math.cos(la2) * math.cos(dl);
+    return (math.atan2(y, x) * 180 / math.pi + 360) % 360;
+  }
+
   /// Ponto da rota mais perto de (lat, lon): índice, distância até a rota
   /// (m) e lado (+1 direita, -1 esquerda), procurando de [from] até [to].
   (int, double, int) nearest(double lat, double lon,

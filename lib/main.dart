@@ -1030,7 +1030,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         onRoad: _sameRoad
             ? (r) {
                 try {
-                  return _roads.onCurrentRoad(r.id, r.lat, r.lon, pos.heading);
+                  final b = (Geolocator.bearingBetween(
+                              pos.latitude, pos.longitude, r.lat, r.lon) +
+                          360) %
+                      360;
+                  return _roads.radarOnMyRoad(
+                      r, pos.heading, b, pos.speed * 3.6);
                 } catch (e, st) {
                   _logError('via do radar', e, st);
                   return null;

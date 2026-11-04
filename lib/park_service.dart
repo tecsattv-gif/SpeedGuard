@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 
+import 'models.dart';
 import 'overpass_gate.dart';
 import 'route_service.dart';
 import 'tile_store.dart';
@@ -15,7 +16,28 @@ class Park {
   final double lat, lon;
   final String kind; // rest_area, services, parking
   final Map<String, String> tags;
-  const Park(this.id, this.name, this.lat, this.lon, this.kind, this.tags);
+  /// Vias principais perto do park (base própria, 1.29.0); vazio = não se sabe.
+  final List<RoadRef> roads;
+  const Park(this.id, this.name, this.lat, this.lon, this.kind, this.tags,
+      [this.roads = const []]);
+
+  /// O park é do sentido de quem vai no rumo [dir]? (1.29.0)
+  /// true/false pela via de mão única (pista) ao lado do park; null quando
+  /// não há pista de mão única perto (estrada comum, ou park sem via na base).
+  bool? servesDirection(double dir) {
+    if (roads.isEmpty) return null;
+    final near = roads.first.d;
+    bool? res;
+    for (final r in roads) {
+      if (r.d > near + 25) break;
+      final d = r.dir;
+      if (d == null) return null; // estrada de mão dupla: serve os dois lados
+      final diff = (d - dir).abs() % 360;
+      if ((diff > 180 ? 360 - diff : diff) < 90) return true;
+      res = false;
+    }
+    return res;
+  }
 
   String get kindLabel => switch (kind) {
         'services' => 'Área de serviço',
@@ -140,7 +162,8 @@ class ParkService {
               ? 'rest_area'
               : 'parking';
       out.add(Park(m['i'].toString(), tags['name'] ?? '',
-          (m['a'] as num).toDouble(), (m['o'] as num).toDouble(), kind, tags));
+          (m['a'] as num).toDouble(), (m['o'] as num).toDouble(), kind, tags,
+          RoadRef.list(m['rd'])));
     }
     return out;
   }
@@ -289,9 +312,16 @@ class ParkService {
           final (k, d, side) = route.nearest(p.lat, p.lon);
           if (d > 600) continue;
           final right = side > 0;
+          // 1.29.0: pela pista ao lado do park (base própria), comparando com
+          // o sentido da rota naquele ponto.
+          final rb = route.bearingAt(k);
+          final serves = rb == null ? null : p.servesDirection(rb);
+          if (serves == false) continue;
           // Área de autoestrada do outro lado: é da pista contrária.
           final wrong = leftHand ? right : !right;
-          if (wrong && p.kind != 'parking' && d < 500) continue;
+          if (serves == null && wrong && p.kind != 'parking' && d < 500) {
+            continue;
+          }
           out.add((p, route.cum[k], right ? 'direita' : 'esquerda'));
         }
         out.sort((a, b) => a.$2.compareTo(b.$2));
@@ -330,7 +360,8 @@ class ParkService {
         out.add(p);
       } else if (out[i].name.isEmpty && p.name.isNotEmpty) {
         final o = out[i];
-        out[i] = Park(o.id, p.name, o.lat, o.lon, o.kind, {...p.tags, ...o.tags});
+        out[i] = Park(o.id, p.name, o.lat, o.lon, o.kind, {...p.tags, ...o.tags},
+            o.roads.isNotEmpty ? o.roads : p.roads);
       }
     }
     return out;
@@ -360,6 +391,10 @@ class ParkService {
       final diff = _angleDiff(h, b);
       // Longe a estrada faz curvas: aceita um cone maior.
       if (diff > (d > 10000 ? 50 : 40)) continue;
+      // 1.29.0: park de autoestrada só do meu sentido, pela pista ao lado
+      // dele (gravada na base) — vale a qualquer distância.
+      final serves = p.servesDirection(d > 3000 ? b : h);
+      if (serves == false) continue;
       String? side;
       if (d < 3000) {
         final rel = ((b - h) + 360) % 360; // 0..360, à direita < 180
@@ -368,7 +403,9 @@ class ParkService {
         // Área de autoestrada do lado contrário (perto do eixo): é da outra
         // pista, não serve para quem vai neste sentido.
         final wrong = leftHand ? side == 'direita' : side == 'esquerda';
-        if (wrong && p.kind != 'parking' && lateral < 400) continue;
+        if (serves == null && wrong && p.kind != 'parking' && lateral < 400) {
+          continue;
+        }
       }
       out.add(ParkAhead(p, d, side));
     }

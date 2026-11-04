@@ -1,3 +1,51 @@
+/// Uma via perto de um radar/park, gravada na base própria (1.29.0,
+/// tools/road_match.py): tipo, número, nome, mão única e rumo do trecho.
+class RoadRef {
+  final double d; // distância do ponto até a via (m)
+  final String hw; // highway=*
+  final String ref;
+  final String name;
+  final int ow; // 1 = mão única no sentido dos pontos, -1 = ao contrário, 0 = dupla
+  final double b; // rumo do trecho (sentido dos pontos)
+  const RoadRef(this.d, this.hw, this.ref, this.name, this.ow, this.b);
+
+  static List<RoadRef> list(dynamic raw) {
+    if (raw is! List) return const [];
+    final out = <RoadRef>[];
+    for (final e in raw) {
+      if (e is! Map) continue;
+      out.add(RoadRef(
+        (e['d'] as num?)?.toDouble() ?? 0,
+        e['h']?.toString() ?? '',
+        e['r']?.toString() ?? '',
+        e['n']?.toString() ?? '',
+        (e['o'] as num?)?.toInt() ?? 0,
+        (e['b'] as num?)?.toDouble() ?? 0,
+      ));
+    }
+    return out;
+  }
+
+  Map<String, dynamic> toJson() =>
+      {'d': d, 'h': hw, 'r': ref, 'n': name, 'o': ow, 'b': b};
+
+  bool get isLink => hw.endsWith('_link');
+
+  /// Sentido do trânsito (mão única) ou null (mão dupla).
+  double? get dir => ow == 0 ? null : (ow == 1 ? b : (b + 180) % 360);
+
+  /// Números da via (ref) ou, sem número, o nome — normalizados.
+  Set<String> get ids {
+    String norm(String v) => v.toUpperCase().replaceAll(RegExp(r'[\s-]'), '');
+    final out = <String>{
+      for (final r in ref.split(';'))
+        if (r.trim().isNotEmpty) 'R:${norm(r)}'
+    };
+    if (out.isEmpty && name.trim().isNotEmpty) out.add('N:${norm(name)}');
+    return out;
+  }
+}
+
 /// Um radar (fixo, de semáforo, móvel ou reportado pelo usuário).
 class Radar {
   final String id;
@@ -8,6 +56,8 @@ class Radar {
   // fila, acidente, obra, perigo, policia (avisos: somem após 6 h)
   final double? direction; // graus (0 = norte), se conhecido
   final int? checkAfter; // ms; após essa data, pergunta se o radar móvel ainda está lá
+  /// Vias perto do radar (base própria, 1.29.0); vazio = não se sabe.
+  final List<RoadRef> roads;
 
   const Radar({
     required this.id,
@@ -17,6 +67,7 @@ class Radar {
     this.type = 'fixo',
     this.direction,
     this.checkAfter,
+    this.roads = const [],
   });
 
   /// Aviso de trânsito (fila, acidente, obra, perigo, polícia), não radar.
@@ -55,6 +106,7 @@ class Radar {
         'type': type,
         'direction': direction,
         'checkAfter': checkAfter,
+        if (roads.isNotEmpty) 'rd': [for (final r in roads) r.toJson()],
       };
 
   factory Radar.fromJson(Map<String, dynamic> j) => Radar(
@@ -65,6 +117,7 @@ class Radar {
         type: (j['type'] as String?) ?? 'fixo',
         direction: (j['direction'] as num?)?.toDouble(),
         checkAfter: j['checkAfter'] as int?,
+        roads: RoadRef.list(j['rd']),
       );
 
   /// Converte um nó do OpenStreetMap (Overpass) em Radar.
@@ -93,6 +146,7 @@ class Radar {
       type: type,
       direction: _parseDirection(tags['direction']?.toString() ??
           tags['camera:direction']?.toString()),
+      roads: RoadRef.list(el['rd']),
     );
   }
 

@@ -28,7 +28,7 @@ class RadarService {
   static const double refetchDistance = 20000; // rebaixa após 20 km
   static const Duration cacheLife = Duration(hours: 6);
   static const Duration retryAfterFail = Duration(seconds: 90);
-  static const _queryVersion = 4; // 1.26.3: raio de 60 km
+  static const _queryVersion = 5; // 1.29.0: via de cada radar na base
 
   List<Radar> _osm = [];
   List<Radar> _user = [];

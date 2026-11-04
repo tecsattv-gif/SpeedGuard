@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 
+import 'models.dart';
 import 'overpass_gate.dart';
 
 /// Uma via do OpenStreetMap com o limite de velocidade.
@@ -47,8 +48,10 @@ class RoadLimitService {
     'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
   ];
   static const _ua = 'SpeedGuard/1.23 (Android; tecsattv-gif/SpeedGuard)';
-  static const _radius = 2500.0; // baixa as vias num raio de 2,5 km
-  static const _refetch = 1800.0; // e baixa de novo depois de 1,8 km
+  // 1.29.0: busca mais leve (responde mais rápido e falha menos); a via de
+  // cada radar agora vem da base própria.
+  static const _radius = 1500.0; // baixa as vias num raio de 1,5 km
+  static const _refetch = 1000.0; // e baixa de novo depois de 1 km
 
   List<_Way> _ways = [];
   double? _lat, _lon;
@@ -259,6 +262,61 @@ class RoadLimitService {
     if (nearestGood == null) return false; // só outras vias perto (alça, rua)
     // A minha via (no meu sentido) tem de ser a mais perto do radar.
     return nearestGood <= nearestAny + 4 || identical(nearestWay, cur);
+  }
+
+  static double _axisDiff(double a, double b) {
+    final d = _angleDiff(a, b);
+    return math.min(d, 180 - d);
+  }
+
+  /// Ruas de bairro: com o veículo rápido, ele não está nelas.
+  static const _minor = {'residential', 'living_street', 'unclassified'};
+
+  /// O radar está na via e no sentido do veículo? (1.29.0)
+  /// Usa a via gravada na base própria para cada radar ([Radar.roads]):
+  /// * via de mão única no sentido contrário (pista do outro sentido) → não;
+  /// * via de mão dupla atravessada (rua que cruza) → não;
+  /// * via com outro número/nome que a do veículo (paralela, marginal) → não;
+  /// * alça de entrada/saída quando o veículo está na rodovia (e vice-versa) → não;
+  /// * sem saber a via do veículo: rápido (> 70 km/h) não avisa radar de rua
+  ///   de bairro.
+  /// Radar sem via na base (reportado, Overpass): usa [onCurrentRoad].
+  bool? radarOnMyRoad(Radar r, double heading, double bearing, double kmh) {
+    if (r.roads.isEmpty) return onCurrentRoad(r.id, r.lat, r.lon, heading);
+    final cur = _current;
+    final mine = cur?.ids ?? const <String>{};
+    final near = r.roads.first.d;
+    bool ok(RoadRef x) {
+      final dir = x.dir;
+      if (dir != null) {
+        // Mão única: o trânsito tem de ir no meu sentido.
+        if (_angleDiff(dir, heading) > 100 && _angleDiff(dir, bearing) > 100) {
+          return false;
+        }
+      } else if (_axisDiff(x.b, heading) > 55 && _axisDiff(x.b, bearing) > 55) {
+        return false; // rua que cruza
+      }
+      if (cur != null) {
+        if (x.isLink != cur.type.endsWith('_link')) return false;
+        if (mine.isNotEmpty) {
+          final ids = x.ids;
+          if (ids.isNotEmpty && ids.intersection(mine).isEmpty) return false;
+          if (ids.isEmpty && x.hw != cur.type) return false;
+        } else if (x.hw != cur.type) {
+          return false;
+        }
+      } else if (kmh > 70 && _minor.contains(x.hw)) {
+        return false;
+      }
+      return true;
+    }
+
+    // Vale qualquer via praticamente à mesma distância (cruzamento, pista dupla).
+    for (final x in r.roads) {
+      if (x.d > near + 6) break;
+      if (ok(x)) return true;
+    }
+    return false;
   }
 
   /// Limite da via onde o veículo está, em km/h (null se não souber).
