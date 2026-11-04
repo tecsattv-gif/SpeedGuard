@@ -33,6 +33,7 @@ import 'gps_filter.dart';
 import 'park_service.dart';
 import 'road_limit.dart';
 import 'route_service.dart';
+import 'section_watch.dart';
 import 'speed_watch.dart';
 import 'speed_picker.dart';
 
@@ -115,6 +116,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   bool _showParks = true;
   bool _parkOpen = false;
   final _watch = SpeedWatch();
+  final _section = SectionWatch(); // velocidade média (1.29.1)
   /// Aviso de velocidade excedida ligado (Configurações).
   bool _speedWarn = true;
   /// Velocidade máxima do caminhão (limitador), em km/h.
@@ -509,6 +511,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     _predictTimer?.cancel();
     _predictTimer = null;
     _gps.reset();
+    _section.reset();
     // Parou o monitoramento: o painel flutuante sai da tela.
     await _closeBubble();
     await WakelockPlus.disable();
@@ -569,6 +572,17 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     });
     _safe('avisos', () => _runAlerts(pos));
     _safe('velocidade', () => _checkSpeedLimit(pos));
+    _safe('média', () {
+      final say = _section.update(
+          pos, [for (final r in _allRadars) if (r.type == 'media') r]);
+      if (say != null && _voice && _speedSound != 'mute') {
+        if (_sound == 'beep') {
+          _beep(3);
+        } else {
+          _tts.speak(say);
+        }
+      }
+    });
     _safe('parks', () => _checkParks(pos));
     _safe('pergunta', () => _checkAsk(pos));
   }
@@ -2083,6 +2097,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             ? SG.violet
         : r.type == 'semaforo'
             ? Colors.amber.shade700
+        : r.type == 'media'
+            ? const Color(0xFF00BCD4)
             : SG.red;
     return GestureDetector(
       onTap: () => _showRadar(r),
@@ -2211,6 +2227,25 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                         _SpeedBox(
                             speed: speed,
                             over: a.overLimit || overSecs != null),
+                        // Trecho de velocidade média: mostra a média.
+                        if (_running && _section.active)
+                          Container(
+                            margin: const EdgeInsets.only(top: 4),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                                color: (_section.average ?? 0) >
+                                        (_section.limit ?? 9999) + 2
+                                    ? SG.red
+                                    : const Color(0xFF00BCD4),
+                                borderRadius: BorderRadius.circular(10)),
+                            child: Text(
+                                'Média ${_section.average ?? '--'}',
+                                style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold)),
+                          ),
                         // Contagem dos 30 s acima do limite.
                         if (overSecs != null)
                           Container(

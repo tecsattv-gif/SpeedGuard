@@ -79,13 +79,23 @@ class Pass1(osmium.SimpleHandler):
         t = dict(r.tags)
         if t.get("type") != "enforcement" or t.get("enforcement") not in ENF_TYPES:
             return
-        dev = frm = None
+        dev = frm = to = None
         for m in r.members:
             if m.type == "n":
                 if m.role == "device" and dev is None:
                     dev = m.ref
                 elif m.role == "from" and frm is None:
                     frm = m.ref
+                elif m.role == "to" and to is None:
+                    to = m.ref
+        if t.get("enforcement") == "average_speed":
+            # Velocidade média: início (from, ou a câmera) e fim (to) do trecho.
+            start = frm if frm is not None else dev
+            if start is not None:
+                self.rel_node[start] = {**t, "section": "start"}
+            if to is not None:
+                self.rel_node[to] = {**t, "section": "end"}
+            return
         node = dev if dev is not None else frm
         if node is not None:
             self.rel_node[node] = t

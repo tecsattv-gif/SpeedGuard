@@ -28,7 +28,7 @@ class RadarService {
   static const double refetchDistance = 20000; // rebaixa após 20 km
   static const Duration cacheLife = Duration(hours: 6);
   static const Duration retryAfterFail = Duration(seconds: 90);
-  static const _queryVersion = 5; // 1.29.0: via de cada radar na base
+  static const _queryVersion = 6; // 1.29.1: velocidade média
 
   List<Radar> _osm = [];
   List<Radar> _user = [];
@@ -61,7 +61,7 @@ class RadarService {
         '(node["highway"="speed_camera"]($area);'
         'node["enforcement"]($area);)->.n;'
         'relation["type"="enforcement"]($area)->.r;'
-        '(node(r.r:"device");node(r.r:"from");)->.d;'
+        '(node(r.r:"device");node(r.r:"from");node(r.r:"to");)->.d;'
         '(.n;.d;.r;);out body;';
     for (final url in _overpassUrls) {
       try {
@@ -136,6 +136,14 @@ class RadarService {
             }
           }
           return null;
+        }
+        if (enf == 'average_speed') {
+          // Velocidade média: início (from, ou a câmera) e fim (to).
+          final start = pick('from') ?? pick('device');
+          if (start != null) fromRel[start] = {...tags, 'section': 'start'};
+          final end = pick('to');
+          if (end != null) fromRel[end] = {...tags, 'section': 'end'};
+          continue;
         }
         final node = pick('device') ?? pick('from');
         if (node != null) fromRel[node] = tags;

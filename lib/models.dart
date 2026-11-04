@@ -58,6 +58,8 @@ class Radar {
   final int? checkAfter; // ms; após essa data, pergunta se o radar móvel ainda está lá
   /// Vias perto do radar (base própria, 1.29.0); vazio = não se sabe.
   final List<RoadRef> roads;
+  /// Velocidade média: 'start' (início do trecho), 'end' (fim) ou null.
+  final String? section;
 
   const Radar({
     required this.id,
@@ -68,7 +70,10 @@ class Radar {
     this.direction,
     this.checkAfter,
     this.roads = const [],
+    this.section,
   });
+
+  bool get isSectionEnd => type == 'media' && section == 'end';
 
   /// Aviso de trânsito (fila, acidente, obra, perigo, polícia), não radar.
   bool get isEvent => const {'fila', 'acidente', 'obra', 'perigo', 'policia'}.contains(type);
@@ -79,6 +84,10 @@ class Radar {
         return 'Radar de semáforo';
       case 'movel':
         return 'Radar móvel';
+      case 'media':
+        return section == 'end'
+            ? 'Fim da velocidade média'
+            : 'Radar de velocidade média';
       case 'usuario':
         return 'Reportado por você';
       case 'comunidade':
@@ -107,6 +116,7 @@ class Radar {
         'direction': direction,
         'checkAfter': checkAfter,
         if (roads.isNotEmpty) 'rd': [for (final r in roads) r.toJson()],
+        if (section != null) 'section': section,
       };
 
   factory Radar.fromJson(Map<String, dynamic> j) => Radar(
@@ -118,6 +128,7 @@ class Radar {
         direction: (j['direction'] as num?)?.toDouble(),
         checkAfter: j['checkAfter'] as int?,
         roads: RoadRef.list(j['rd']),
+        section: j['section'] as String?,
       );
 
   /// Converte um nó do OpenStreetMap (Overpass) em Radar.
@@ -137,6 +148,7 @@ class Radar {
     if (kinds.contains('traffic_signals') || kinds.contains('red_light')) {
       type = 'semaforo';
     }
+    if (kinds.contains('average_speed')) type = 'media';
     if (tags['mobile'] == 'yes') type = 'movel';
     return Radar(
       id: 'osm_${el['id']}',
@@ -147,6 +159,7 @@ class Radar {
       direction: _parseDirection(tags['direction']?.toString() ??
           tags['camera:direction']?.toString()),
       roads: RoadRef.list(el['rd']),
+      section: tags['section']?.toString(),
     );
   }
 

@@ -9,6 +9,8 @@ enum Layer {
       Icons.photo_camera),
   semaforo('Radares de semáforo', 'Fiscalizam o sinal vermelho',
       Color(0xFFFFA000), Icons.traffic),
+  media('Velocidade média', 'Trechos com controle de velocidade média (início e fim)',
+      Color(0xFF00BCD4), Icons.timer),
   moveis('Radares móveis', 'Controles móveis reportados pelos motoristas', Color(0xFF8C50FF),
       Icons.speed),
   fila('Filas', 'Trânsito parado ou lento', Color(0xFFFF7A2F),
@@ -36,6 +38,8 @@ enum Layer {
     switch (r.type) {
       case 'semaforo':
         return semaforo;
+      case 'media':
+        return media;
       case 'movel':
       case 'usuario':
         return moveis;
