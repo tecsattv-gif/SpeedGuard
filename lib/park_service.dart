@@ -21,6 +21,23 @@ class Park {
   const Park(this.id, this.name, this.lat, this.lon, this.kind, this.tags,
       [this.roads = const []]);
 
+  /// Park para caminhão (1.29.5): estacionamento de caminhão, parada de
+  /// caminhão (truck_stop), ou área com vagas/acesso de caminhão marcados.
+  bool get isTruck {
+    if (tags['hgv'] == 'no') return false;
+    if (kind == 'parking') return true; // a base só traz os de caminhão
+    if (const {'yes', 'designated', 'only'}.contains(tags['hgv'])) return true;
+    if (tags['parking'] == 'truck_stop') return true;
+    final cap = int.tryParse(tags['capacity:hgv'] ?? '') ?? 0;
+    if (cap > 0) return true;
+    return _truckName.hasMatch(name);
+  }
+
+  static final _truckName = RegExp(
+      r'truck|camion|lkw|vrachtwagen|autohof|routier|poids.?lourds|'
+      r'tir\b|safe.?park|caminh|camioneros|hgv|ciężar|kamion',
+      caseSensitive: false);
+
   /// O park é do sentido de quem vai no rumo [dir]? (1.29.0)
   /// true/false pela via de mão única (pista) ao lado do park; null quando
   /// não há pista de mão única perto (estrada comum, ou park sem via na base).
@@ -74,6 +91,10 @@ class ParkAhead {
 
 /// Busca os parks em volta no OpenStreetMap e diz quais estão à frente.
 class ParkService {
+  /// Só parks de caminhão (Configurações, 1.29.5).
+  bool truckOnly = true;
+  bool _ok(Park p) => !truckOnly || p.isTruck;
+
   static const _urls = [
     'https://overpass-api.de/api/interpreter',
     'https://overpass.private.coffee/api/interpreter',
@@ -342,7 +363,7 @@ class ParkService {
   List<ParkAhead> alongRoute(double progress, {int max = 3}) {
     final out = [
       for (final (p, at, side) in _route)
-        if (at > progress + 100) ParkAhead(p, at - progress, side, road: true)
+        if (at > progress + 100 && _ok(p)) ParkAhead(p, at - progress, side, road: true)
     ];
     return max <= 0 ? out : out.take(max).toList();
   }
@@ -358,10 +379,19 @@ class ParkService {
           Geolocator.distanceBetween(o.lat, o.lon, p.lat, p.lon) < 250);
       if (i < 0) {
         out.add(p);
-      } else if (out[i].name.isEmpty && p.name.isNotEmpty) {
+        continue;
+      }
+      if (out[i].name.isEmpty && p.name.isNotEmpty) {
         final o = out[i];
         out[i] = Park(o.id, p.name, o.lat, o.lon, o.kind, {...p.tags, ...o.tags},
             o.roads.isNotEmpty ? o.roads : p.roads);
+      }
+      // Área de serviço com estacionamento de caminhão junto: a área fica
+      // marcada como de caminhão (1.29.5).
+      if (p.isTruck && !out[i].isTruck) {
+        final o = out[i];
+        out[i] = Park(o.id, o.name, o.lat, o.lon, o.kind,
+            {...o.tags, 'hgv': 'yes'}, o.roads);
       }
     }
     return out;
@@ -384,6 +414,7 @@ class ParkService {
         const {'gb', 'ie', 'mt', 'cy'}.contains(country?.toLowerCase());
     final out = <ParkAhead>[];
     for (final p in _parks) {
+      if (!_ok(p)) continue;
       final d = Geolocator.distanceBetween(lat, lon, p.lat, p.lon);
       if (d < 150 || d > _radius) continue;
       final b =
@@ -417,7 +448,8 @@ class ParkService {
   List<ParkAhead> nearest(double lat, double lon, {int max = 3}) {
     final out = [
       for (final p in _parks)
-        ParkAhead(p, Geolocator.distanceBetween(lat, lon, p.lat, p.lon), null)
+        if (_ok(p))
+          ParkAhead(p, Geolocator.distanceBetween(lat, lon, p.lat, p.lon), null)
     ]..sort((a, b) => a.distance.compareTo(b.distance));
     return out.take(max).toList();
   }

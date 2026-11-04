@@ -251,6 +251,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     _voice = p.getBool('voice') ?? true;
     _speedWarn = p.getBool('speed_warn') ?? true;
     _showParks = p.getBool('show_parks') ?? true;
+    _parks.truckOnly = p.getBool('parks_truck_only') ?? true;
     _truckMax = p.getInt('truck_max') ?? 90;
     if (![80, 90, 91, 92, 93, 94, 95].contains(_truckMax)) _truckMax = 90;
     _sound = p.getString('sound') ?? 'voice';
@@ -1596,6 +1597,20 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   setState(() {});
                 },
               ),
+              if (_showParks)
+                SwitchListTile(
+                  title: const Text('Só parks de caminhão'),
+                  subtitle: const Text(
+                      'Estacionamentos e paradas de caminhão. Desligado: também '
+                      'as áreas de descanso e de serviço sem vaga de caminhão marcada'),
+                  value: _parks.truckOnly,
+                  onChanged: (v) async {
+                    final p = await SharedPreferences.getInstance();
+                    await p.setBool('parks_truck_only', v);
+                    setSheet(() => _parks.truckOnly = v);
+                    setState(() {});
+                  },
+                ),
               SwitchListTile(
                 title: const Text('Só radares da minha via'),
                 subtitle: const Text(
