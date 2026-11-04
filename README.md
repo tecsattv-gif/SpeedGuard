@@ -137,6 +137,12 @@ A pasta `docs/` é o site público do app, com recursos, vídeo tutorial, passo 
 
 Para aparecer no Google: no [Google Search Console](https://search.google.com/search-console), adicione a propriedade com prefixo de URL `https://tecsattv-gif.github.io/SpeedGuard/`, verifique pelo arquivo HTML (coloque-o em `docs/`) e envie o sitemap `sitemap.xml`.
 
+## Base de dados (workflow data.yml)
+
+- Roda toda semana e pode ser disparado à mão. Baixa os mapas da Geofabrik por país, filtra parks e radares e, desde a 1.29.0, descobre a via e o sentido de cada um.
+- Desde a 1.29.5 a **Europa é dividida em 4 partes** e a América do Norte em 2, rodando ao mesmo tempo (inteira, a Europa passava do tempo limite de 5 h do GitHub).
+- A base só é publicada se **todas** as partes deram certo. Antes, uma parte que falhasse fazia a base sair sem aquela região, porque o ramo `data` é substituído inteiro.
+
 ## Como gerar o APK
 
 O GitHub Actions compila sozinho a cada push na `main` (ou manualmente em **Actions → Build APK → Run workflow**). O APK fica em **Actions → última execução → Artifacts → SpeedGuard-apk**.
