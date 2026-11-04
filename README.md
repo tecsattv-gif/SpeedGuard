@@ -69,6 +69,7 @@ Autor: Luiz Alberto Cardoso
   - **Tamanho**: Pequeno, Médio (igual ao CamSam, 64 × 250 dp) ou Grande
   - **Formato**: Vertical (retrato) ou Horizontal (paisagem, 240 × 72 dp no Médio), com uma miniatura mostrando como fica
   - O tamanho é convertido para pixels e conferido pelo próprio painel ao abrir, para ficar certo em qualquer tela
+  - Depois do pop-up "VELOCIDADE EXCEDIDA" e da janela do **+**, o painel volta ao tamanho certo e confere o tamanho real (desde a 1.29.3). Antes, a janela ficava ~2,5× maior que o painel, com uma área **invisível** que descia até o rodapé e roubava os toques nos botões de baixo da tela
 
   - **Toque duplo no painel**: abre o SpeedGuard direto em tela cheia (o painel some e volta quando você sair do app). Desde a 1.6.4 não aparece mais a janela "Completar ação usando" pedindo para escolher outro app
   - **Reportar pelo painel** (botão + do painel): a janela traz em cima os avisos **Fila, Acidente, Obras, Perigo e Polícia** e embaixo Móvel/Fixo com as placas de velocidade, igual à janela do app em tela cheia (desde a 1.21.0; antes o painel só reportava radares). Um toque já envia para todos; o app confirma por voz ("Obras reportado. Obrigado!")

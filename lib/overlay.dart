@@ -125,8 +125,6 @@ class _OverlayBubbleState extends State<OverlayBubble> {
     setState(() => _ask = false);
   }
 
-  /// Quantas unidades do plugin valem 1 dp (calibrado no 1º desenho).
-  double? _unitsPerDp;
   bool _calibrated = false;
 
   /// Mede a janela real e, se o plugin usar outra unidade, corrige o tamanho.
@@ -134,16 +132,56 @@ class _OverlayBubbleState extends State<OverlayBubble> {
     if (_calibrated || windowWidthDp <= 0) return;
     _calibrated = true;
     final want = panelDp(_land, _scale);
-    _unitsPerDp = overlayUnits(want.width) / windowWidthDp;
     if ((windowWidthDp - want.width).abs() > 3) _resizeToPanel();
   }
 
   Future<void> _resizeToPanel() {
     final want = panelDp(_land, _scale);
-    return FlutterOverlayWindow.resizeOverlay(
-        overlayUnits(want.width, _unitsPerDp),
-        overlayUnits(want.height, _unitsPerDp),
-        true);
+    return _resize(want.width, want.height, true);
+  }
+
+  /// Unidade do resizeOverlay (1.29.3). No plugin publicado, o showOverlay
+  /// mede em pixels, mas o resizeOverlay mede em dp. Usar a mesma conta nos
+  /// dois deixava a janela ~2,5× maior que o painel depois do pop-up
+  /// "VELOCIDADE EXCEDIDA" ou do menu "+": uma área invisível ia até o
+  /// rodapé e roubava os toques. Agora o tamanho real é conferido depois de
+  /// cada mudança e corrigido.
+  double _resizeUnits = 1.0;
+  int _resizeSeq = 0;
+
+  double _windowWidthDp() {
+    final v = WidgetsBinding.instance.platformDispatcher.views.first;
+    return v.devicePixelRatio <= 0
+        ? 0
+        : v.physicalSize.width / v.devicePixelRatio;
+  }
+
+  /// Muda o tamanho da janela e, logo depois, confere o tamanho real em
+  /// segundo plano (sem atrasar o desenho do painel).
+  Future<void> _resize(double wDp, double hDp, bool drag) async {
+    final seq = ++_resizeSeq;
+    final sentW = overlayUnits(wDp, _resizeUnits);
+    try {
+      await FlutterOverlayWindow.resizeOverlay(
+          sentW, overlayUnits(hDp, _resizeUnits), drag);
+    } catch (_) {
+      return;
+    }
+    unawaited(_checkSize(seq, sentW, wDp, hDp, drag));
+  }
+
+  Future<void> _checkSize(
+      int seq, int sentW, double wDp, double hDp, bool drag) async {
+    await Future.delayed(const Duration(milliseconds: 400));
+    if (!mounted || seq != _resizeSeq) return; // veio outra mudança depois
+    final got = _windowWidthDp();
+    if (got <= 0 || (got - wDp).abs() <= 3) return;
+    // Unidades que o plugin realmente usa por dp; corrige uma vez.
+    _resizeUnits = sentW / got;
+    try {
+      await FlutterOverlayWindow.resizeOverlay(overlayUnits(wDp, _resizeUnits),
+          overlayUnits(hDp, _resizeUnits), drag);
+    } catch (_) {}
   }
 
   /// Abre o SpeedGuard em tela cheia (o app fecha o painel ao voltar).
@@ -178,8 +216,7 @@ class _OverlayBubbleState extends State<OverlayBubble> {
   }
 
   Future<void> _openPicker() async {
-    await FlutterOverlayWindow.resizeOverlay(overlayUnits(kPickerW, _unitsPerDp),
-        overlayUnits(kPickerH, _unitsPerDp), false);
+    await _resize(kPickerW.toDouble(), kPickerH.toDouble(), false);
     if (!mounted) return;
     setState(() => _picker = true);
     // Dirigindo: se ninguém escolher em 20 s, fecha sozinho.
@@ -188,8 +225,7 @@ class _OverlayBubbleState extends State<OverlayBubble> {
   }
 
   Future<void> _openExc() async {
-    await FlutterOverlayWindow.resizeOverlay(overlayUnits(kExcW, _unitsPerDp),
-        overlayUnits(kExcH, _unitsPerDp), false);
+    await _resize(kExcW.toDouble(), kExcH.toDouble(), false);
     if (!mounted) return;
     setState(() => _excPopup = true);
     // Fecha sozinho em 6 s (ou com um toque); o painel continua vermelho
