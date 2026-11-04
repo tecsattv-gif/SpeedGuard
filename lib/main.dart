@@ -130,6 +130,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   Timer? _predictTimer;
   bool _running = false;
   bool _follow = true;
+  // 1.29.10: mapa gira com o veículo (a seta fica sempre para cima).
+  bool _headingUp = true;
+  double _mapRot = 0;
   /// Tela cheia: true = mapa, false = tela de alerta (setas grandes).
   bool _mapView = true;
   /// Ícone da sua posição no mapa (seta, carro, caminhão ou moto).
@@ -281,6 +284,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     _bubbleScale = p.getDouble('bubbleScale') ?? 1.0;
     _bubbleLand = p.getBool('bubbleLand') ?? false;
     _mapView = p.getBool('mapView') ?? true;
+    _headingUp = p.getBool('map_heading_up') ?? true;
     _vehicle = VehicleIcon.fromName(p.getString('vehicle'));
     final saved = p.getStringList('layers');
     if (saved != null) {
@@ -558,14 +562,34 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     }
   }
 
+  /// Leva o mapa até [pos]. Com "mapa gira com o veículo", vira o mapa
+  /// para a direção em que você anda (só andando: parado mantém o giro).
+  void _camTo(Position pos, double zoom) {
+    final c = LatLng(pos.latitude, pos.longitude);
+    if (!_headingUp) {
+      if (_mapRot != 0 || _map.camera.rotation != 0) {
+        _mapRot = 0;
+        _map.moveAndRotate(c, zoom, 0);
+      } else {
+        _map.move(c, zoom);
+      }
+      return;
+    }
+    if (pos.speed > 2.5 && pos.heading >= 0) {
+      var d = (-pos.heading) - _mapRot;
+      d = (d + 540) % 360 - 180; // menor caminho (ex.: 359° → 1°)
+      // Ignora tremidas pequenas do GPS; suaviza as curvas.
+      if (d.abs() > 3) _mapRot += d * (d.abs() > 45 ? 1 : 0.6);
+    }
+    _map.moveAndRotate(c, zoom, _mapRot);
+  }
+
   Future<void> _onPosition(Position pos) async {
     _pos = pos;
     // Velocidade e posição na tela primeiro, aconteça o que acontecer depois.
     if (mounted) setState(() {});
     _safe('mapa', () {
-      if (_follow) {
-        _map.move(LatLng(pos.latitude, pos.longitude), _map.camera.zoom);
-      }
+      if (_follow) _camTo(pos, _map.camera.zoom);
     });
     _safe('país', () => _checkCountry(pos));
     _safe('radares', () {
@@ -1383,8 +1407,28 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                     setSheet(() {});
                     setState(() => _follow = v);
                     final pos = _pos;
-                    if (v && pos != null) {
-                      _map.move(LatLng(pos.latitude, pos.longitude), 16);
+                    if (v && pos != null) _camTo(pos, 16);
+                  },
+                ),
+                SwitchListTile(
+                  secondary: Icon(Icons.explore, color: SG.accent),
+                  title: const Text('Mapa gira com o veículo',
+                      style: TextStyle(fontWeight: FontWeight.w600)),
+                  subtitle: const Text(
+                      'Ligado: a seta fica sempre para cima e o mapa vira '
+                      'conforme você anda. Desligado: norte sempre em cima.'),
+                  value: _headingUp,
+                  onChanged: (v) async {
+                    setSheet(() {});
+                    setState(() => _headingUp = v);
+                    (await SharedPreferences.getInstance())
+                        .setBool('map_heading_up', v);
+                    final pos = _pos;
+                    if (pos != null) {
+                      _camTo(pos, _map.camera.zoom);
+                    } else if (!v) {
+                      _mapRot = 0;
+                      _map.rotate(0);
                     }
                   },
                 ),
@@ -2261,6 +2305,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                         point: LatLng(r.lat, r.lon),
                         width: 34,
                         height: 34,
+                        rotate: true, // placa fica em pé com o mapa girado
                         child: _radarIcon(r),
                       ),
                   ],
@@ -2418,9 +2463,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           : FloatingActionButton.small(
               onPressed: () {
                 setState(() => _follow = true);
-                if (pos != null) {
-                  _map.move(LatLng(pos.latitude, pos.longitude), 16);
-                }
+                if (pos != null) _camTo(pos, 16);
               },
               child: const Icon(Icons.my_location),
             ),
