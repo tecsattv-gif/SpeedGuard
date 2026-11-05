@@ -350,6 +350,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         state == AppLifecycleState.paused) {
       _inFront = false;
       if (_running && _bubble) _showBubble();
+      // 1.29.16: sem a bolha, abre já agora (app ainda visível) a janela do
+      // círculo da contagem, minúscula e invisível; ela cresce quando a
+      // contagem começa. Aberta depois, com o app em segundo plano, o
+      // Android 15 bloqueava e o pop-up não aparecia.
+      if (_running && !_bubble && _speedWarn) _showRing();
     } else if (state == AppLifecycleState.resumed) {
       _inFront = true;
       _closeBubble();
@@ -403,11 +408,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         _speedWarn &&
         _rule.mode != RadarMode.disabled &&
         _watch.seconds != null;
-    if (want && !_overlayShown) {
-      _showRing();
-    } else if (!want && _ringPopup) {
-      _closeBubble();
-    }
+    // A janela fica aberta (minúscula) enquanto o app está minimizado;
+    // aqui só tenta abrir se ainda não abriu (Android antigo deixa).
+    if (want && !_overlayShown) _showRing();
   }
 
   Future<void> _showRing() async {
@@ -418,9 +421,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         _bubbleNoPermission = true;
         return;
       }
+      final secs = _watch.seconds != null;
       await FlutterOverlayWindow.showOverlay(
-        height: overlayUnits(kRingD),
-        width: overlayUnits(kRingD),
+        height: overlayUnits(secs ? kRingD : 1),
+        width: overlayUnits(secs ? kRingD : 1),
         alignment: OverlayAlignment.topCenter,
         enableDrag: true,
         positionGravity: PositionGravity.none,

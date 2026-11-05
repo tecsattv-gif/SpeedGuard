@@ -68,6 +68,7 @@ class _OverlayBubbleState extends State<OverlayBubble> {
   bool _excShown = false; // já mostrou neste excesso
   bool _ringOn = false; // janela com o círculo da contagem
   bool _only = false; // 1.29.15: janela só com o círculo (sem a bolha)
+  bool _onlySized = false;
   Timer? _excTimer;
   String? _park; // distância do próximo park
   bool _ask = false;
@@ -104,9 +105,18 @@ class _OverlayBubbleState extends State<OverlayBubble> {
           }
           _gotConfig = true;
         });
-        if (_only) return; // só o círculo: janela fixa, sem pop-up
         // Círculo da contagem: aumenta/diminui a janela quando começa/acaba.
         final ring = _overSecs != null;
+        if (_only) {
+          // Só o círculo (1.29.16): janela minúscula e invisível até a
+          // contagem começar; aí cresce para o círculo.
+          if (ring != _ringOn || !_onlySized) {
+            _onlySized = true;
+            setState(() => _ringOn = ring);
+            _resizeToPanel();
+          }
+          return;
+        }
         if (ring != _ringOn) {
           setState(() => _ringOn = ring);
           if (!_excPopup && !_picker) _resizeToPanel();
@@ -150,7 +160,7 @@ class _OverlayBubbleState extends State<OverlayBubble> {
 
   /// Tamanho da janela: o painel e, durante a contagem, o círculo ao lado.
   Size _windowDp() {
-    if (_only) return const Size(kRingD, kRingD);
+    if (_only) return _ringOn ? const Size(kRingD, kRingD) : const Size(1, 1);
     final p = panelDp(_land, _scale);
     if (!_ringOn) return p;
     return Size(p.width + kRingGap + kRingD,
@@ -196,6 +206,7 @@ class _OverlayBubbleState extends State<OverlayBubble> {
       int seq, int sentW, double wDp, double hDp, bool drag) async {
     await Future.delayed(const Duration(milliseconds: 400));
     if (!mounted || seq != _resizeSeq) return; // veio outra mudança depois
+    if (wDp < 10) return; // janela minúscula (só o círculo, em espera)
     final got = _windowWidthDp();
     if (got <= 0 || (got - wDp).abs() <= 3) return;
     // Unidades que o plugin realmente usa por dp; corrige uma vez.
@@ -337,8 +348,10 @@ class _OverlayBubbleState extends State<OverlayBubble> {
         child: Align(
           alignment: Alignment.topLeft,
           // Toque duplo abre o SpeedGuard.
-          child: GestureDetector(
-              onDoubleTap: _openApp, child: _ring(_overSecs ?? 0)),
+          child: _overSecs == null
+              ? const SizedBox.shrink()
+              : GestureDetector(
+                  onDoubleTap: _openApp, child: _ring(_overSecs!)),
         ),
       );
     }
