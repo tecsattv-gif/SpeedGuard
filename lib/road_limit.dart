@@ -327,7 +327,13 @@ class RoadLimitService {
         // países de mão inglesa). Do outro lado = pista contrária.
         final right = x.s == 1;
         final t = right != _left ? x.b : (x.b + 180) % 360;
-        if (against(t)) return false;
+        // 1.29.14: direção em graus marcada no mapa que contradiz o lado
+        // (na base: ~2/3 dos radares apontam para o trânsito que vem, o
+        // que bate com o lado; o resto contradiz) — na dúvida avisa os dois
+        // sentidos, para não perder radar de verdade.
+        final dg = r.direction;
+        final doubt = dg != null && _angleDiff(dg, t) <= 45;
+        if (!doubt && against(t)) return false;
       }
       if (curType != null) {
         if (x.isLink != curType.endsWith('_link')) return false;
