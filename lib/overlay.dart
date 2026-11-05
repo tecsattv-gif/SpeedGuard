@@ -67,6 +67,7 @@ class _OverlayBubbleState extends State<OverlayBubble> {
   bool _excPopup = false; // pop-up "VELOCIDADE EXCEDIDA" aberto
   bool _excShown = false; // já mostrou neste excesso
   bool _ringOn = false; // janela com o círculo da contagem
+  bool _only = false; // 1.29.15: janela só com o círculo (sem a bolha)
   Timer? _excTimer;
   String? _park; // distância do próximo park
   bool _ask = false;
@@ -95,6 +96,7 @@ class _OverlayBubbleState extends State<OverlayBubble> {
           _overSecs = (m['overSecs'] as num?)?.toInt();
           _park = m['park'] as String?;
           _ask = m['ask'] == true;
+          _only = m['ringOnly'] == true;
           if (m['scale'] is num) _scale = (m['scale'] as num).toDouble();
           if (m['land'] is bool) _land = m['land'] as bool;
           if (m['palette'] is String) {
@@ -102,6 +104,7 @@ class _OverlayBubbleState extends State<OverlayBubble> {
           }
           _gotConfig = true;
         });
+        if (_only) return; // só o círculo: janela fixa, sem pop-up
         // Círculo da contagem: aumenta/diminui a janela quando começa/acaba.
         final ring = _overSecs != null;
         if (ring != _ringOn) {
@@ -147,6 +150,7 @@ class _OverlayBubbleState extends State<OverlayBubble> {
 
   /// Tamanho da janela: o painel e, durante a contagem, o círculo ao lado.
   Size _windowDp() {
+    if (_only) return const Size(kRingD, kRingD);
     final p = panelDp(_land, _scale);
     if (!_ringOn) return p;
     return Size(p.width + kRingGap + kRingD,
@@ -324,6 +328,19 @@ class _OverlayBubbleState extends State<OverlayBubble> {
     if (!_calibrated && _gotConfig) {
       final w = MediaQuery.sizeOf(context).width;
       WidgetsBinding.instance.addPostFrameCallback((_) => _calibrate(w));
+    }
+    // Antes do primeiro dado não sabe se é a bolha ou só o círculo.
+    if (!_gotConfig) return const SizedBox.shrink();
+    if (_only) {
+      return Material(
+        color: Colors.transparent,
+        child: Align(
+          alignment: Alignment.topLeft,
+          // Toque duplo abre o SpeedGuard.
+          child: GestureDetector(
+              onDoubleTap: _openApp, child: _ring(_overSecs ?? 0)),
+        ),
+      );
     }
     return Material(
       color: Colors.transparent,

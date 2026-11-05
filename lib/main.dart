@@ -162,6 +162,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   double _bubbleScale = 1.0; // tamanho do painel flutuante
   bool _bubbleLand = false; // formato horizontal (paisagem)
   bool _overlayShown = false;
+  // 1.29.15: janela só com o círculo da contagem (app minimizado sem bolha).
+  bool _ringPopup = false;
   bool _opening = false;
   bool _inFront = true;
   bool _bubbleNoPermission = false;
@@ -233,7 +235,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         final m = jsonDecode(event.toString()) as Map;
         if (m['answer'] is bool) _answer(m['answer'] as bool);
         // Usuário fechou o painel segurando o dedo nele.
-        if (m['closed'] == true) _overlayShown = false;
+        if (m['closed'] == true) {
+          _overlayShown = false;
+          _ringPopup = false;
+        }
         if (m['event'] is String) {
           final l = Layer.values.where((x) => x.name == m['event']);
           if (l.isNotEmpty && l.first.isEvent) {
@@ -388,9 +393,57 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     }
   }
 
+  /// Contagem dos 30 s com o app minimizado e a bolha desligada (1.29.15):
+  /// abre por cima do app da tela um pop-up só com o círculo vermelho da
+  /// contagem (igual ao da bolha) e fecha quando volta ao limite.
+  void _syncRingPopup() {
+    final want = _running &&
+        !_inFront &&
+        !_bubble &&
+        _speedWarn &&
+        _rule.mode != RadarMode.disabled &&
+        _watch.seconds != null;
+    if (want && !_overlayShown) {
+      _showRing();
+    } else if (!want && _ringPopup) {
+      _closeBubble();
+    }
+  }
+
+  Future<void> _showRing() async {
+    if (_overlayShown || _opening) return;
+    _opening = true;
+    try {
+      if (!await FlutterOverlayWindow.isPermissionGranted()) {
+        _bubbleNoPermission = true;
+        return;
+      }
+      await FlutterOverlayWindow.showOverlay(
+        height: overlayUnits(kRingD),
+        width: overlayUnits(kRingD),
+        alignment: OverlayAlignment.topCenter,
+        enableDrag: true,
+        positionGravity: PositionGravity.none,
+        overlayTitle: 'SpeedGuard',
+        overlayContent: 'Contagem dos 30 s',
+      );
+      _overlayShown = true;
+      _ringPopup = true;
+      if (_inFront) {
+        await _closeBubble();
+        return;
+      }
+      _sendBubble();
+    } catch (_) {
+    } finally {
+      _opening = false;
+    }
+  }
+
   Future<void> _closeBubble() async {
     if (!_overlayShown) return;
     _overlayShown = false;
+    _ringPopup = false;
     try {
       await FlutterOverlayWindow.closeOverlay();
     } catch (_) {}
@@ -416,6 +469,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       'scale': _bubbleScale,
       'land': _bubbleLand,
       'palette': SG.palette.value.name,
+      'ringOnly': _ringPopup,
     })).catchError((_) => false);
   }
 
@@ -1057,6 +1111,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       return;
     }
     final ev = _watch.update(speed: speed, limit: _watchLimit);
+    _syncRingPopup();
     String? say = ev?.text;
     var beep = ev == null
         ? 0
