@@ -2544,7 +2544,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                         // Placa com o limite da via (caminhão: no máximo o
                         // do limitador) em cima da velocidade.
                         if (roadSign != null) ...[
-                          SpeedSign(label: '$roadSign', size: 40),
+                          // 1.29.21: maior; caminhão com a placa do
+                          // caminhão embaixo.
+                          SpeedSign(
+                              label: '$roadSign', size: 56, truck: _isTruck),
                           const SizedBox(height: 4),
                         ],
                         _SpeedBox(

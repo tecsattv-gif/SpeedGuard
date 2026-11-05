@@ -132,13 +132,45 @@ class SpeedSign extends StatelessWidget {
   final String label;
   final VoidCallback? onTap;
   final double size;
-  const SpeedSign({super.key, required this.label, this.onTap, this.size = 56});
+  /// Placa complementar com o caminhão embaixo (limite para caminhões).
+  final bool truck;
+  const SpeedSign(
+      {super.key,
+      required this.label,
+      this.onTap,
+      this.size = 56,
+      this.truck = false});
 
   @override
   Widget build(BuildContext context) {
+    final sign = _circle();
+    if (!truck) return GestureDetector(onTap: onTap, child: sign);
+    // 1.29.21: placa de caminhão embaixo, como nas estradas da Europa.
     return GestureDetector(
       onTap: onTap,
-      child: Container(
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        sign,
+        Transform.translate(
+          offset: Offset(0, -size * 0.08),
+          child: Container(
+            width: size * 0.92,
+            height: size * 0.42,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(size * 0.1),
+              border: Border.all(color: Colors.black, width: size * 0.035),
+            ),
+            alignment: Alignment.center,
+            child: Icon(Icons.local_shipping,
+                color: Colors.black, size: size * 0.34),
+          ),
+        ),
+      ]),
+    );
+  }
+
+  Widget _circle() {
+    return Container(
         width: size,
         height: size,
         decoration: BoxDecoration(
@@ -152,7 +184,6 @@ class SpeedSign extends StatelessWidget {
                 fontSize: size * 0.34,
                 fontWeight: FontWeight.w900,
                 color: Colors.black)),
-      ),
     );
   }
 }
