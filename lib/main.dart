@@ -288,9 +288,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       try {
         final m = jsonDecode(event.toString()) as Map;
         if (m['answer'] is bool) _answer(m['answer'] as bool);
-        if (m['ack'] != null) {
-          _plog('janela respondeu: ${m['ack']} (largura ${m['w']} dp)');
-        }
+
         // Usuário fechou o painel segurando o dedo nele.
         if (m['closed'] == true) {
           _overlayShown = false;
@@ -2334,9 +2332,14 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 onTap: () async {
                   final p = await SharedPreferences.getInstance();
                   final err = _lastError ?? p.getString('last_error');
-                  final log = _popLog.isNotEmpty
-                      ? _popLog
-                      : (p.getStringList('popup_log') ?? const <String>[]);
+                  await p.reload();
+                  final log = [
+                    ...(_popLog.isNotEmpty
+                        ? _popLog
+                        : (p.getStringList('popup_log') ?? const <String>[])),
+                    // O que a própria janela registrou (1.29.23).
+                    ...(p.getStringList('overlay_log') ?? const <String>[]),
+                  ]..sort();
                   if (!ctx.mounted) return;
                   showDialog(
                     context: ctx,

@@ -6,6 +6,7 @@ import 'package:android_intent_plus/flag.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_overlay_window/flutter_overlay_window.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'alert_view.dart';
 import 'layers.dart';
@@ -84,10 +85,16 @@ class _OverlayBubbleState extends State<OverlayBubble> {
   @override
   void initState() {
     super.initState();
+    _olog('janela: iniciou');
     _sub = FlutterOverlayWindow.overlayListener.listen((event) {
       try {
         final m = jsonDecode(event.toString()) as Map;
         if (!mounted) return;
+        // 1.29.23: o plugin devolve para a própria janela o que ela envia
+        // ao app (resposta, reporte, aviso...). Isso não é atualização do
+        // app: sem "speed", ignora — antes zerava a contagem e o modo "só o
+        // círculo" e o círculo sumia.
+        if (!m.containsKey('speed')) return;
         setState(() {
           _speed = (m['speed'] as num?)?.toInt() ?? 0;
           _dist = (m['dist'] as num?)?.toDouble();
@@ -116,11 +123,11 @@ class _OverlayBubbleState extends State<OverlayBubble> {
           _lastMsg = now;
           if (ring != _ringOn || gap) {
             setState(() => _ringOn = ring);
-            // 1.29.20: avisa o app (registro do Diagnóstico).
-            FlutterOverlayWindow.shareData(jsonEncode({
-              'ack': ring ? 'círculo na tela ($_overSecs s)' : 'em espera',
-              'w': _windowWidthDp().round(),
-            })).catchError((_) => false);
+            // Registro do Diagnóstico (gravado pela janela).
+            _olog(ring
+                ? 'janela: contagem ${_overSecs}s, círculo na tela '
+                    '(${_windowWidthDp().round()} dp)'
+                : 'janela: em espera (${_windowWidthDp().round()} dp)');
           }
           return;
         }
@@ -139,6 +146,20 @@ class _OverlayBubbleState extends State<OverlayBubble> {
         }
       } catch (_) {}
     });
+  }
+
+  /// Registro da janela (1.29.23), lido em Configurações → Diagnóstico.
+  static Future<void> _olog(String s) async {
+    try {
+      final p = await SharedPreferences.getInstance();
+      await p.reload();
+      final l = p.getStringList('overlay_log') ?? <String>[];
+      l.add('${DateTime.now().toIso8601String().substring(11, 19)} $s');
+      while (l.length > 15) {
+        l.removeAt(0);
+      }
+      await p.setStringList('overlay_log', l);
+    } catch (_) {}
   }
 
   @override
