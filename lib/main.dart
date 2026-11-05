@@ -193,9 +193,23 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   /// Testar pop-up: conta de 0 a 35 s; o usuário minimiza o app e vê o
   /// círculo por cima do outro app.
+  /// 1.29.22: o toque só "arma" o teste; a contagem começa quando o app é
+  /// minimizado (antes começava no toque e, se demorasse mais de 35 s para
+  /// minimizar, o teste já tinha acabado).
+  DateTime? _testArmed;
   void _testRing() {
     _testTimer?.cancel();
+    _testSecs = null;
+    _testArmed = DateTime.now();
+    _plog('teste armado');
+    _snack('Teste pronto: agora minimize o SpeedGuard e abra outro app (ex.: YouTube).');
+  }
+
+  void _startTestCount() {
+    _testArmed = null;
+    _testTimer?.cancel();
     _testSecs = 0;
+    _plog('teste: contagem começou');
     _testTimer = Timer.periodic(const Duration(seconds: 1), (t) {
       final s = (_testSecs ?? 0) + 1;
       _testSecs = s > 35 ? null : s;
@@ -203,7 +217,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       _syncRingPopup();
       _sendBubble();
     });
-    _snack('Teste: minimize o SpeedGuard agora e abra outro app (ex.: YouTube).');
   }
   bool _opening = false;
   bool _inFront = true;
@@ -397,6 +410,14 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         state == AppLifecycleState.hidden ||
         state == AppLifecycleState.paused) {
       _inFront = false;
+      final armed = _testArmed;
+      if (armed != null) {
+        if (DateTime.now().difference(armed).inMinutes < 3) {
+          _startTestCount();
+        } else {
+          _testArmed = null;
+        }
+      }
       if (_running && _bubble) _showBubble();
       // 1.29.16: sem a bolha, abre já agora (app ainda visível) a janela do
       // círculo da contagem, minúscula e invisível; ela cresce quando a
@@ -451,7 +472,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   /// Contagem dos 30 s com o app minimizado e a bolha desligada (1.29.15):
   /// abre por cima do app da tela um pop-up só com o círculo vermelho da
   /// contagem (igual ao da bolha) e fecha quando volta ao limite.
-  /// Bipe quando o pop-up da contagem entra na tela (1.29.18).
+  /// Bipe quando o pop-up da contagem entra na tela (1.29.18; desde a
+  /// 1.29.22 o mesmo bipe do 1º aviso de radar).
   bool _ringBeeped = false;
   void _ringBeep() {
     final counting = !_inFront && !_bubble && _countSecs != null;
@@ -460,7 +482,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       if (_voice && _speedSound != 'mute') {
         _player
             .stop()
-            .then((_) => _player.play(AssetSource('sounds/popup.wav'),
+            .then((_) => _player.play(AssetSource('sounds/step1.wav'),
                 volume: _volume))
             .catchError((_) {});
       }
