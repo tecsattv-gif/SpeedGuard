@@ -2613,13 +2613,16 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                           ),
                         // Contagem dos 30 s acima do limite.
                         if (overSecs != null)
+                          // 1.29.27: contagem e aviso bem maiores.
                           Container(
-                            margin: const EdgeInsets.only(top: 4),
+                            margin: const EdgeInsets.only(top: 6),
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 2),
+                                horizontal: 12, vertical: 6),
                             decoration: BoxDecoration(
                                 color: SG.red,
-                                borderRadius: BorderRadius.circular(10)),
+                                borderRadius: BorderRadius.circular(16),
+                                border:
+                                    Border.all(color: Colors.white, width: 2)),
                             child: Text(
                                 overSecs >= 30
                                     ? 'VELOCIDADE\nEXCEDIDA'
@@ -2627,9 +2630,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
                                     color: Colors.white,
-                                    fontSize: overSecs >= 30 ? 11 : 14,
-                                    height: 1.1,
-                                    fontWeight: FontWeight.bold)),
+                                    fontSize: overSecs >= 30 ? 22 : 44,
+                                    height: 1.05,
+                                    fontWeight: FontWeight.w900)),
                           ),
                       ]),
                       const SizedBox(width: 10),
