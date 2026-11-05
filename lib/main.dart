@@ -250,9 +250,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       } catch (_) {}
     });
     _init();
-    // Nova versão no GitHub? Pergunta (só com o monitoramento parado).
-    Future.delayed(const Duration(seconds: 5), () {
-      if (mounted && !_running) UpdateService.autoCheck(context);
+    // Nova versão no GitHub? Pergunta sempre que o app abre (1.29.13).
+    Future.delayed(const Duration(seconds: 3), () {
+      if (mounted) UpdateService.autoCheck(context);
     });
   }
 
@@ -349,6 +349,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       _inFront = true;
       _closeBubble();
       _presenceTick();
+      if (mounted) UpdateService.autoCheck(context, resumed: true);
       if (_bubbleNoPermission) {
         _bubbleNoPermission = false;
         _snack('Painel flutuante sem permissão: ative "Sobrepor a outros apps" para o SpeedGuard.');

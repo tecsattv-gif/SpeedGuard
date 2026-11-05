@@ -6,7 +6,6 @@ import 'package:http/http.dart' as http;
 import 'package:open_filex/open_filex.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import 'theme.dart';
 
@@ -28,8 +27,11 @@ class UpdateService {
   static const _api =
       'https://api.github.com/repos/tecsattv-gif/SpeedGuard/releases/latest';
 
-  /// Intervalo mínimo entre as verificações automáticas.
-  static const checkEvery = Duration(hours: 6);
+  /// Ao voltar para o app (já aberto), procura de novo no máximo a cada
+  /// 30 min — para não perguntar a cada troca com o Google Maps/Waze.
+  static const resumeEvery = Duration(minutes: 30);
+  static DateTime? _lastCheck;
+  static bool _asking = false;
 
   /// Versão instalada (ex.: "1.27.0").
   static Future<String> installed() async =>
@@ -73,26 +75,33 @@ class UpdateService {
         (apk['size'] as num?)?.toInt() ?? 0);
   }
 
-  /// Verificação automática (na abertura do app, no máximo a cada 6 h).
-  /// Pergunta só uma vez por versão; "Agora não" espera a próxima.
-  static Future<void> autoCheck(BuildContext context) async {
-    final p = await SharedPreferences.getInstance();
-    final last = p.getInt('update_check') ?? 0;
-    if (DateTime.now().millisecondsSinceEpoch - last <
-        checkEvery.inMilliseconds) {
+  /// Verificação automática (1.29.13): toda vez que o app é aberto, se
+  /// houver versão nova aparece a mensagem com o botão **Atualizar** (como
+  /// nos outros apps). "Agora não" só adia: na próxima abertura pergunta de
+  /// novo. [resumed] = voltou para o app que já estava aberto.
+  static Future<void> autoCheck(BuildContext context,
+      {bool resumed = false}) async {
+    if (_asking) return;
+    final now = DateTime.now();
+    if (resumed &&
+        _lastCheck != null &&
+        now.difference(_lastCheck!) < resumeEvery) {
       return;
     }
-    await p.setInt('update_check', DateTime.now().millisecondsSinceEpoch);
+    _lastCheck = now;
     UpdateInfo? info;
     try {
       info = await check();
     } catch (_) {
       return;
     }
-    if (info == null || !context.mounted) return;
-    if (p.getString('update_skipped') == info.version) return;
-    final ok = await ask(context, info);
-    if (ok != true) await p.setString('update_skipped', info.version);
+    if (info == null || !context.mounted || _asking) return;
+    _asking = true;
+    try {
+      await ask(context, info);
+    } finally {
+      _asking = false;
+    }
   }
 
   /// Botão "Procurar atualização" em Configurações.
