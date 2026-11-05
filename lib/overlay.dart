@@ -68,6 +68,7 @@ class _OverlayBubbleState extends State<OverlayBubble> {
   bool _excShown = false; // já mostrou neste excesso
   bool _ringOn = false; // janela com o círculo da contagem
   bool _only = false; // 1.29.15: janela só com o círculo (sem a bolha)
+  DateTime? _lastMsg;
   Timer? _excTimer;
   String? _park; // distância do próximo park
   bool _ask = false;
@@ -109,7 +110,18 @@ class _OverlayBubbleState extends State<OverlayBubble> {
         if (_only) {
           // Só o círculo (1.29.17): janela fixa do tamanho do círculo,
           // transparente e sem toque; o círculo só é desenhado na contagem.
-          if (ring != _ringOn) setState(() => _ringOn = ring);
+          final now = DateTime.now();
+          final gap = _lastMsg == null ||
+              now.difference(_lastMsg!) > const Duration(seconds: 3);
+          _lastMsg = now;
+          if (ring != _ringOn || gap) {
+            setState(() => _ringOn = ring);
+            // 1.29.20: avisa o app (registro do Diagnóstico).
+            FlutterOverlayWindow.shareData(jsonEncode({
+              'ack': ring ? 'círculo na tela ($_overSecs s)' : 'em espera',
+              'w': _windowWidthDp().round(),
+            })).catchError((_) => false);
+          }
           return;
         }
         if (ring != _ringOn) {

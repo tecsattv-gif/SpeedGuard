@@ -175,6 +175,18 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   int? _testSecs;
   Timer? _testTimer;
 
+  /// Registro do pop-up da contagem (1.29.20), em Configurações →
+  /// Diagnóstico: mostra cada passo para achar por que não aparece.
+  final List<String> _popLog = [];
+  void _plog(String s) {
+    final t = DateTime.now().toIso8601String().substring(11, 19);
+    _popLog.add('$t $s');
+    if (_popLog.length > 40) _popLog.removeAt(0);
+    SharedPreferences.getInstance()
+        .then((p) => p.setStringList('popup_log', _popLog))
+        .catchError((_) => false);
+  }
+
   /// Segundos da contagem (a de verdade ou a do teste).
   int? get _countSecs =>
       _testSecs ?? (_running && _speedWarn ? _watch.seconds : null);
@@ -263,6 +275,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       try {
         final m = jsonDecode(event.toString()) as Map;
         if (m['answer'] is bool) _answer(m['answer'] as bool);
+        if (m['ack'] != null) {
+          _plog('janela respondeu: ${m['ack']} (largura ${m['w']} dp)');
+        }
         // Usuário fechou o painel segurando o dedo nele.
         if (m['closed'] == true) {
           _overlayShown = false;
@@ -374,6 +389,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     // O painel é aberto já em "inactive", enquanto o app ainda está visível:
     // no Android 15+ o serviço da janela flutuante é bloqueado se for iniciado
     // com o app já em segundo plano (paused).
+    _plog('app ${state.name} (monit. ${_running ? 'on' : 'off'}, bolha '
+        '${_bubble ? 'on' : 'off'}, teste ${_testSecs ?? '-'}, '
+        'janela ${_overlayShown ? 'aberta' : 'fechada'}'
+        '${_opening ? ', abrindo' : ''})');
     if (state == AppLifecycleState.inactive ||
         state == AppLifecycleState.hidden ||
         state == AppLifecycleState.paused) {
@@ -465,10 +484,15 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   }
 
   Future<void> _showRing() async {
-    if (_overlayShown || _opening) return;
+    if (_overlayShown || _opening) {
+      _plog('abrir círculo: ignorado (${_overlayShown ? 'já aberta' : 'abrindo'})');
+      return;
+    }
     _opening = true;
+    _plog('abrir círculo: pedindo');
     try {
       if (!await FlutterOverlayWindow.isPermissionGranted()) {
+        _plog('abrir círculo: SEM PERMISSÃO');
         _bubbleNoPermission = true;
         _logError('pop-up da contagem', 'sem permissão Sobrepor a outros apps',
             StackTrace.current);
@@ -489,12 +513,22 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       );
       _overlayShown = true;
       _ringPopup = true;
+      _plog('abrir círculo: Android aceitou');
+      Future.delayed(const Duration(milliseconds: 1500), () async {
+        try {
+          _plog('janela ativa: ${await FlutterOverlayWindow.isActive()}');
+        } catch (e) {
+          _plog('janela ativa: erro $e');
+        }
+      });
       if (_inFront) {
+        _plog('abrir círculo: app voltou, fechando');
         await _closeBubble();
         return;
       }
       _sendBubble();
     } catch (e, st) {
+      _plog('abrir círculo: ERRO $e');
       _logError('pop-up da contagem', e, st);
     } finally {
       _opening = false;
@@ -503,6 +537,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   Future<void> _closeBubble() async {
     if (!_overlayShown) return;
+    if (_ringPopup) _plog('fechar círculo');
     _overlayShown = false;
     _ringPopup = false;
     try {
@@ -2277,13 +2312,20 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 onTap: () async {
                   final p = await SharedPreferences.getInstance();
                   final err = _lastError ?? p.getString('last_error');
+                  final log = _popLog.isNotEmpty
+                      ? _popLog
+                      : (p.getStringList('popup_log') ?? const <String>[]);
                   if (!ctx.mounted) return;
                   showDialog(
                     context: ctx,
                     builder: (d) => AlertDialog(
                       title: const Text('Último erro'),
                       content: SingleChildScrollView(
-                          child: SelectableText(err ?? 'Nenhum erro registrado.')),
+                          child: SelectableText(
+                              '${err ?? 'Nenhum erro registrado.'}\n\n'
+                              'Pop-up da contagem:\n'
+                              '${log.isEmpty ? '(vazio)' : log.reversed.take(25).join('\n')}',
+                              style: const TextStyle(fontSize: 12))),
                       actions: [
                         if (err != null)
                           TextButton(
