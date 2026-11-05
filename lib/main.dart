@@ -164,6 +164,28 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   bool _overlayShown = false;
   // 1.29.15: janela só com o círculo da contagem (app minimizado sem bolha).
   bool _ringPopup = false;
+  // 1.29.17: teste do pop-up (contagem de mentira, sem precisar correr).
+  int? _testSecs;
+  Timer? _testTimer;
+
+  /// Segundos da contagem (a de verdade ou a do teste).
+  int? get _countSecs =>
+      _testSecs ?? (_running && _speedWarn ? _watch.seconds : null);
+
+  /// Testar pop-up: conta de 0 a 35 s; o usuário minimiza o app e vê o
+  /// círculo por cima do outro app.
+  void _testRing() {
+    _testTimer?.cancel();
+    _testSecs = 0;
+    _testTimer = Timer.periodic(const Duration(seconds: 1), (t) {
+      final s = (_testSecs ?? 0) + 1;
+      _testSecs = s > 35 ? null : s;
+      if (_testSecs == null) t.cancel();
+      _syncRingPopup();
+      _sendBubble();
+    });
+    _snack('Teste: minimize o SpeedGuard agora e abra outro app (ex.: YouTube).');
+  }
   bool _opening = false;
   bool _inFront = true;
   bool _bubbleNoPermission = false;
@@ -354,7 +376,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       // círculo da contagem, minúscula e invisível; ela cresce quando a
       // contagem começa. Aberta depois, com o app em segundo plano, o
       // Android 15 bloqueava e o pop-up não aparecia.
-      if (_running && !_bubble && _speedWarn) _showRing();
+      if (!_bubble && ((_running && _speedWarn) || _testSecs != null)) {
+        _showRing();
+      }
     } else if (state == AppLifecycleState.resumed) {
       _inFront = true;
       _closeBubble();
@@ -402,12 +426,13 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   /// abre por cima do app da tela um pop-up só com o círculo vermelho da
   /// contagem (igual ao da bolha) e fecha quando volta ao limite.
   void _syncRingPopup() {
-    final want = _running &&
-        !_inFront &&
+    final want = !_inFront &&
         !_bubble &&
-        _speedWarn &&
-        _rule.mode != RadarMode.disabled &&
-        _watch.seconds != null;
+        (_testSecs != null ||
+            (_running &&
+                _speedWarn &&
+                _rule.mode != RadarMode.disabled &&
+                _watch.seconds != null));
     // A janela fica aberta (minúscula) enquanto o app está minimizado;
     // aqui só tenta abrir se ainda não abriu (Android antigo deixa).
     if (want && !_overlayShown) _showRing();
@@ -419,14 +444,19 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     try {
       if (!await FlutterOverlayWindow.isPermissionGranted()) {
         _bubbleNoPermission = true;
+        _logError('pop-up da contagem', 'sem permissão Sobrepor a outros apps',
+            StackTrace.current);
         return;
       }
-      final secs = _watch.seconds != null;
+      // 1.29.17: janela já do tamanho do círculo, transparente e que deixa
+      // os toques passarem (clickThrough) — sem mudar de tamanho (na 1.29.16
+      // a janela minúscula não crescia e o círculo não aparecia).
       await FlutterOverlayWindow.showOverlay(
-        height: overlayUnits(secs ? kRingD : 1),
-        width: overlayUnits(secs ? kRingD : 1),
+        height: overlayUnits(kRingD),
+        width: overlayUnits(kRingD),
         alignment: OverlayAlignment.topCenter,
-        enableDrag: true,
+        flag: OverlayFlag.clickThrough,
+        enableDrag: false,
         positionGravity: PositionGravity.none,
         overlayTitle: 'SpeedGuard',
         overlayContent: 'Contagem dos 30 s',
@@ -438,7 +468,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         return;
       }
       _sendBubble();
-    } catch (_) {
+    } catch (e, st) {
+      _logError('pop-up da contagem', e, st);
     } finally {
       _opening = false;
     }
@@ -464,7 +495,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       'limit': show ? a.radar!.maxSpeed : null,
       'over': a.overLimit || _watch.seconds != null,
       // Segundos acima do limite (contagem dos 30 s e pop-up na bolha).
-      'overSecs': _running && _speedWarn ? _watch.seconds : null,
+      'overSecs': _countSecs,
       'road': _running && _speedWarn ? _shownLimit : null,
       'park': _running && _showParks && _parksAhead.isNotEmpty
           ? _km(_parksAhead.first.distance)
@@ -1988,6 +2019,24 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   setSheet(() => _bubble = v);
                 },
               ),
+              if (!_bubble)
+                ListTile(
+                  leading: Icon(Icons.timer_outlined, color: SG.red),
+                  title: const Text('Testar pop-up da contagem'),
+                  subtitle: const Text(
+                      'Conta 35 s de mentira: toque, minimize o app e abra '
+                      'outro (ex.: YouTube) — o círculo vermelho tem de '
+                      'aparecer por cima'),
+                  onTap: () async {
+                    if (!await FlutterOverlayWindow.isPermissionGranted()) {
+                      final ok = await FlutterOverlayWindow.requestPermission();
+                      if (ok != true) return;
+                    }
+                    if (!mounted) return;
+                    Navigator.pop(context);
+                    _testRing();
+                  },
+                ),
               if (_bubble) ...[
                 const Padding(
                   padding: EdgeInsets.fromLTRB(16, 4, 16, 6),

@@ -68,7 +68,6 @@ class _OverlayBubbleState extends State<OverlayBubble> {
   bool _excShown = false; // já mostrou neste excesso
   bool _ringOn = false; // janela com o círculo da contagem
   bool _only = false; // 1.29.15: janela só com o círculo (sem a bolha)
-  bool _onlySized = false;
   Timer? _excTimer;
   String? _park; // distância do próximo park
   bool _ask = false;
@@ -108,13 +107,9 @@ class _OverlayBubbleState extends State<OverlayBubble> {
         // Círculo da contagem: aumenta/diminui a janela quando começa/acaba.
         final ring = _overSecs != null;
         if (_only) {
-          // Só o círculo (1.29.16): janela minúscula e invisível até a
-          // contagem começar; aí cresce para o círculo.
-          if (ring != _ringOn || !_onlySized) {
-            _onlySized = true;
-            setState(() => _ringOn = ring);
-            _resizeToPanel();
-          }
+          // Só o círculo (1.29.17): janela fixa do tamanho do círculo,
+          // transparente e sem toque; o círculo só é desenhado na contagem.
+          if (ring != _ringOn) setState(() => _ringOn = ring);
           return;
         }
         if (ring != _ringOn) {
@@ -160,7 +155,7 @@ class _OverlayBubbleState extends State<OverlayBubble> {
 
   /// Tamanho da janela: o painel e, durante a contagem, o círculo ao lado.
   Size _windowDp() {
-    if (_only) return _ringOn ? const Size(kRingD, kRingD) : const Size(1, 1);
+    if (_only) return const Size(kRingD, kRingD);
     final p = panelDp(_land, _scale);
     if (!_ringOn) return p;
     return Size(p.width + kRingGap + kRingD,
@@ -336,7 +331,7 @@ class _OverlayBubbleState extends State<OverlayBubble> {
 
   @override
   Widget build(BuildContext context) {
-    if (!_calibrated && _gotConfig) {
+    if (!_calibrated && _gotConfig && !_only) {
       final w = MediaQuery.sizeOf(context).width;
       WidgetsBinding.instance.addPostFrameCallback((_) => _calibrate(w));
     }
@@ -350,8 +345,7 @@ class _OverlayBubbleState extends State<OverlayBubble> {
           // Toque duplo abre o SpeedGuard.
           child: _overSecs == null
               ? const SizedBox.shrink()
-              : GestureDetector(
-                  onDoubleTap: _openApp, child: _ring(_overSecs!)),
+              : _ring(_overSecs!),
         ),
       );
     }
