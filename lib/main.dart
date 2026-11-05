@@ -62,6 +62,14 @@ const List<int> kTruckLimits = [
 
 Future<void> overlayMain() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // 1.29.24: registro do Diagnóstico — a janela flutuante foi criada.
+  try {
+    final p = await SharedPreferences.getInstance();
+    final l = p.getStringList('overlay_log') ?? <String>[];
+    l.add('${DateTime.now().toIso8601String().substring(11, 19)} '
+        'janela: motor criado');
+    await p.setStringList('overlay_log', l.length > 15 ? l.sublist(l.length - 15) : l);
+  } catch (_) {}
   // Mesmas cores do app (a paleta também chega pelos dados do painel).
   try {
     final p = await SharedPreferences.getInstance();
@@ -521,13 +529,19 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       // 1.29.17: janela já do tamanho do círculo, transparente e que deixa
       // os toques passarem (clickThrough) — sem mudar de tamanho (na 1.29.16
       // a janela minúscula não crescia e o círculo não aparecia).
+      // 1.29.24: abre do mesmo jeito que a bolha (que funciona neste
+      // celular): canto de cima, toque normal; a janela é levada para o
+      // centro e a própria janela passa a deixar os toques passarem
+      // depois que recebe a contagem. Aberta direto "sem toque" e no
+      // centro, a janela não desenhava nada.
+      final w = mounted ? MediaQuery.sizeOf(context).width : 400.0;
       await FlutterOverlayWindow.showOverlay(
         height: overlayUnits(kRingD),
         width: overlayUnits(kRingD),
-        alignment: OverlayAlignment.topCenter,
-        flag: OverlayFlag.clickThrough,
-        enableDrag: false,
+        alignment: OverlayAlignment.topLeft,
+        enableDrag: true,
         positionGravity: PositionGravity.none,
+        startPosition: OverlayPosition((w - kRingD) / 2, 0),
         overlayTitle: 'SpeedGuard',
         overlayContent: 'Contagem dos 30 s',
       );

@@ -70,6 +70,7 @@ class _OverlayBubbleState extends State<OverlayBubble> {
   bool _ringOn = false; // janela com o círculo da contagem
   bool _only = false; // 1.29.15: janela só com o círculo (sem a bolha)
   DateTime? _lastMsg;
+  bool _clickThrough = false;
   Timer? _excTimer;
   String? _park; // distância do próximo park
   bool _ask = false;
@@ -121,6 +122,16 @@ class _OverlayBubbleState extends State<OverlayBubble> {
           final gap = _lastMsg == null ||
               now.difference(_lastMsg!) > const Duration(seconds: 3);
           _lastMsg = now;
+          if (gap) _clickThrough = false; // janela aberta de novo
+          if (!_clickThrough) {
+            _clickThrough = true;
+            FlutterOverlayWindow.updateFlag(OverlayFlag.clickThrough)
+                .then((v) => _olog('janela: toques passam ($v)'))
+                .catchError((e) {
+              _olog('janela: erro ao mudar toque $e');
+              return null;
+            });
+          }
           if (ring != _ringOn || gap) {
             setState(() => _ringOn = ring);
             // Registro do Diagnóstico (gravado pela janela).
