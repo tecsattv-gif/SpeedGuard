@@ -489,11 +489,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     if (counting && !_ringBeeped) {
       _ringBeeped = true;
       if (_voice && _speedSound != 'mute') {
-        _player
-            .stop()
-            .then((_) => _player.play(AssetSource('sounds/step1.wav'),
-                volume: _volume))
-            .catchError((_) {});
+        // 1.29.26: o bipe de "acima do limite" do próprio app.
+        _beep(AlertEngine.overBeep);
       }
     } else if (_countSecs == null) {
       _ringBeeped = false;
@@ -539,12 +536,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       // centro, a janela não desenhava nada.
       final w = mounted ? MediaQuery.sizeOf(context).width : 400.0;
       await FlutterOverlayWindow.showOverlay(
-        height: overlayUnits(kRingD),
-        width: overlayUnits(kRingD),
+        height: overlayUnits(kPopRingD),
+        width: overlayUnits(kPopRingD),
         alignment: OverlayAlignment.topLeft,
         enableDrag: true,
         positionGravity: PositionGravity.none,
-        startPosition: OverlayPosition((w - kRingD) / 2, 0),
+        startPosition: OverlayPosition((w - kPopRingD) / 2, 0),
         overlayTitle: 'SpeedGuard',
         overlayContent: 'Contagem dos 30 s',
       );

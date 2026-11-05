@@ -26,6 +26,9 @@ const int kExcH = 120;
 /// Círculo da contagem dos 30 s ao lado do painel (1.29.4): ~2 cm.
 const double kRingD = 120, kRingGap = 6;
 
+/// Pop-up só com o círculo (bolha desligada): 50% maior (1.29.26).
+const double kPopRingD = 180;
+
 /// Tamanhos que o usuário escolhe em Configurações.
 const Map<String, double> kPanelScales = {
   'Pequeno': 0.8,
@@ -199,7 +202,7 @@ class _OverlayBubbleState extends State<OverlayBubble> {
 
   /// Tamanho da janela: o painel e, durante a contagem, o círculo ao lado.
   Size _windowDp() {
-    if (_only) return const Size(kRingD, kRingD);
+    if (_only) return const Size(kPopRingD, kPopRingD);
     final p = panelDp(_land, _scale);
     if (!_ringOn) return p;
     return Size(p.width + kRingGap + kRingD,
@@ -389,7 +392,7 @@ class _OverlayBubbleState extends State<OverlayBubble> {
           // Toque duplo abre o SpeedGuard.
           child: _overSecs == null
               ? const SizedBox.shrink()
-              : _ring(_overSecs!),
+              : _ring(_overSecs!, kPopRingD),
         ),
       );
     }
@@ -439,12 +442,13 @@ class _OverlayBubbleState extends State<OverlayBubble> {
   /// Círculo vermelho da contagem (fundo escuro desde a 1.29.5): o anel vai
   /// esvaziando e o número mostra os segundos que faltam; depois dos 30 s
   /// mostra "EXCEDIDA" até voltar ao limite.
-  Widget _ring(int secs) {
+  Widget _ring(int secs, [double d = kRingD]) {
     final left = (30 - secs).clamp(0, 30);
+    final k = d / kRingD; // escala (pop-up sem a bolha: 1,5×)
     const shadow = [Shadow(color: Colors.black, blurRadius: 4)];
     return SizedBox(
-      width: kRingD,
-      height: kRingD,
+      width: d,
+      height: d,
       child: Stack(alignment: Alignment.center, children: [
         // 1.29.5: fundo escuro sólido, para o texto do app de baixo
         // (ex.: "WhatsApp") não aparecer atrás do número.
@@ -454,23 +458,23 @@ class _OverlayBubbleState extends State<OverlayBubble> {
         SizedBox.expand(
           child: CircularProgressIndicator(
             value: left / 30,
-            strokeWidth: 8,
+            strokeWidth: 8 * k,
             color: SG.red,
             backgroundColor: SG.red.withValues(alpha: 0.25),
           ),
         ),
         left > 0
             ? Text('$left',
-                style: const TextStyle(
+                style: TextStyle(
                     color: SG.red,
-                    fontSize: 54,
+                    fontSize: 54 * k,
                     height: 1,
                     fontWeight: FontWeight.w900,
                     shadows: shadow))
-            : const Text('EXCEDIDA',
+            : Text('EXCEDIDA',
                 style: TextStyle(
                     color: SG.red,
-                    fontSize: 17,
+                    fontSize: 17 * k,
                     fontWeight: FontWeight.w900,
                     shadows: shadow)),
       ]),
