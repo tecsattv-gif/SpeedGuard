@@ -1,5 +1,7 @@
 """Descobre em que via fica cada radar e cada park (1.29.0).
 
+1.29.11: grava também de que lado da via fica o ponto ("s").
+
 Para cada radar (até 50 m) e cada park (até 300 m, só vias principais),
 grava as vias mais perto: tipo (highway), número (ref), nome, se é de
 mão única (e em que sentido) e o rumo do trecho. O app usa isso para
@@ -93,7 +95,7 @@ class Roads(osmium.SimpleHandler):
                 continue
             kx = 111320 * math.cos(math.radians(plat))
             ky = 110540.0
-            best, bear = 1e18, 0.0
+            best, bear, cross = 1e18, 0.0, 0.0
             for i in range(len(coords) - 1):
                 ax = (coords[i][1] - plon) * kx
                 ay = (coords[i][0] - plat) * ky
@@ -107,12 +109,18 @@ class Roads(osmium.SimpleHandler):
                 if d < best:
                     best = d
                     bear = (math.degrees(math.atan2(dx, dy)) + 360) % 360
+                    # > 0: o ponto fica à esquerda do sentido dos pontos.
+                    cross = dy * ax - dx * ay
             if best > r:
                 continue
             if tags is None:
                 tags = {"h": hw, "r": t.get("ref", "") or t.get("int_ref", ""),
                         "n": t.get("name", ""), "o": oneway(t, hw)}
             rec = dict(tags, d=round(best, 1), b=round(bear))
+            # 1.29.11: de que lado da via fica o ponto (1 = direita, -1 =
+            # esquerda do sentido dos pontos; sem "s" = em cima da via).
+            if best >= 2.5:
+                rec["s"] = -1 if cross > 0 else 1
             self.pts.best.setdefault(k, {})[w.id] = rec
 
 

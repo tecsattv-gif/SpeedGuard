@@ -88,6 +88,10 @@ class AlertEngine {
         if (r.direction != null) {
           final diff = _angleDiff(pos.heading, r.direction!);
           if (diff > 70 && diff < 110) continue;
+          // Reportado por motorista (radar móvel, polícia, fila...): a
+          // direção é o sentido em que ele andava. Outro sentido = pista do
+          // outro lado (1.29.11).
+          if (!r.id.startsWith('osm_') && diff >= 110) continue;
         }
         // Só os radares da via e do sentido onde o veículo está (1.28.0).
         // Colado no radar (< 20 m) não filtra, por causa do erro do GPS.

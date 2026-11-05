@@ -55,6 +55,19 @@ class RoadLimitService {
 
   List<_Way> _ways = [];
   double? _lat, _lon;
+  // Última via conhecida do veículo (1.29.11): se o Overpass falhar, vale
+  // por mais 800 m — antes, sem a via atual, quase nada era filtrado.
+  Set<String> _lastIds = const {};
+  String? _lastType;
+  double? _lastAtLat, _lastAtLon, _posLat, _posLon;
+
+  /// Países de mão inglesa (dirige-se pela esquerda).
+  static const leftHand = {
+    'gb', 'uk', 'ie', 'im', 'je', 'gg', 'cy', 'mt', 'jm', 'bs', 'bb', 'tt',
+    'gy', 'sr', 'ag', 'dm', 'gd', 'kn', 'lc', 'vc', 'fk', 'vg', 'vi', 'ky',
+    'ai', 'ms', 'tc', 'bm',
+  };
+  bool _left = false;
   DateTime? _lastFail;
   bool _busy = false;
   _Way? _current;
@@ -63,7 +76,7 @@ class RoadLimitService {
   Future<void> update(double lat, double lon) async {
     if (_busy) return;
     if (_lastFail != null &&
-        DateTime.now().difference(_lastFail!) < const Duration(seconds: 60)) {
+        DateTime.now().difference(_lastFail!) < const Duration(seconds: 20)) {
       return;
     }
     if (_lat != null &&
@@ -282,27 +295,47 @@ class RoadLimitService {
   ///   de bairro.
   /// Radar sem via na base (reportado, Overpass): usa [onCurrentRoad].
   bool? radarOnMyRoad(Radar r, double heading, double bearing, double kmh) {
+    bool against(double t) =>
+        _angleDiff(t, heading) > 100 && _angleDiff(t, bearing) > 100;
+    // Sentido exato do radar (relação de fiscalização / forward-backward).
+    if (r.travel != null && !r.both && against(r.travel!)) return false;
     if (r.roads.isEmpty) return onCurrentRoad(r.id, r.lat, r.lon, heading);
-    final cur = _current;
-    final mine = cur?.ids ?? const <String>{};
+    // Via do veículo: a atual ou, sem ela, a última conhecida (até 800 m).
+    var curType = _current?.type;
+    var mine = _current?.ids ?? const <String>{};
+    if (_current == null &&
+        _lastType != null &&
+        _posLat != null &&
+        Geolocator.distanceBetween(
+                _posLat!, _posLon!, _lastAtLat!, _lastAtLon!) <
+            800) {
+      curType = _lastType;
+      mine = _lastIds;
+    }
     final near = r.roads.first.d;
     bool ok(RoadRef x) {
       final dir = x.dir;
       if (dir != null) {
         // Mão única: o trânsito tem de ir no meu sentido.
-        if (_angleDiff(dir, heading) > 100 && _angleDiff(dir, bearing) > 100) {
-          return false;
-        }
+        if (against(dir)) return false;
       } else if (_axisDiff(x.b, heading) > 55 && _axisDiff(x.b, bearing) > 55) {
         return false; // rua que cruza
+      } else if (r.travel == null && !r.both && x.s != 0 && x.d >= 3 &&
+          x.d <= 25) {
+        // Mão dupla (1.29.11): o radar ao lado da via fiscaliza a pista do
+        // lado dele — à direita do sentido do trânsito (à esquerda nos
+        // países de mão inglesa). Do outro lado = pista contrária.
+        final right = x.s == 1;
+        final t = right != _left ? x.b : (x.b + 180) % 360;
+        if (against(t)) return false;
       }
-      if (cur != null) {
-        if (x.isLink != cur.type.endsWith('_link')) return false;
+      if (curType != null) {
+        if (x.isLink != curType.endsWith('_link')) return false;
         if (mine.isNotEmpty) {
           final ids = x.ids;
           if (ids.isNotEmpty && ids.intersection(mine).isEmpty) return false;
-          if (ids.isEmpty && x.hw != cur.type) return false;
-        } else if (x.hw != cur.type) {
+          if (ids.isEmpty && x.hw != curType) return false;
+        } else if (x.hw != curType) {
           return false;
         }
       } else if (kmh > 70 && _minor.contains(x.hw)) {
@@ -323,7 +356,13 @@ class RoadLimitService {
   /// [heading] < 0 quando o GPS não sabe a direção.
   int? limitAt(double lat, double lon, double heading,
       {required bool truck, String? country}) {
-    if (_ways.isEmpty) return null;
+    _posLat = lat;
+    _posLon = lon;
+    _left = leftHand.contains(country?.toLowerCase());
+    if (_ways.isEmpty) {
+      _current = null;
+      return null;
+    }
     _Way? best;
     var bestScore = double.infinity;
     for (final w in _ways) {
@@ -346,6 +385,10 @@ class RoadLimitService {
     }
     _current = best;
     if (best == null) return null;
+    _lastIds = best.ids;
+    _lastType = best.type;
+    _lastAtLat = lat;
+    _lastAtLon = lon;
     return _limit(best, truck, country);
   }
 

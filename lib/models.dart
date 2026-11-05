@@ -7,7 +7,11 @@ class RoadRef {
   final String name;
   final int ow; // 1 = mão única no sentido dos pontos, -1 = ao contrário, 0 = dupla
   final double b; // rumo do trecho (sentido dos pontos)
-  const RoadRef(this.d, this.hw, this.ref, this.name, this.ow, this.b);
+  /// Lado da via em que o ponto fica (1.29.11): 1 = à direita do sentido dos
+  /// pontos, -1 = à esquerda, 0 = em cima da via / não se sabe.
+  final int s;
+  const RoadRef(this.d, this.hw, this.ref, this.name, this.ow, this.b,
+      [this.s = 0]);
 
   static List<RoadRef> list(dynamic raw) {
     if (raw is! List) return const [];
@@ -21,13 +25,14 @@ class RoadRef {
         e['n']?.toString() ?? '',
         (e['o'] as num?)?.toInt() ?? 0,
         (e['b'] as num?)?.toDouble() ?? 0,
+        (e['s'] as num?)?.toInt() ?? 0,
       ));
     }
     return out;
   }
 
   Map<String, dynamic> toJson() =>
-      {'d': d, 'h': hw, 'r': ref, 'n': name, 'o': ow, 'b': b};
+      {'d': d, 'h': hw, 'r': ref, 'n': name, 'o': ow, 'b': b, if (s != 0) 's': s};
 
   bool get isLink => hw.endsWith('_link');
 
@@ -60,6 +65,11 @@ class Radar {
   final List<RoadRef> roads;
   /// Velocidade média: 'start' (início do trecho), 'end' (fim) ou null.
   final String? section;
+  /// Sentido do trânsito que o radar fiscaliza (graus), quando a base sabe
+  /// com certeza (relação de fiscalização ou direction=forward/backward).
+  final double? travel;
+  /// Radar marcado para os dois sentidos (direction=both).
+  final bool both;
 
   const Radar({
     required this.id,
@@ -71,6 +81,8 @@ class Radar {
     this.checkAfter,
     this.roads = const [],
     this.section,
+    this.travel,
+    this.both = false,
   });
 
   bool get isSectionEnd => type == 'media' && section == 'end';
@@ -117,6 +129,8 @@ class Radar {
         'checkAfter': checkAfter,
         if (roads.isNotEmpty) 'rd': [for (final r in roads) r.toJson()],
         if (section != null) 'section': section,
+        if (travel != null) 'travel': travel,
+        if (both) 'both': true,
       };
 
   factory Radar.fromJson(Map<String, dynamic> j) => Radar(
@@ -129,6 +143,8 @@ class Radar {
         checkAfter: j['checkAfter'] as int?,
         roads: RoadRef.list(j['rd']),
         section: j['section'] as String?,
+        travel: (j['travel'] as num?)?.toDouble(),
+        both: j['both'] == true,
       );
 
   /// Converte um nó do OpenStreetMap (Overpass) em Radar.
@@ -160,6 +176,9 @@ class Radar {
           tags['camera:direction']?.toString()),
       roads: RoadRef.list(el['rd']),
       section: tags['section']?.toString(),
+      travel: (el['td'] as num?)?.toDouble(),
+      both: RegExp(r'both|forward;backward|backward;forward')
+          .hasMatch(tags['direction']?.toString().toLowerCase() ?? ''),
     );
   }
 
