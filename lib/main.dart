@@ -671,7 +671,18 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       return;
     }
     if (mounted) setState(() {});
-    final n = await _parks.loadRoute(_route, country: _country);
+    var n = await _parks.loadRoute(_route, country: _country);
+    // 1.29.12: busca os pedaços seguintes até ter os 30 parks (ou o fim da
+    // rota), sem esperar o GPS andar.
+    for (var i = 0; i < 20 && n != null && mounted; i++) {
+      final prog = _route.progress(pos.latitude, pos.longitude) ?? 0;
+      if (!_parks.needMore(_route, prog)) break;
+      final more = await _parks.loadRoute(_route,
+          country: _country, from: _parks.loadedUntil);
+      if (more == null) break; // pedaço falhou: o resto vem andando
+      n = more;
+      if (mounted) setState(() {});
+    }
     if (!mounted) return;
     setState(() {});
     _snack(n == null
@@ -781,7 +792,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             if (routing && _parks.hasRoute) {
               final prog =
                   _route.progress(pos.latitude, pos.longitude) ?? 0;
-              list = _parks.alongRoute(prog, max: 30); // os 30 próximos (1.29.8)
+              list = _parks.alongRoute(prog, max: ParkService.routeList);
               title = 'Próximos parks até ${_route.destName}';
               hint = _parks.routeLoading
                   ? 'Buscando mais parks da rota…'

@@ -249,12 +249,19 @@ class ParkService {
   List<Park> _found = []; // parks já baixados desta rota
   double _loadedUntil = 0; // até onde (m) a rota já foi buscada
 
-  /// Precisa buscar o próximo pedaço da rota? (faltam < 40 km do buscado)
+  /// Quantos parks a lista do P mostra.
+  static const routeList = 30;
+
+  /// Precisa buscar o próximo pedaço da rota? Quando faltam < 120 km do
+  /// buscado ou (1.29.12) quando ainda não há 30 parks à frente — com "Só
+  /// parks de caminhão" ligado, 300 km muitas vezes não têm 30.
   bool needMore(RouteService route, double progress) =>
       routeReady &&
       !routeLoading &&
+      _loadedUntil > 0 &&
       _loadedUntil < route.total &&
-      progress + 120000 > _loadedUntil;
+      (progress + 120000 > _loadedUntil ||
+          alongRoute(progress, max: routeList).length < routeList);
   double get loadedUntil => _loadedUntil;
   int get routeCount => _route.length;
 
