@@ -53,6 +53,13 @@ Future<void> main() async {
 
 /// Ponto de entrada da bolha flutuante (roda separado do app).
 @pragma('vm:entry-point')
+/// Valores do seletor "Limitador do caminhão" (1.29.19): de 80 a 95 de 1
+/// em 1 e depois de 10 em 10 até 130.
+const List<int> kTruckLimits = [
+  80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, //
+  100, 110, 120, 130,
+];
+
 Future<void> overlayMain() async {
   WidgetsFlutterBinding.ensureInitialized();
   // Mesmas cores do app (a paleta também chega pelos dados do painel).
@@ -291,7 +298,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     _showParks = p.getBool('show_parks') ?? true;
     _parks.truckOnly = p.getBool('parks_truck_only') ?? true;
     _truckMax = p.getInt('truck_max') ?? 90;
-    if (![80, 90, 91, 92, 93, 94, 95].contains(_truckMax)) _truckMax = 90;
+    if (!kTruckLimits.contains(_truckMax)) _truckMax = 90;
     _sound = p.getString('sound') ?? 'voice';
     _speedSound = p.getString('speed_sound') ?? 'voice';
     _sameRoad = p.getBool('same_road') ?? true;
@@ -1919,7 +1926,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                             style: TextStyle(height: 1.3))),
                     DropdownButton<int>(
                       value: _truckMax,
-                      items: const [80, 90, 91, 92, 93, 94, 95]
+                      menuMaxHeight: 360,
+                      items: kTruckLimits
                           .map((v) => DropdownMenuItem(
                               value: v, child: Text('$v km/h')))
                           .toList(),
