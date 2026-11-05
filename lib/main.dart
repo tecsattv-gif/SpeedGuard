@@ -51,8 +51,6 @@ Future<void> main() async {
   runApp(const SpeedGuardApp());
 }
 
-/// Ponto de entrada da bolha flutuante (roda separado do app).
-@pragma('vm:entry-point')
 /// Valores do seletor "Limitador do caminhão" (1.29.19): de 80 a 95 de 1
 /// em 1 e depois de 10 em 10 até 130.
 const List<int> kTruckLimits = [
@@ -60,6 +58,11 @@ const List<int> kTruckLimits = [
   100, 110, 120, 130,
 ];
 
+/// Ponto de entrada da bolha flutuante (roda separado do app).
+/// ATENÇÃO: o @pragma tem de ficar colado no overlayMain — na 1.29.19 uma
+/// constante entrou no meio, o compilador removeu o overlayMain e a bolha
+/// e o pop-up pararam de funcionar (corrigido na 1.29.25).
+@pragma('vm:entry-point')
 Future<void> overlayMain() async {
   WidgetsFlutterBinding.ensureInitialized();
   // 1.29.24: registro do Diagnóstico — a janela flutuante foi criada.
