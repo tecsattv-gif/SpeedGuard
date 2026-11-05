@@ -425,7 +425,26 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   /// Contagem dos 30 s com o app minimizado e a bolha desligada (1.29.15):
   /// abre por cima do app da tela um pop-up só com o círculo vermelho da
   /// contagem (igual ao da bolha) e fecha quando volta ao limite.
+  /// Bipe quando o pop-up da contagem entra na tela (1.29.18).
+  bool _ringBeeped = false;
+  void _ringBeep() {
+    final counting = !_inFront && !_bubble && _countSecs != null;
+    if (counting && !_ringBeeped) {
+      _ringBeeped = true;
+      if (_voice && _speedSound != 'mute') {
+        _player
+            .stop()
+            .then((_) => _player.play(AssetSource('sounds/popup.wav'),
+                volume: _volume))
+            .catchError((_) {});
+      }
+    } else if (_countSecs == null) {
+      _ringBeeped = false;
+    }
+  }
+
   void _syncRingPopup() {
+    _ringBeep();
     final want = !_inFront &&
         !_bubble &&
         (_testSecs != null ||
