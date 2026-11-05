@@ -285,6 +285,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     _bubbleLand = p.getBool('bubbleLand') ?? false;
     _mapView = p.getBool('mapView') ?? true;
     _headingUp = p.getBool('map_heading_up') ?? true;
+    await _loadSavedRoute();
     _vehicle = VehicleIcon.fromName(p.getString('vehicle'));
     final saved = p.getStringList('layers');
     if (saved != null) {
@@ -586,6 +587,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   Future<void> _onPosition(Position pos) async {
     _pos = pos;
+    // Rota que estava ativa quando o app foi fechado/atualizado: retoma.
+    final resume = _resumeDest;
+    if (resume != null) {
+      _resumeDest = null;
+      if (!_route.active) _planRoute(resume, resumed: true);
+    }
     // Velocidade e posição na tela primeiro, aconteça o que acontecer depois.
     if (mounted) setState(() {});
     _safe('mapa', () {
@@ -651,13 +658,42 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     if (prog != null && _route.total - prog < 300) {
       _route.clear();
       _parks.clearRoute();
+      _saveRoute(null);
       return null;
     }
     return prog;
   }
 
+  /// Destino da rota guardado (1.29.13): se o app for fechado ou
+  /// atualizado no meio da viagem, a rota e os parks voltam sozinhos.
+  String? _resumeDest;
+
+  Future<void> _saveRoute(String? dest) async {
+    final p = await SharedPreferences.getInstance();
+    if (dest == null) {
+      await p.remove('route_dest');
+      await p.remove('route_time');
+    } else {
+      await p.setString('route_dest', dest);
+      await p.setInt('route_time', DateTime.now().millisecondsSinceEpoch);
+    }
+  }
+
+  Future<void> _loadSavedRoute() async {
+    final p = await SharedPreferences.getInstance();
+    final dest = p.getString('route_dest');
+    final t = p.getInt('route_time') ?? 0;
+    // Vale por 2 dias (viagem longa com pernoite).
+    if (dest != null &&
+        DateTime.now().millisecondsSinceEpoch - t < 2 * 86400000) {
+      _resumeDest = dest;
+    } else if (dest != null) {
+      await _saveRoute(null);
+    }
+  }
+
   /// Calcula a rota até o destino digitado e busca os parks nela.
-  Future<void> _planRoute(String dest) async {
+  Future<void> _planRoute(String dest, {bool resumed = false}) async {
     _parks.onRouteUpdate = () {
       if (mounted) setState(() {});
     };
@@ -667,11 +703,21 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     _parks.clearRoute();
     final err = await _route.plan(pos.latitude, pos.longitude, dest);
     if (err != null) {
-      _snack('$err Os parks seguem pelo seu sentido.');
+      if (!resumed) _snack('$err Os parks seguem pelo seu sentido.');
       return;
     }
+    if (!resumed) _saveRoute(dest);
     if (mounted) setState(() {});
     var n = await _parks.loadRoute(_route, country: _country);
+    // Aviso logo no primeiro pedaço, como antes da 1.29.12.
+    if (mounted) {
+      setState(() {});
+      _snack(n == null
+          ? 'Não consegui buscar os parks da rota. Toque no P para tentar de novo.'
+          : resumed
+              ? 'Rota até ${_route.destName} retomada. Toque no P para ver os parks.'
+              : 'Parks da rota até ${_route.destName} prontos. Toque no P para ver.');
+    }
     // 1.29.12: busca os pedaços seguintes até ter os 30 parks (ou o fim da
     // rota), sem esperar o GPS andar.
     for (var i = 0; i < 20 && n != null && mounted; i++) {
@@ -683,11 +729,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       n = more;
       if (mounted) setState(() {});
     }
-    if (!mounted) return;
-    setState(() {});
-    _snack(n == null
-        ? 'Não consegui buscar os parks da rota. Toque no P para tentar de novo.'
-        : 'Parks da rota até ${_route.destName} prontos. Toque no P para ver.');
+    if (mounted) setState(() {});
   }
 
   static String _km(double m) => m < 1000
@@ -918,6 +960,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                       onPressed: () {
                         _route.clear();
                         _parks.clearRoute();
+                        _saveRoute(null);
                         setState(() {});
                         Navigator.pop(ctx);
                       },
