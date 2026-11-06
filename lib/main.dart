@@ -43,6 +43,7 @@ import 'removed_radars.dart';
 import 'section_watch.dart';
 import 'speed_watch.dart';
 import 'speed_picker.dart';
+import 'toll_service.dart';
 import 'track_nav.dart';
 import 'track_recorder.dart';
 
@@ -361,6 +362,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     _voice = p.getBool('voice') ?? true;
     _speedWarn = p.getBool('speed_warn') ?? true;
     _showParks = p.getBool('show_parks') ?? true;
+    _tolls.enabled = p.getBool('toll_warn') ?? true;
     _parks.truckOnly = p.getBool('parks_truck_only') ?? true;
     _truckMax = p.getInt('truck_max') ?? 90;
     if (!kTruckLimits.contains(_truckMax)) _truckMax = 90;
@@ -841,7 +843,31 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       }
     });
     _safe('parks', () => _checkParks(pos));
+    _safe('pedágio', () => _checkToll(pos));
     _safe('pergunta', () => _checkAsk(pos));
+  }
+
+  // ---------- Aviso de pedágio (1.29.48) ----------
+  final _tolls = TollService();
+  String? _tollBanner;
+  Timer? _tollTimer;
+
+  void _checkToll(Position pos) {
+    if (!_tolls.enabled) return;
+    _tolls.update(pos.latitude, pos.longitude);
+    final d = _tolls.check(
+        pos.latitude, pos.longitude, pos.heading, pos.speed * 3.6);
+    if (d == null) return;
+    final m = (d / 100).round() * 100;
+    final km = m >= 900;
+    if (_voice) {
+      _tts.speak(km ? 'Pedágio em 1 quilômetro.' : 'Pedágio em $m metros.');
+    }
+    _tollTimer?.cancel();
+    setState(() => _tollBanner = km ? 'Pedágio a 1 km' : 'Pedágio a $m m');
+    _tollTimer = Timer(const Duration(seconds: 15), () {
+      if (mounted) setState(() => _tollBanner = null);
+    });
   }
 
   void _checkParks(Position pos) {
@@ -3385,6 +3411,17 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   },
                 ),
               SwitchListTile(
+                title: const Text('Aviso de pedágio'),
+                subtitle: const Text(
+                    'Avisa uma vez, a 1000 m, com voz e na tela'),
+                value: _tolls.enabled,
+                onChanged: (v) async {
+                  final p = await SharedPreferences.getInstance();
+                  await p.setBool('toll_warn', v);
+                  setSheet(() => _tolls.enabled = v);
+                },
+              ),
+              SwitchListTile(
                 title: const Text('Só radares da minha via'),
                 subtitle: const Text(
                     'Avisa só os radares da rodovia/rua onde você está. Radares '
@@ -4415,6 +4452,41 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   ),
                 ],
               ]),
+            ),
+
+          // Aviso de pedágio (15 s), acima do card do park e dos botões.
+          if (_tollBanner != null && _placing == null)
+            Positioned(
+              left: 12,
+              right: 12,
+              bottom: (_running && _showParks && _parksAhead.isNotEmpty
+                      ? 166.0
+                      : 72.0) +
+                  (_nav != null ? 96 : 0),
+              child: Material(
+                color: const Color(0xFFF9A825),
+                borderRadius: BorderRadius.circular(16),
+                elevation: 6,
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  child: Row(children: [
+                    const Icon(Icons.toll, color: Colors.black, size: 38),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(_tollBanner!,
+                          style: const TextStyle(
+                              color: Colors.black,
+                              fontSize: 24,
+                              fontWeight: FontWeight.w900)),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, color: Colors.black),
+                      onPressed: () => setState(() => _tollBanner = null),
+                    ),
+                  ]),
+                ),
+              ),
             ),
 
           // Parks à frente, logo acima dos botões.
