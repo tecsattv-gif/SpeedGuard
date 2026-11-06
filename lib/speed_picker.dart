@@ -152,17 +152,20 @@ class SpeedSign extends StatelessWidget {
         sign,
         Transform.translate(
           offset: Offset(0, -size * 0.08),
+          // 1.29.37: placa mais larga com a foto do portacarros (sem fundo).
           child: Container(
-            width: size * 0.92,
-            height: size * 0.42,
+            width: size * 1.5,
+            height: size * 0.5,
+            padding: EdgeInsets.symmetric(
+                horizontal: size * 0.06, vertical: size * 0.04),
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(size * 0.1),
               border: Border.all(color: Colors.black, width: size * 0.035),
             ),
             alignment: Alignment.center,
-            child: Icon(Icons.local_shipping,
-                color: Colors.black, size: size * 0.34),
+            child: Image.asset('assets/portacarros.png',
+                fit: BoxFit.contain, filterQuality: FilterQuality.medium),
           ),
         ),
       ]),
