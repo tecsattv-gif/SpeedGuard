@@ -1103,6 +1103,27 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         : 'Park adicionado! Ele aparece para todos os motoristas.');
   }
 
+  /// Botão "P+" verde ao lado do P (1.29.31): adicionar park aqui.
+  Widget _addParkButton() => Material(
+        color: const Color(0xFF2E7D32),
+        shape: CircleBorder(side: BorderSide(color: SG.outline, width: 1.5)),
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: _addPark,
+          child: const SizedBox(
+            width: 46,
+            height: 46,
+            child: Center(
+              child: Text('P+',
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 19,
+                      fontWeight: FontWeight.w900)),
+            ),
+          ),
+        ),
+      );
+
   /// Botão "P" ao lado de Navegar: abre a lista dos 3 parks à frente.
   /// Toque longo: adicionar park aqui (1.29.30).
   Widget _parkButton() => Material(
@@ -1625,7 +1646,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           customBorder: const StadiumBorder(),
           onTap: onTap,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            // 1.29.31: um pouco mais estreito, para caber o botão P+.
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             child: Row(mainAxisSize: MainAxisSize.min, children: [
               Icon(icon, color: SG.accent, size: 20),
               const SizedBox(width: 8),
@@ -2934,10 +2956,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             bottom: 12,
             child: Row(children: [
               _pill(Icons.tune, 'Opções', _mapOptions),
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
               _pill(Icons.navigation, 'Navegar', _navigate),
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
               _parkButton(),
+              const SizedBox(width: 6),
+              _addParkButton(),
             ]),
           ),
 
