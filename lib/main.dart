@@ -3443,7 +3443,16 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                           // 1.29.21: maior; caminhão com a placa do
                           // caminhão embaixo.
                           SpeedSign(
-                              label: '$roadSign', size: 56, truck: _isTruck),
+                              label: '$roadSign',
+                              size: 56,
+                              // 1.29.37: foto do veículo escolhido (seta: só
+                              // a placa).
+                              plateImage: switch (_vehicle) {
+                                VehicleIcon.truck => 'assets/portacarros.png',
+                                VehicleIcon.car => 'assets/carro.png',
+                                VehicleIcon.moto => 'assets/moto.png',
+                                _ => null,
+                              }),
                           const SizedBox(height: 4),
                         ],
                         _SpeedBox(

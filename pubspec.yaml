@@ -37,5 +37,7 @@ flutter:
     - assets/splash.png
     - assets/icon.png
     - assets/portacarros.png
+    - assets/carro.png
+    - assets/moto.png
     - assets/sounds/
     - assets/tutorial.mp4

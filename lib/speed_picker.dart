@@ -134,17 +134,21 @@ class SpeedSign extends StatelessWidget {
   final double size;
   /// Placa complementar com o caminhão embaixo (limite para caminhões).
   final bool truck;
+  /// Foto embaixo da placa (1.29.37): portacarros, carro ou moto.
+  final String? plateImage;
   const SpeedSign(
       {super.key,
       required this.label,
       this.onTap,
       this.size = 56,
-      this.truck = false});
+      this.truck = false,
+      this.plateImage});
 
   @override
   Widget build(BuildContext context) {
     final sign = _circle();
-    if (!truck) return GestureDetector(onTap: onTap, child: sign);
+    final img = plateImage ?? (truck ? 'assets/portacarros.png' : null);
+    if (img == null) return GestureDetector(onTap: onTap, child: sign);
     // 1.29.21: placa de caminhão embaixo, como nas estradas da Europa.
     return GestureDetector(
       onTap: onTap,
@@ -164,7 +168,7 @@ class SpeedSign extends StatelessWidget {
               border: Border.all(color: Colors.black, width: size * 0.035),
             ),
             alignment: Alignment.center,
-            child: Image.asset('assets/portacarros.png',
+            child: Image.asset(img,
                 fit: BoxFit.contain, filterQuality: FilterQuality.medium),
           ),
         ),
