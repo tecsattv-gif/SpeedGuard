@@ -237,6 +237,97 @@ class CommunityService {
     }
   }
 
+  // ---------- Parks adicionados pelos motoristas (1.29.30) ----------
+  //
+  // Ficam na mesma coleção `radars` (as regras já publicadas aceitam), com
+  // type "park_privado", "park_free" ou "park_zona". O nome vai no campo
+  // cell como "p|Nome" (as regras publicadas não aceitam um campo novo, e
+  // cell de park não é usado na busca de radares). Valem 2 anos.
+
+  static const parkTypes = ['park_privado', 'park_free', 'park_zona'];
+  static const parkLife = Duration(days: 730);
+
+  /// Todos os parks dos motoristas (são poucos: baixa todos de uma vez).
+  Future<List<(String, double, double, String, String)>?> fetchParks() async {
+    if (!communityEnabled) return null;
+    try {
+      final body = {
+        'structuredQuery': {
+          'from': [
+            {'collectionId': 'radars'}
+          ],
+          'where': {
+            'fieldFilter': {
+              'field': {'fieldPath': 'type'},
+              'op': 'IN',
+              'value': {
+                'arrayValue': {
+                  'values': [for (final t in parkTypes) {'stringValue': t}]
+                }
+              }
+            }
+          },
+          'limit': 5000,
+        }
+      };
+      final res = await http
+          .post(Uri.parse('$_base:runQuery?key=$firebaseApiKey'),
+              headers: {'Content-Type': 'application/json'},
+              body: jsonEncode(body))
+          .timeout(const Duration(seconds: 25));
+      if (res.statusCode != 200) return null;
+      final out = <(String, double, double, String, String)>[];
+      for (final item in jsonDecode(utf8.decode(res.bodyBytes)) as List) {
+        final doc = (item as Map)['document'] as Map?;
+        if (doc == null) continue;
+        final r = _fromDoc(doc.cast<String, dynamic>());
+        if (r == null) continue;
+        final cell = ((doc['fields'] as Map?)?['cell'] as Map?)?['stringValue']
+                ?.toString() ??
+            '';
+        final name = cell.startsWith('p|') ? cell.substring(2).trim() : '';
+        out.add((r.id, r.lat, r.lon, r.type, name));
+      }
+      return out;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Adiciona um park onde você está. [type]: park_privado/park_free/park_zona.
+  Future<String?> reportPark(
+      double lat, double lon, String type, String name, double? heading) async {
+    final n = name.trim();
+    if (!communityEnabled) return null;
+    final now = DateTime.now();
+    final fields = <String, dynamic>{
+      'lat': {'doubleValue': lat},
+      'lon': {'doubleValue': lon},
+      'cell': {
+        'stringValue': 'p|${n.length > 60 ? n.substring(0, 60) : n}'
+      },
+      'type': {'stringValue': type},
+      if (heading != null && heading >= 0)
+        'direction': {'doubleValue': heading},
+      'createdAt': {'integerValue': '${now.millisecondsSinceEpoch}'},
+      'checkAfter': {
+        'integerValue': '${now.add(parkLife).millisecondsSinceEpoch}'
+      },
+    };
+    try {
+      final res = await http
+          .post(Uri.parse('$_base/radars?key=$firebaseApiKey'),
+              headers: {'Content-Type': 'application/json'},
+              body: jsonEncode({'fields': fields}))
+          .timeout(const Duration(seconds: 20));
+      if (res.statusCode != 200) return null;
+      final name = (jsonDecode(res.body) as Map)['name']?.toString() ?? '';
+      return 'cm_${name.split('/').last}';
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// Avisa que o radar [r] não existe mais (vale 90 dias).
   Future<bool> reportRemoved(Radar r) async {
     if (!communityEnabled) return false;

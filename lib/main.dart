@@ -330,6 +330,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   Future<void> _init() async {
     final p = await SharedPreferences.getInstance();
     await _removed.load();
+    _loadUserParks();
+    Timer.periodic(const Duration(minutes: 30), (_) => _loadUserParks());
     _voice = p.getBool('voice') ?? true;
     _speedWarn = p.getBool('speed_warn') ?? true;
     _showParks = p.getBool('show_parks') ?? true;
@@ -930,13 +932,145 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     }
   }
 
+  // ---------- Adicionar park (1.29.30) ----------
+
+  /// Parks dos motoristas: do aparelho (na hora) e depois do Firebase.
+  Future<void> _loadUserParks() async {
+    final p = await SharedPreferences.getInstance();
+    List<Park> fromJson(String? raw) {
+      if (raw == null) return [];
+      try {
+        return [
+          for (final e in jsonDecode(raw) as List)
+            Park.user(e['id'] as String, (e['lat'] as num).toDouble(),
+                (e['lon'] as num).toDouble(), e['t'] as String,
+                (e['n'] as String?) ?? '')
+        ];
+      } catch (_) {
+        return [];
+      }
+    }
+
+    final mine = fromJson(p.getString('my_parks'));
+    if (_parks.userParks.isEmpty) {
+      _parks.userParks = [...fromJson(p.getString('user_parks')), ...mine];
+    }
+    final got = await _community.fetchParks();
+    if (got == null) return;
+    final list = [
+      for (final (id, lat, lon, t, n) in got) Park.user(id, lat, lon, t, n)
+    ];
+    // Os seus que ainda não subiram (sem internet) continuam valendo.
+    final ids = list.map((e) => e.id).toSet();
+    _parks.userParks = [
+      ...list,
+      for (final m in mine)
+        if (!ids.contains(m.id) && m.id.startsWith('local_')) m
+    ];
+    await p.setString(
+        'user_parks',
+        jsonEncode([
+          for (final (id, lat, lon, t, n) in got)
+            {'id': id, 'lat': lat, 'lon': lon, 't': t, 'n': n}
+        ]));
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _addPark() async {
+    final pos = _pos ?? await _currentPos();
+    if (!mounted) return;
+    if (pos == null) {
+      _snack('Aguardando o sinal do GPS…');
+      return;
+    }
+    final nameCtrl = TextEditingController();
+    String? type;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setD) {
+          Widget opt(String t, IconData icon, String label, String sub) =>
+              RadioListTile<String>(
+                value: t,
+                groupValue: type,
+                onChanged: (v) => setD(() => type = v),
+                contentPadding: EdgeInsets.zero,
+                secondary: Icon(icon),
+                title: Text(label,
+                    style: const TextStyle(fontWeight: FontWeight.w700)),
+                subtitle: Text(sub, style: const TextStyle(fontSize: 12)),
+              );
+          return AlertDialog(
+            title: const Text('Adicionar park aqui'),
+            content: SingleChildScrollView(
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                opt('park_privado', Icons.local_parking, 'Park privado',
+                    'Pago'),
+                opt('park_free', Icons.money_off, 'Park free', 'Grátis'),
+                opt('park_zona', Icons.factory_outlined, 'Zona industrial',
+                    'Onde caminhão estaciona, entra e sai'),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: nameCtrl,
+                  maxLength: 60,
+                  textCapitalization: TextCapitalization.sentences,
+                  decoration: const InputDecoration(
+                      labelText: 'Nome (opcional)',
+                      hintText: 'Ex.: Park Los Pinos'),
+                ),
+              ]),
+            ),
+            actions: [
+              TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: const Text('Cancelar')),
+              FilledButton(
+                  onPressed:
+                      type == null ? null : () => Navigator.pop(ctx, true),
+                  child: const Text('Adicionar')),
+            ],
+          );
+        },
+      ),
+    );
+    final name = nameCtrl.text.trim();
+    nameCtrl.dispose();
+    if (ok != true || type == null) return;
+    final id = await _community.reportPark(
+            pos.latitude, pos.longitude, type!, name, _goodHeading) ??
+        'local_${DateTime.now().millisecondsSinceEpoch}';
+    final park = Park.user(id, pos.latitude, pos.longitude, type!, name);
+    _parks.userParks = [..._parks.userParks, park];
+    final p = await SharedPreferences.getInstance();
+    List mine;
+    try {
+      mine = jsonDecode(p.getString('my_parks') ?? '[]') as List;
+    } catch (_) {
+      mine = [];
+    }
+    mine.add({
+      'id': id,
+      'lat': pos.latitude,
+      'lon': pos.longitude,
+      't': type,
+      'n': name,
+    });
+    await p.setString('my_parks', jsonEncode(mine));
+    if (mounted) setState(() {});
+    _snack(id.startsWith('local_')
+        ? 'Park salvo neste aparelho (sem internet para enviar).'
+        : 'Park adicionado! Ele aparece para todos os motoristas.');
+  }
+
   /// Botão "P" ao lado de Navegar: abre a lista dos 3 parks à frente.
+  /// Toque longo: adicionar park aqui (1.29.30).
   Widget _parkButton() => Material(
         color: const Color(0xFF1565C0),
         shape: CircleBorder(side: BorderSide(color: SG.outline, width: 1.5)),
         child: InkWell(
           customBorder: const CircleBorder(),
           onTap: _parksSheet,
+          onLongPress: _addPark,
           child: const SizedBox(
             width: 46,
             height: 46,
@@ -1074,6 +1208,16 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   if (hint.isNotEmpty)
                     Text(hint,
                         style: TextStyle(color: SG.textSoft, fontSize: 12)),
+                  const SizedBox(height: 8),
+                  // 1.29.30: park que não está no mapa.
+                  FilledButton.icon(
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      _addPark();
+                    },
+                    icon: const Icon(Icons.add_location_alt),
+                    label: const Text('Adicionar park aqui'),
+                  ),
                   const SizedBox(height: 8),
                   if (waiting && list.isEmpty)
                     const Padding(

@@ -23,7 +23,28 @@ class Park {
 
   /// Park para caminhão (1.29.5): estacionamento de caminhão, parada de
   /// caminhão (truck_stop), ou área com vagas/acesso de caminhão marcados.
+  /// Park adicionado por motorista no app (1.29.30).
+  bool get isUser => kind == 'user';
+
+  /// Park de motorista a partir do Firebase ([type] park_privado/free/zona).
+  factory Park.user(String id, double lat, double lon, String type,
+      [String name = '']) {
+    final (label, fee) = userTypeLabel(type);
+    return Park(id, name.isNotEmpty ? name : label, lat, lon, 'user', {
+      'hgv': 'yes',
+      'ptype': type,
+      if (fee.isNotEmpty) 'fee': fee,
+    });
+  }
+
+  static (String, String) userTypeLabel(String type) => switch (type) {
+        'park_privado' => ('Park privado (pago)', 'yes'),
+        'park_free' => ('Park free (grátis)', 'no'),
+        _ => ('Zona industrial', ''),
+      };
+
   bool get isTruck {
+    if (isUser) return true;
     if (tags['hgv'] == 'no') return false;
     if (kind == 'parking') return true; // a base só traz os de caminhão
     if (const {'yes', 'designated', 'only'}.contains(tags['hgv'])) return true;
@@ -59,6 +80,9 @@ class Park {
   String get kindLabel => switch (kind) {
         'services' => 'Área de serviço',
         'rest_area' => 'Área de descanso',
+        'user' => tags['ptype'] == 'park_zona'
+            ? 'Zona industrial · adicionado por motorista'
+            : 'Adicionado por motorista',
         _ => 'Estacionamento de caminhão',
       };
 
@@ -247,6 +271,34 @@ class ParkService {
   void Function()? onRouteUpdate;
   Object? _routeOf; // rota que está sendo buscada
   List<Park> _found = []; // parks já baixados desta rota
+
+  // Parks adicionados pelos motoristas (1.29.30): entram na lista em volta
+  // e na rota.
+  List<Park> _user = [];
+  RouteService? _rs;
+  List<(Park, double, String)> _routeUser = [];
+  List<Park> get userParks => _user;
+  set userParks(List<Park> v) {
+    _user = v;
+    _placeUser();
+  }
+
+  void _placeUser() {
+    final rs = _rs;
+    if (rs == null || !identical(rs.pts, _routeOf)) {
+      _routeUser = [];
+      return;
+    }
+    final out = <(Park, double, String)>[];
+    for (final p in _user) {
+      final (k, d, side) = rs.nearest(p.lat, p.lon);
+      if (d > 600) continue;
+      out.add((p, rs.cum[k], side > 0 ? 'direita' : 'esquerda'));
+    }
+    _routeUser = out;
+  }
+
+  List<Park> get _all => _user.isEmpty ? _parks : [..._parks, ..._user];
   double _loadedUntil = 0; // até onde (m) a rota já foi buscada
 
   /// Quantos parks a lista do P mostra.
@@ -268,6 +320,8 @@ class ParkService {
   void clearRoute() {
     _route = [];
     _found = [];
+    _rs = null;
+    _routeUser = [];
     _loadedUntil = 0;
     routeReady = false;
     _routeOf = null;
@@ -284,6 +338,8 @@ class ParkService {
       _route = [];
       _found = [];
       _routeOf = route.pts;
+      _rs = route;
+      _placeUser();
     }
     try {
       // A rota é dividida em trechos de ~15 km; cada trecho vira um
@@ -369,9 +425,9 @@ class ParkService {
   /// [max] = 0 devolve todos.
   List<ParkAhead> alongRoute(double progress, {int max = 3}) {
     final out = [
-      for (final (p, at, side) in _route)
+      for (final (p, at, side) in [..._route, ..._routeUser])
         if (at > progress + 100 && _ok(p)) ParkAhead(p, at - progress, side, road: true)
-    ];
+    ]..sort((a, b) => a.distance.compareTo(b.distance));
     return max <= 0 ? out : out.take(max).toList();
   }
 
@@ -415,12 +471,12 @@ class ParkService {
       {int max = 3, String? country}) {
     if (heading >= 0) _lastHeading = heading;
     final h = _lastHeading;
-    if (h < 0 || _parks.isEmpty) return const [];
+    if (h < 0 || _all.isEmpty) return const [];
     // Mão inglesa: o park do seu sentido fica à esquerda.
     final leftHand =
         const {'gb', 'ie', 'mt', 'cy'}.contains(country?.toLowerCase());
     final out = <ParkAhead>[];
-    for (final p in _parks) {
+    for (final p in _all) {
       if (!_ok(p)) continue;
       final d = Geolocator.distanceBetween(lat, lon, p.lat, p.lon);
       if (d < 150 || d > _radius) continue;
@@ -441,7 +497,11 @@ class ParkService {
         // Área de autoestrada do lado contrário (perto do eixo): é da outra
         // pista, não serve para quem vai neste sentido.
         final wrong = leftHand ? side == 'direita' : side == 'esquerda';
-        if (serves == null && wrong && p.kind != 'parking' && lateral < 400) {
+        if (serves == null &&
+            wrong &&
+            p.kind != 'parking' &&
+            !p.isUser &&
+            lateral < 400) {
           continue;
         }
       }
@@ -454,7 +514,7 @@ class ParkService {
   /// Os parks mais perto em qualquer direção (quando ainda não há rumo).
   List<ParkAhead> nearest(double lat, double lon, {int max = 3}) {
     final out = [
-      for (final p in _parks)
+      for (final p in _all)
         if (_ok(p))
           ParkAhead(p, Geolocator.distanceBetween(lat, lon, p.lat, p.lon), null)
     ]..sort((a, b) => a.distance.compareTo(b.distance));
