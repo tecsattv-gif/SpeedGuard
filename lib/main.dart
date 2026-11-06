@@ -1170,6 +1170,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   }
 
   Future<void> _addPark() async {
+    // Só caminhão adiciona park (1.29.34): evita park falso de quem usa o
+    // app no carro.
+    if (!_isTruck) {
+      _snack('Adicionar park é só para quem escolheu Caminhão nas Configurações.');
+      return;
+    }
     if (!await _parkWarning()) return;
     final pos = _pos ?? await _currentPos();
     if (!mounted) return;
@@ -1316,7 +1322,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         child: InkWell(
           customBorder: const CircleBorder(),
           onTap: _parksSheet,
-          onLongPress: _addPark,
+          onLongPress: _isTruck ? _addPark : null,
           child: const SizedBox(
             width: 46,
             height: 46,
@@ -1466,7 +1472,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                     Text(hint,
                         style: TextStyle(color: SG.textSoft, fontSize: 12)),
                   const SizedBox(height: 8),
-                  // 1.29.30: park que não está no mapa.
+                  // 1.29.30: park que não está no mapa (só caminhão).
+                  if (_isTruck)
                   FilledButton.icon(
                     onPressed: () {
                       Navigator.pop(ctx);
@@ -3220,8 +3227,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               _pill(Icons.navigation, 'Navegar', _navigate),
               const SizedBox(width: 6),
               _parkButton(),
-              const SizedBox(width: 6),
-              _addParkButton(),
+              // Adicionar park: só com caminhão escolhido (1.29.34).
+              if (_isTruck) ...[
+                const SizedBox(width: 6),
+                _addParkButton(),
+              ],
             ]),
           ),
 
