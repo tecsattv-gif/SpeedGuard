@@ -33,6 +33,7 @@ import 'layers.dart';
 import 'live_bg.dart';
 import 'live_service.dart';
 import 'theme.dart';
+import 'help_page.dart';
 import 'tutorial_page.dart';
 import 'vehicle_icon.dart';
 import 'gps_filter.dart';
@@ -3856,6 +3857,17 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                       context,
                       MaterialPageRoute(
                           builder: (_) => const TutorialPage()));
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.help_outline),
+                title: const Text('Ajuda'),
+                subtitle: const Text('Perguntas e respostas (funciona sem internet)'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const HelpPage()));
                 },
               ),
               ListTile(
