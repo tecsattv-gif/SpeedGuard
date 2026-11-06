@@ -313,13 +313,19 @@ class RoadLimitService {
       mine = _lastIds;
     }
     final near = r.roads.first.d;
+    // Rua que cruza (1.29.29): vale também para mão única — antes só para
+    // mão dupla, e radar de avenida com pistas separadas que passa por
+    // cima/baixo da rodovia avisava. Acima de 60 km/h (rodovia, poucas
+    // curvas) basta 40° de diferença; abaixo, 55°.
+    final cross = kmh > 60 ? 40.0 : 55.0;
     bool ok(RoadRef x) {
       final dir = x.dir;
+      if (_axisDiff(x.b, heading) > cross && _axisDiff(x.b, bearing) > cross) {
+        return false; // rua que cruza
+      }
       if (dir != null) {
         // Mão única: o trânsito tem de ir no meu sentido.
         if (against(dir)) return false;
-      } else if (_axisDiff(x.b, heading) > 55 && _axisDiff(x.b, bearing) > 55) {
-        return false; // rua que cruza
       } else if (r.travel == null && !r.both && x.s != 0 && x.d >= 3 &&
           x.d <= 25) {
         // Mão dupla (1.29.11): o radar ao lado da via fiscaliza a pista do
