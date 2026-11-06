@@ -769,8 +769,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     _map.moveAndRotate(c, zoom, _mapRot);
   }
 
+  /// Último sentido confiável (andando) — para "Radar da outra pista".
+  double _goodHeading = -1;
+
   Future<void> _onPosition(Position pos) async {
     _pos = pos;
+    if (pos.speed > 2.5 && pos.heading >= 0) _goodHeading = pos.heading;
     // Velocidade e posição na tela primeiro, aconteça o que acontecer depois.
     if (mounted) setState(() {});
     _safe('mapa', () {
@@ -1278,8 +1282,17 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   void _runAlerts(Position pos) {
     final st = _engine.update(
         pos: pos, radars: _allRadars, mode: _rule.mode,
-        onRoad: _sameRoad
-            ? (r) {
+        onRoad: (r) {
+          // Marcado por você como "da outra pista" neste sentido (1.29.28).
+          if (_removed.wrongSide(r, pos.heading)) return false;
+          return _sameRoadCheck(pos, r);
+        });
+    _afterAlerts(st);
+  }
+
+  bool? _sameRoadCheck(Position pos, Radar r) {
+    return _sameRoad
+            ? (() {
                 try {
                   final b = (Geolocator.bearingBetween(
                               pos.latitude, pos.longitude, r.lat, r.lon) +
@@ -1291,8 +1304,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   _logError('via do radar', e, st);
                   return null;
                 }
-              }
-            : null);
+              })()
+            : null;
+  }
+
+  void _afterAlerts(AlertState st) {
     if (st.speak != null || st.beeps > 0) {
       HapticFeedback.heavyImpact();
       if (_voice) {
@@ -1831,6 +1847,29 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   setState(() {});
                 },
               ),
+            ],
+            if (r.type != 'usuario') ...[
+              const SizedBox(height: 16),
+              FilledButton.icon(
+                icon: const Icon(Icons.swap_horiz),
+                label: const Text('Este radar é da outra pista'),
+                onPressed: _goodHeading < 0
+                    ? null
+                    : () async {
+                        Navigator.pop(context);
+                        await _removed.markWrongSide(r, _goodHeading);
+                        if (mounted) setState(() {});
+                        _snack('Pronto: neste sentido ele não avisa mais. '
+                            'Na pista dele continua avisando.');
+                      },
+              ),
+              const SizedBox(height: 4),
+              Text(
+                  _goodHeading < 0
+                      ? 'Para usar, ande um pouco (o app precisa saber o seu sentido).'
+                      : 'Use quando o app avisar um radar da pista contrária: '
+                          'ele para de avisar no seu sentido.',
+                  style: const TextStyle(fontSize: 12, color: Colors.white60)),
             ],
             if (r.type != 'usuario' && !r.isEvent) ...[
               const SizedBox(height: 16),
@@ -2846,7 +2885,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         : a.overLimit
             ? SG.red
             : SG.orange;
-    return Container(
+    // 1.29.28: tocar no card do radar abre as opções dele (ex.: "Este
+    // radar é da outra pista").
+    return GestureDetector(
+      onTap: hasAlert ? () => _showRadar(a.radar!) : null,
+      child: Container(
       decoration: BoxDecoration(
         gradient: hasAlert
             ? LinearGradient(colors: [
@@ -2873,6 +2916,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           ],
         ),
       ),
+    ),
     );
   }
 }

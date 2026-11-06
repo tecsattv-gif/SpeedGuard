@@ -18,18 +18,46 @@ class RemovedRadars {
   final Set<String> _mine = {};
   List<(double, double)> _shared = [];
 
-  int get mineCount => _mine.length;
+  /// "Radar da outra pista" (1.29.28): id → sentido (graus) em que você
+  /// andava quando marcou. Nesse sentido o radar não avisa mais; no
+  /// sentido contrário (a pista dele) continua avisando.
+  final Map<String, double> _wrong = {};
+  static const _wrongKey = 'wrong_side';
+
+  int get mineCount => _mine.length + _wrong.length;
 
   Future<void> load() async {
     final p = await SharedPreferences.getInstance();
     _mine
       ..clear()
       ..addAll(p.getStringList(_key) ?? const []);
+    _wrong.clear();
+    for (final e in p.getStringList(_wrongKey) ?? const <String>[]) {
+      final i = e.lastIndexOf('|');
+      final h = i > 0 ? double.tryParse(e.substring(i + 1)) : null;
+      if (h != null) _wrong[e.substring(0, i)] = h;
+    }
   }
 
   Future<void> _save() async {
     final p = await SharedPreferences.getInstance();
     await p.setStringList(_key, _mine.toList());
+    await p.setStringList(_wrongKey,
+        [for (final e in _wrong.entries) '${e.key}|${e.value.round()}']);
+  }
+
+  Future<void> markWrongSide(Radar r, double heading) async {
+    _wrong[r.id] = heading;
+    await _save();
+  }
+
+  /// Radar marcado como "da outra pista" para quem anda no sentido [heading].
+  bool wrongSide(Radar r, double heading) {
+    final h = _wrong[r.id];
+    if (h == null || heading < 0) return false;
+    var d = (h - heading).abs() % 360;
+    if (d > 180) d = 360 - d;
+    return d <= 60;
   }
 
   Future<void> hide(Radar r) async {
@@ -40,6 +68,7 @@ class RemovedRadars {
   /// Mostra de novo todos os radares que você escondeu.
   Future<void> clearMine() async {
     _mine.clear();
+    _wrong.clear();
     await _save();
   }
 
