@@ -41,6 +41,8 @@ class TrackRecorder {
   static const minStep = 30.0; // metros entre pontos
 
   bool recording = false;
+  /// Continuando uma rota já salva (1.29.41): id dela; null = rota nova.
+  String? appendTo;
   final List<(double, double, int)> _pts = [];
   double _km = 0;
   List<SavedTrack> tracks = [];
@@ -82,6 +84,11 @@ class TrackRecorder {
         if (la != null && lo != null && t != null) _addRaw(la, lo, t);
       }
       recording = _pts.isNotEmpty;
+      final ap = File('${d.path}/_rec_append');
+      if (recording && await ap.exists()) {
+        final id = (await ap.readAsString()).trim();
+        if (tracks.any((t) => t.id == id)) appendTo = id;
+      }
     }
   }
 
@@ -96,7 +103,33 @@ class TrackRecorder {
     _pts.clear();
     _km = 0;
     recording = true;
+    appendTo = null;
     await File('${d.path}/_rec.txt').writeAsString('');
+    final ap = File('${d.path}/_rec_append');
+    if (await ap.exists()) await ap.delete();
+  }
+
+  /// Continua gravando uma rota já salva: os pontos novos entram no fim
+  /// dela (1.29.41).
+  Future<void> resume(SavedTrack t) async {
+    final d = await _folder();
+    final old = await points0(t);
+    _pts.clear();
+    _km = 0;
+    final t0 = t.end.millisecondsSinceEpoch;
+    final b = StringBuffer();
+    for (final p in old) {
+      _addRaw(p.$1, p.$2, t0);
+      b.write('${p.$1.toStringAsFixed(6)},${p.$2.toStringAsFixed(6)},$t0\n');
+    }
+    // Começo real da rota (para a duração) no primeiro ponto.
+    if (_pts.isNotEmpty) {
+      _pts[0] = (_pts[0].$1, _pts[0].$2, t.start.millisecondsSinceEpoch);
+    }
+    await File('${d.path}/_rec.txt').writeAsString(b.toString());
+    await File('${d.path}/_rec_append').writeAsString(t.id);
+    appendTo = t.id;
+    recording = true;
   }
 
   void _addRaw(double lat, double lon, int t) {
@@ -131,9 +164,33 @@ class TrackRecorder {
     final d = await _folder();
     final rec = File('${d.path}/_rec.txt');
     if (await rec.exists()) await rec.delete();
+    final ap = File('${d.path}/_rec_append');
+    if (await ap.exists()) await ap.delete();
+    final into = appendTo;
+    appendTo = null;
     if (_pts.length < 2) {
       _pts.clear();
       return null;
+    }
+    if (into != null) {
+      // Continuação: regrava a mesma rota (mesmo id), agora maior.
+      final i = tracks.indexWhere((t) => t.id == into);
+      if (i >= 0) {
+        final pts = [for (final p in _pts) (p.$1, p.$2)];
+        await _file(d, into).writeAsString(toGpx(name, pts, null));
+        final t = SavedTrack(
+            into,
+            name,
+            tracks[i].start,
+            DateTime.fromMillisecondsSinceEpoch(_pts.last.$3),
+            _km,
+            pts.length);
+        tracks[i] = t;
+        await _saveIndex();
+        _pts.clear();
+        _km = 0;
+        return t;
+      }
     }
     final t = await _store(name, [for (final p in _pts) (p.$1, p.$2)],
         DateTime.fromMillisecondsSinceEpoch(_pts.first.$3),

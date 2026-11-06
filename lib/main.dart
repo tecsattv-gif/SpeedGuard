@@ -1308,8 +1308,24 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     _snack('Gravando a rota. Para parar: botão Rotas → Parar gravação.');
   }
 
+  /// Continuar gravando uma rota já salva (1.29.41).
+  Future<void> _resumeRecording(SavedTrack t) async {
+    if (_rec.recording) {
+      _snack('Já está gravando. Pare a gravação atual antes.');
+      return;
+    }
+    await _rec.resume(t);
+    if (!_running) await _start();
+    if (mounted) setState(() {});
+    _snack('Continuando a gravação de "${t.name}" '
+        '(${t.km.toStringAsFixed(1)} km). O caminho novo entra no fim dela.');
+  }
+
   Future<void> _stopRecording() async {
-    final def = 'Rota ${_when(DateTime.now())}';
+    final cont = _rec.appendTo == null
+        ? null
+        : _rec.tracks.where((t) => t.id == _rec.appendTo).firstOrNull;
+    final def = cont?.name ?? 'Rota ${_when(DateTime.now())}';
     final name = await _askName('Salvar rota gravada', def);
     if (name == null) return; // continua gravando
     final t = await _rec.stop(name.isEmpty ? def : name);
@@ -1496,6 +1512,15 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               onPressed: () {
                 Navigator.pop(ctx);
                 _startTrackNav(t, reverse: true);
+              },
+            ),
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              icon: const Icon(Icons.fiber_manual_record, color: Colors.red),
+              label: const Text('Continuar gravando esta rota'),
+              onPressed: () {
+                Navigator.pop(ctx);
+                _resumeRecording(t);
               },
             ),
             const SizedBox(height: 8),
