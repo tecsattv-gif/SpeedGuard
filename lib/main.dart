@@ -1020,7 +1020,45 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   /// Marcando o park no mapa (1.29.32): tipo e nome já escolhidos.
   (String, String)? _placing;
 
+  /// Aviso antes de adicionar park (1.29.33): balão com X para fechar.
+  Future<bool> _parkWarning() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        icon: const Icon(Icons.warning_amber_rounded,
+            color: Colors.amber, size: 40),
+        title: Row(children: [
+          const Expanded(child: Text('Atenção, motorista!')),
+          IconButton(
+            tooltip: 'Fechar',
+            icon: const Icon(Icons.close),
+            onPressed: () => Navigator.pop(ctx, true),
+          ),
+        ]),
+        content: const Text(
+          'Só adicione um park onde você mesmo parou com o caminhão e '
+          'tem certeza de que o caminhão entra, manobra e sai.\n\n'
+          'Park adicionado aparece para todos os motoristas. Um park '
+          'errado ou inventado pode levar um colega a um lugar sem saída, '
+          'sem vaga ou proibido — de madrugada, cansado e sem tempo de '
+          'direção.\n\n'
+          'Na dúvida, não adicione.',
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancelar')),
+          FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Entendi')),
+        ],
+      ),
+    );
+    return ok == true;
+  }
+
   Future<void> _addPark() async {
+    if (!await _parkWarning()) return;
     final pos = _pos ?? await _currentPos();
     if (!mounted) return;
     final nameCtrl = TextEditingController();
