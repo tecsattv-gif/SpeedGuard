@@ -72,6 +72,21 @@ class RouteService {
     }
   }
 
+  /// Usa uma rota gravada como rota atual (1.29.35): parks do caminho etc.
+  void setTrack(String name, List<(double, double)> p) {
+    final c = <double>[0];
+    for (var i = 1; i < p.length; i++) {
+      c.add(c.last +
+          Geolocator.distanceBetween(
+              p[i - 1].$1, p[i - 1].$2, p[i].$1, p[i].$2));
+    }
+    pts = p;
+    cum = c;
+    destName = name;
+    _idx = 0;
+    _offCount = 0;
+  }
+
   /// Rumo da rota no trecho [i] → [i]+1 (null fora da rota).
   double? bearingAt(int i) {
     if (i < 0 || i + 1 >= pts.length) return null;

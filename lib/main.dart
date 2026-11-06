@@ -1,6 +1,7 @@
 import 'update_service.dart';
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:android_intent_plus/android_intent.dart';
 import 'package:android_intent_plus/flag.dart';
@@ -9,9 +10,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_overlay_window/flutter_overlay_window.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
@@ -37,6 +40,7 @@ import 'removed_radars.dart';
 import 'section_watch.dart';
 import 'speed_watch.dart';
 import 'speed_picker.dart';
+import 'track_recorder.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -330,6 +334,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   Future<void> _init() async {
     final p = await SharedPreferences.getInstance();
     await _removed.load();
+    await _rec.load();
     _loadUserParks();
     Timer.periodic(const Duration(minutes: 30), (_) => _loadUserParks());
     _voice = p.getBool('voice') ?? true;
@@ -776,6 +781,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   Future<void> _onPosition(Position pos) async {
     _pos = pos;
+    if (_rec.recording) {
+      _rec.add(pos).catchError((_) {});
+    }
     if (pos.speed > 2.5 && pos.heading >= 0) _goodHeading = pos.heading;
     // Velocidade e posição na tela primeiro, aconteça o que acontecer depois.
     if (mounted) setState(() {});
@@ -1043,6 +1051,347 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             {'id': id, 'lat': lat, 'lon': lon, 't': t, 'n': n}
         ]));
     if (mounted) setState(() {});
+  }
+
+  // ---------- Rotas gravadas (1.29.35) ----------
+
+  final _rec = TrackRecorder();
+  List<LatLng>? _shownTrack;
+  String? _shownTrackName;
+
+  String _two(int n) => n.toString().padLeft(2, '0');
+  String _when(DateTime d) =>
+      '${_two(d.day)}/${_two(d.month)}/${d.year} ${_two(d.hour)}:${_two(d.minute)}';
+  String _dur(Duration d) =>
+      d.inHours > 0 ? '${d.inHours} h ${_two(d.inMinutes % 60)} min' : '${d.inMinutes} min';
+
+  Future<String?> _askName(String title, String initial) async {
+    final c = TextEditingController(text: initial);
+    final r = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(title),
+        content: TextField(
+          controller: c,
+          autofocus: true,
+          maxLength: 60,
+          textCapitalization: TextCapitalization.sentences,
+          decoration: const InputDecoration(labelText: 'Nome da rota'),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancelar')),
+          FilledButton(
+              onPressed: () => Navigator.pop(ctx, c.text.trim()),
+              child: const Text('Salvar')),
+        ],
+      ),
+    );
+    c.dispose();
+    return r;
+  }
+
+  Future<void> _startRecording() async {
+    await _rec.start();
+    if (!_running) await _start();
+    if (mounted) setState(() {});
+    _snack('Gravando a rota. Para parar: botão Rotas → Parar gravação.');
+  }
+
+  Future<void> _stopRecording() async {
+    final def = 'Rota ${_when(DateTime.now())}';
+    final name = await _askName('Salvar rota gravada', def);
+    if (name == null) return; // continua gravando
+    final t = await _rec.stop(name.isEmpty ? def : name);
+    if (mounted) setState(() {});
+    _snack(t == null
+        ? 'Rota muito curta, não foi salva.'
+        : 'Rota "${t.name}" salva (${t.km.toStringAsFixed(1)} km).');
+  }
+
+  Future<void> _showTrack(SavedTrack t) async {
+    final pts = await _rec.points0(t);
+    if (pts.length < 2 || !mounted) return;
+    final ll = [for (final p in pts) LatLng(p.$1, p.$2)];
+    setState(() {
+      _shownTrack = ll;
+      _shownTrackName = t.name;
+      _mapView = true;
+      _follow = false;
+    });
+    try {
+      _map.fitCamera(CameraFit.bounds(
+          bounds: LatLngBounds.fromPoints(ll),
+          padding: const EdgeInsets.all(48)));
+    } catch (_) {}
+    // Parks do caminho na lista do P, como numa rota de Navegar.
+    _route.setTrack(t.name, pts);
+    _parks.clearRoute();
+    _parks.loadRoute(_route, country: _country).then((_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  void _hideTrack() {
+    setState(() {
+      _shownTrack = null;
+      _shownTrackName = null;
+    });
+    _route.clear();
+    _parks.clearRoute();
+  }
+
+  Future<void> _trackToGoogle(SavedTrack t) async {
+    final pts = await _rec.points0(t);
+    if (pts.length < 2) return;
+    var from = 0;
+    final pos = _pos;
+    if (pos != null) {
+      var best = double.infinity;
+      for (var i = 0; i < pts.length; i++) {
+        final d = Geolocator.distanceBetween(
+            pos.latitude, pos.longitude, pts[i].$1, pts[i].$2);
+        if (d < best) {
+          best = d;
+          from = i;
+        }
+      }
+      if (best > 3000) from = 0;
+    }
+    final url = TrackRecorder.googleUrl(pts, from: from);
+    try {
+      await AndroidIntent(
+        action: 'action_view',
+        data: url,
+        package: 'com.google.android.apps.maps',
+        flags: const [Flag.FLAG_ACTIVITY_NEW_TASK],
+      ).launch();
+    } catch (_) {
+      try {
+        await AndroidIntent(
+                action: 'action_view',
+                data: url,
+                flags: const [Flag.FLAG_ACTIVITY_NEW_TASK])
+            .launch();
+      } catch (_) {
+        _snack('Não foi possível abrir o Google Maps.');
+      }
+    }
+  }
+
+  Future<void> _shareTrack(SavedTrack t) async {
+    final f = await _rec.fileOf(t);
+    final safe = t.name.replaceAll(RegExp(r'[^\w\- ]'), '').trim();
+    final tmp = File('${f.parent.path}/${safe.isEmpty ? 'rota' : safe}.gpx');
+    await f.copy(tmp.path);
+    await SharePlus.instance.share(ShareParams(
+      files: [XFile(tmp.path, mimeType: 'application/gpx+xml')],
+      text: 'Rota "${t.name}" (${t.km.toStringAsFixed(0)} km), gravada no '
+          'SpeedGuard. Abra no SpeedGuard (Rotas → Importar) ou em outro '
+          'app de GPS.',
+    ));
+  }
+
+  Future<void> _importTrack() async {
+    FilePickerResult? res;
+    try {
+      res = await FilePicker.platform
+          .pickFiles(type: FileType.any, withData: true);
+    } catch (_) {
+      _snack('Não consegui abrir os arquivos.');
+      return;
+    }
+    if (res == null || res.files.isEmpty) return;
+    final f = res.files.first;
+    var bytes = f.bytes;
+    if (bytes == null && f.path != null) bytes = await File(f.path!).readAsBytes();
+    if (bytes == null) return;
+    final t = await _rec.importGpx(utf8.decode(bytes, allowMalformed: true),
+        f.name.replaceAll(RegExp(r'\.gpx$', caseSensitive: false), ''));
+    if (mounted) setState(() {});
+    _snack(t == null
+        ? 'Esse arquivo não tem uma rota (GPX).'
+        : 'Rota "${t.name}" importada (${t.km.toStringAsFixed(0)} km).');
+  }
+
+  void _trackActions(SavedTrack t) {
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.fromLTRB(
+            20, 16, 20, 20 + MediaQuery.viewPaddingOf(ctx).bottom),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(t.name,
+                style:
+                    const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            Text('${_when(t.start)} · ${t.km.toStringAsFixed(1)} km'
+                '${t.duration.inMinutes > 0 ? ' · ${_dur(t.duration)}' : ''}',
+                style: TextStyle(color: SG.textSoft)),
+            const SizedBox(height: 14),
+            FilledButton.icon(
+              icon: const Icon(Icons.map),
+              label: const Text('Ver no mapa'),
+              onPressed: () {
+                Navigator.pop(ctx);
+                _showTrack(t);
+              },
+            ),
+            const SizedBox(height: 8),
+            FilledButton.tonalIcon(
+              icon: const Icon(Icons.directions),
+              label: const Text('Seguir no Google Maps'),
+              onPressed: () {
+                Navigator.pop(ctx);
+                _trackToGoogle(t);
+              },
+            ),
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              icon: const Icon(Icons.share),
+              label: const Text('Compartilhar'),
+              onPressed: () {
+                Navigator.pop(ctx);
+                _shareTrack(t);
+              },
+            ),
+            const SizedBox(height: 8),
+            Row(children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  icon: const Icon(Icons.edit),
+                  label: const Text('Renomear'),
+                  onPressed: () async {
+                    Navigator.pop(ctx);
+                    final n = await _askName('Renomear rota', t.name);
+                    if (n == null || n.isEmpty) return;
+                    await _rec.rename(t, n);
+                    if (mounted) setState(() {});
+                  },
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(foregroundColor: SG.red),
+                  icon: const Icon(Icons.delete_outline),
+                  label: const Text('Excluir'),
+                  onPressed: () async {
+                    Navigator.pop(ctx);
+                    final ok = await showDialog<bool>(
+                      context: context,
+                      builder: (d) => AlertDialog(
+                        title: const Text('Excluir rota?'),
+                        content: Text('"${t.name}" será apagada do celular.'),
+                        actions: [
+                          TextButton(
+                              onPressed: () => Navigator.pop(d, false),
+                              child: const Text('Cancelar')),
+                          FilledButton(
+                              onPressed: () => Navigator.pop(d, true),
+                              child: const Text('Excluir')),
+                        ],
+                      ),
+                    );
+                    if (ok != true) return;
+                    if (_shownTrackName == t.name) _hideTrack();
+                    await _rec.delete(t);
+                    if (mounted) setState(() {});
+                  },
+                ),
+              ),
+            ]),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _tracksSheet() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      constraints:
+          BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.8),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheet) => Padding(
+          padding: EdgeInsets.fromLTRB(
+              16, 12, 16, 16 + MediaQuery.viewPaddingOf(ctx).bottom),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text('Rotas gravadas',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+              Text('Ficam só no seu celular.',
+                  style: TextStyle(color: SG.textSoft, fontSize: 12)),
+              const SizedBox(height: 10),
+              if (_rec.recording)
+                FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                      backgroundColor: SG.red, foregroundColor: Colors.white),
+                  icon: const Icon(Icons.stop),
+                  label: Text('Parar gravação '
+                      '(${_rec.km.toStringAsFixed(1)} km)'),
+                  onPressed: () async {
+                    Navigator.pop(ctx);
+                    await _stopRecording();
+                  },
+                )
+              else
+                FilledButton.icon(
+                  icon: const Icon(Icons.fiber_manual_record,
+                      color: Colors.red),
+                  label: const Text('Gravar rota agora'),
+                  onPressed: () async {
+                    Navigator.pop(ctx);
+                    await _startRecording();
+                  },
+                ),
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                icon: const Icon(Icons.file_open),
+                label: const Text('Importar rota (arquivo GPX)'),
+                onPressed: () async {
+                  Navigator.pop(ctx);
+                  await _importTrack();
+                },
+              ),
+              const SizedBox(height: 8),
+              if (_rec.tracks.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Text('Nenhuma rota gravada ainda.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: SG.textSoft)),
+                )
+              else
+                Flexible(
+                  child: ListView(shrinkWrap: true, children: [
+                    for (final t in _rec.tracks)
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: const Icon(Icons.route, size: 32),
+                        title: Text(t.name,
+                            maxLines: 1, overflow: TextOverflow.ellipsis),
+                        subtitle: Text('${_when(t.start)} · '
+                            '${t.km.toStringAsFixed(1)} km'),
+                        trailing: const Icon(Icons.chevron_right),
+                        onTap: () {
+                          Navigator.pop(ctx);
+                          _trackActions(t);
+                        },
+                      ),
+                  ]),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   /// Marcando o park no mapa (1.29.32): tipo e nome já escolhidos.
@@ -2979,6 +3328,22 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 // Modo escuro: mapa escurecido para não ofuscar à noite.
                 tileBuilder: SG.dark ? darkModeTileBuilder : null,
               ),
+              // Rota gravada aberta e a gravação em andamento (1.29.35).
+              if (_shownTrack != null || (_rec.recording && _rec.points > 1))
+                PolylineLayer(polylines: [
+                  if (_shownTrack != null)
+                    Polyline(
+                        points: _shownTrack!,
+                        strokeWidth: 6,
+                        color: const Color(0xCC00E5FF)),
+                  if (_rec.recording && _rec.points > 1)
+                    Polyline(
+                        points: [
+                          for (final p in _rec.livePts) LatLng(p.$1, p.$2)
+                        ],
+                        strokeWidth: 4,
+                        color: const Color(0xCCFF1744)),
+                ]),
               if (showRadars)
                 MarkerLayer(
                   markers: [
@@ -3212,6 +3577,39 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             ),
           ],
 
+          // Rota gravada aberta no mapa / gravando (1.29.35).
+          if (_placing == null && (_shownTrack != null || _rec.recording))
+            Positioned(
+              right: 12,
+              top: MediaQuery.paddingOf(context).top + 64,
+              child: Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                if (_rec.recording)
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                        color: SG.red,
+                        borderRadius: BorderRadius.circular(20)),
+                    child: Text('● REC ${_rec.km.toStringAsFixed(1)} km',
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w800)),
+                  ),
+                if (_shownTrack != null) ...[
+                  const SizedBox(height: 6),
+                  InputChip(
+                    avatar: const Icon(Icons.route, size: 18),
+                    label: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 160),
+                      child: Text(_shownTrackName ?? 'Rota',
+                          overflow: TextOverflow.ellipsis),
+                    ),
+                    onDeleted: _hideTrack,
+                  ),
+                ],
+              ]),
+            ),
+
           // Parks à frente, logo acima dos botões.
           if (_placing == null &&
               _running &&
@@ -3282,6 +3680,13 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   tooltip: _mapView ? 'Tela de alerta' : 'Mapa',
                   icon: _mapView ? Icons.keyboard_double_arrow_up : Icons.map,
                   onTap: _toggleView,
+                ),
+                const SizedBox(width: 10),
+                // 1.29.35: rotas gravadas (vermelho enquanto grava).
+                _RoundAction(
+                  tooltip: 'Rotas gravadas',
+                  icon: _rec.recording ? Icons.fiber_manual_record : Icons.route,
+                  onTap: _tracksSheet,
                 ),
                 const SizedBox(width: 10),
                 Expanded(
