@@ -2,6 +2,7 @@ import 'update_service.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:android_intent_plus/android_intent.dart';
 import 'package:android_intent_plus/flag.dart';
@@ -29,6 +30,7 @@ import 'presence_service.dart';
 import 'radar_service.dart';
 import 'splash_screen.dart';
 import 'layers.dart';
+import 'live_service.dart';
 import 'theme.dart';
 import 'tutorial_page.dart';
 import 'vehicle_icon.dart';
@@ -336,6 +338,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     final p = await SharedPreferences.getInstance();
     await _removed.load();
     await _rec.load();
+    await _live.load();
+    _live.onPhoto = () {
+      if (mounted) setState(() {});
+    };
+    _liveTimer = Timer.periodic(LiveService.every, (_) => _liveTick());
+    Future.delayed(const Duration(seconds: 6), () => _liveTick(photo: true));
     // 1.29.39: app fechado no meio da navegação: oferece continuar.
     Future.delayed(const Duration(seconds: 4), () async {
       final l = await _lastNav();
@@ -411,6 +419,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _presenceTimer?.cancel();
+    _liveTimer?.cancel();
     _closeBubble();
     _overlaySub?.cancel();
     _askTimer?.cancel();
@@ -1069,6 +1078,218 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   // ---------- Rotas gravadas (1.29.35) ----------
 
   final _rec = TrackRecorder();
+
+  // ---------- Localização em grupo (1.29.43) ----------
+  final _live = LiveService();
+  Timer? _liveTimer;
+  bool _livePhotoSent = false;
+
+  Future<void> _liveTick({bool photo = false}) async {
+    if (!mounted) return;
+    final pos = _pos;
+    if (_live.sharing && _live.hasGroup && pos != null) {
+      final ok = await _live.push(pos.latitude, pos.longitude, pos.heading,
+          pos.speed * 3.6,
+          withPhoto: photo || !_livePhotoSent);
+      if (ok) _livePhotoSent = true;
+    }
+    if (_live.hasGroup) {
+      await _live.refresh();
+      if (mounted) setState(() {});
+    }
+  }
+
+  Widget _livePin(Uint8List? photo, String nick, Color color) => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: color,
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.white, width: 3),
+              boxShadow: const [BoxShadow(color: Colors.black54, blurRadius: 5)],
+            ),
+            clipBehavior: Clip.antiAlias,
+            alignment: Alignment.center,
+            child: photo != null
+                ? Image.memory(photo, fit: BoxFit.cover, width: 44, height: 44,
+                    gaplessPlayback: true)
+                : Text(
+                    nick.isEmpty ? '?' : nick.characters.first.toUpperCase(),
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w900)),
+          ),
+          Transform.translate(
+            offset: const Offset(0, -12),
+            child: const Icon(Icons.arrow_drop_down,
+                color: Colors.white, size: 30),
+          ),
+        ],
+      );
+
+  void _showMember(LiveMember m) {
+    final ago = DateTime.now()
+        .difference(DateTime.fromMillisecondsSinceEpoch(m.updatedAt));
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.fromLTRB(
+            20, 16, 20, 20 + MediaQuery.viewPaddingOf(ctx).bottom),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(children: [
+              _livePin(m.photo, m.nick, const Color(0xFF7E57C2)),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(m.nick.isEmpty ? 'Motorista' : m.nick,
+                        style: const TextStyle(
+                            fontSize: 20, fontWeight: FontWeight.bold)),
+                    Text(
+                        '${m.kmh.round()} km/h · '
+                        '${ago.inMinutes < 1 ? 'agora' : 'há ${ago.inMinutes} min'}',
+                        style: TextStyle(color: SG.textSoft)),
+                  ],
+                ),
+              ),
+            ]),
+            const SizedBox(height: 16),
+            FilledButton.icon(
+              icon: const Icon(Icons.directions),
+              label: const Text('Ir até lá (Google Maps)'),
+              onPressed: () {
+                Navigator.pop(ctx);
+                _navigateTo(Park('live', m.nick, m.lat, m.lon, 'parking', const {}));
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _groupSheet() async {
+    final nickC = TextEditingController(text: _live.nick);
+    final groupC = TextEditingController(text: _live.group);
+    var share = _live.sharing;
+    Uint8List? photo = _live.photo;
+    final ok = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setS) => Padding(
+          padding: EdgeInsets.fromLTRB(20, 16, 20,
+              20 + MediaQuery.viewInsetsOf(ctx).bottom +
+                  MediaQuery.viewPaddingOf(ctx).bottom),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text('Localização em grupo',
+                    style:
+                        TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                Text(
+                    'Só quem tem o mesmo código de grupo vê você no mapa '
+                    '(e você vê eles). Some do mapa ao desligar ou 5 min '
+                    'sem sinal. Nada fica gravado.',
+                    style: TextStyle(color: SG.textSoft, fontSize: 12)),
+                const SizedBox(height: 14),
+                Row(children: [
+                  _livePin(photo, nickC.text, SG.pink),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      icon: const Icon(Icons.photo),
+                      label: const Text('Escolher foto'),
+                      onPressed: () async {
+                        try {
+                          final r = await FilePicker.platform.pickFiles(
+                              type: FileType.image, withData: true);
+                          final b = r?.files.first.bytes;
+                          if (b == null) return;
+                          final small = await LiveService.shrink(b);
+                          if (small != null) setS(() => photo = small);
+                        } catch (_) {}
+                      },
+                    ),
+                  ),
+                ]),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: nickC,
+                  maxLength: 30,
+                  onChanged: (_) => setS(() {}),
+                  decoration: const InputDecoration(
+                      labelText: 'Apelido (nome que os outros veem)'),
+                ),
+                TextField(
+                  controller: groupC,
+                  maxLength: 40,
+                  decoration: const InputDecoration(
+                      labelText: 'Código do grupo',
+                      helperText:
+                          'Combine com os colegas. Mínimo 4 letras/números. '
+                          'Quem não sabe o código não vê o grupo.'),
+                ),
+                const SizedBox(height: 6),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Compartilhar minha localização'),
+                  subtitle: const Text('Desligado: você só vê o grupo.'),
+                  value: share,
+                  onChanged: (v) => setS(() => share = v),
+                ),
+                const SizedBox(height: 8),
+                FilledButton(
+                  onPressed: () => Navigator.pop(ctx, true),
+                  child: const Text('Salvar'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    final nick = nickC.text.trim(), group = groupC.text.trim();
+    nickC.dispose();
+    groupC.dispose();
+    if (ok != true) return;
+    if (share && group.length < 4) {
+      _snack('O código do grupo precisa ter pelo menos 4 letras ou números.');
+      return;
+    }
+    final wasSharing = _live.sharing;
+    final groupChanged = group != _live.group;
+    _live
+      ..nick = nick
+      ..group = group
+      ..photo = photo
+      ..sharing = share;
+    if (groupChanged) _live.members.clear();
+    await _live.save();
+    if (wasSharing && !share) await _live.remove();
+    _livePhotoSent = false;
+    if (share && !_running) await _start();
+    await _liveTick(photo: true);
+    if (_live.rulesMissing) {
+      _snack('Falta publicar a regra "live" no Firebase (veja o README).');
+    } else {
+      _snack(share
+          ? 'Compartilhando com o grupo.'
+          : group.length >= 4
+              ? 'Você está vendo o grupo (sem compartilhar).'
+              : 'Localização em grupo desligada.');
+    }
+  }
 
   // ---------- Navegar pela rota gravada (1.29.38) ----------
   TrackNav? _nav;
@@ -3465,6 +3686,19 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 },
               ),
               ListTile(
+                leading: const Icon(Icons.groups),
+                title: const Text('Localização em grupo'),
+                subtitle: Text(_live.sharing
+                    ? 'Compartilhando · ${_live.members.length} no mapa'
+                    : _live.hasGroup
+                        ? 'Vendo o grupo · ${_live.members.length} no mapa'
+                        : 'Ver e mostrar colegas no mapa'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _groupSheet();
+                },
+              ),
+              ListTile(
                 leading: const Icon(Icons.bug_report_outlined),
                 title: const Text('Diagnóstico (último erro)'),
                 onTap: () async {
@@ -3733,6 +3967,52 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                       child: VehicleMarker(type: _vehicle),
                     ),
                   ),
+                ]),
+              // Localização em grupo (1.29.43): caminhãozinho de cada
+              // colega e a gota com a foto em cima.
+              if (_live.members.isNotEmpty)
+                MarkerLayer(markers: [
+                  for (final m in _live.members.values)
+                    Marker(
+                      point: LatLng(m.shown.$1, m.shown.$2),
+                      width: 40,
+                      height: 40,
+                      child: GestureDetector(
+                        onTap: () => _showMember(m),
+                        child: Transform.rotate(
+                          angle: m.heading * 3.14159265 / 180,
+                          child: const VehicleMarker(
+                              type: VehicleIcon.truck, size: 40),
+                        ),
+                      ),
+                    ),
+                ]),
+              if (_live.members.isNotEmpty ||
+                  (_live.sharing && _live.hasGroup && pos != null))
+                MarkerLayer(markers: [
+                  for (final m in _live.members.values)
+                    Marker(
+                      point: LatLng(m.shown.$1, m.shown.$2),
+                      width: 56,
+                      height: 80,
+                      rotate: true,
+                      alignment: Alignment.topCenter,
+                      child: GestureDetector(
+                        onTap: () => _showMember(m),
+                        child: _livePin(
+                            m.photo, m.nick, const Color(0xFF7E57C2)),
+                      ),
+                    ),
+                  if (_live.sharing && _live.hasGroup && pos != null)
+                    Marker(
+                      point: LatLng(pos.latitude, pos.longitude),
+                      width: 56,
+                      height: 90,
+                      rotate: true,
+                      alignment: Alignment.topCenter,
+                      child: IgnorePointer(
+                          child: _livePin(_live.photo, _live.nick, SG.pink)),
+                    ),
                 ]),
               const SimpleAttributionWidget(
                 source: Text('OpenStreetMap'),

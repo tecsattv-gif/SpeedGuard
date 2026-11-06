@@ -100,6 +100,7 @@ Autor: Luiz Alberto Cardoso
   - **1.29.40**: a janela de cada rota agora **rola** (Compartilhar, Renomear e Excluir ficavam escondidos embaixo) e mostra **Continuar rota** no alto quando aquela rota tem navegação parada
   - **1.29.41 — Continuar gravando**: em Rotas → escolha a rota → **Continuar gravando esta rota**. A gravação recomeça e o caminho novo entra **no fim da mesma rota** (mesmo nome; ao parar, ela é regravada com os km e a duração somados). Se o app fechar no meio, continua de onde parou, na mesma rota
   - **1.29.42**: placa de limite com 3 algarismos (120, 130) cortava o último ("12") com letra grande no celular; agora o número sempre cabe na placa (encolhe se precisar)
+  - **1.29.43 — Localização em grupo**: Configurações → **Localização em grupo**: foto (escolhida na galeria, reduzida para 80×80), **apelido**, **código do grupo** (mín. 4 letras/números, combinado entre os colegas) e **Compartilhar minha localização**. Quem tem o mesmo código vê os colegas no mapa: **caminhãozinho** girando no sentido em que anda e, em cima, uma **gota com a foto** (ou a inicial do apelido); entre uma posição e outra o caminhão desliza suave. Tocar na gota/caminhão mostra apelido, velocidade e há quanto tempo, com **Ir até lá (Google Maps)**. Com o compartilhamento desligado você só vê o grupo. A posição vai a cada **30 s** para a coleção `live` do Firebase (sem histórico); some **ao desligar** ou **5 min sem sinal**. O código do grupo vai como hash (FNV-1a), nunca o texto; a foto só é baixada quando muda (`photoAt`), para gastar pouca internet. **Precisa publicar a regra `live`** (abaixo) no console do Firebase; sem ela o app avisa "Falta publicar a regra live"
   - O fundo do painel é sólido desde a 1.29.5 (antes deixava ver um pouco do app de baixo)
   - Depois do pop-up "VELOCIDADE EXCEDIDA" e da janela do **+**, o painel volta ao tamanho certo e confere o tamanho real (desde a 1.29.3). Antes, a janela ficava ~2,5× maior que o painel, com uma área **invisível** que descia até o rodapé e roubava os toques nos botões de baixo da tela
 
@@ -202,6 +203,22 @@ service cloud.firestore {
       allow delete: if resource.data.type == 'movel'
         || (resource.data.type in ['fila', 'acidente', 'obra', 'perigo', 'policia']
             && resource.data.checkAfter < request.time.toMillis());
+    }
+    // localização em grupo (1.29.43): um documento por aparelho; quem
+    // compartilha grava, quem tem o código do grupo (hash) lê
+    match /live/{id} {
+      allow read: if true;
+      allow create, update: if request.resource.data.keys().hasOnly(
+          ['group','nick','photo','photoAt','lat','lon','heading','speed','updatedAt'])
+        && request.resource.data.group is string
+        && request.resource.data.group.size() <= 40
+        && request.resource.data.nick is string
+        && request.resource.data.nick.size() <= 30
+        && request.resource.data.lat is number
+        && request.resource.data.lon is number
+        && (!('photo' in request.resource.data)
+            || request.resource.data.photo.size() <= 60000);
+      allow delete: if true;
     }
     // pessoas conectadas: um documento por aparelho (país + horário)
     match /presence/{id} {
