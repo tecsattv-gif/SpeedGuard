@@ -888,6 +888,47 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           : '${(m / 1000).round()} km';
 
   /// Compartilha o park (WhatsApp, SMS, e-mail…) com o link do Google Maps.
+  /// Toque no "P+" do mapa: nome, tipo, ir até lá e compartilhar.
+  void _showUserPark(Park p) {
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.fromLTRB(
+            20, 16, 20, 20 + MediaQuery.viewPaddingOf(ctx).bottom),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(p.name,
+                style: const TextStyle(
+                    fontSize: 20, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 4),
+            Text([p.kindLabel, ...p.features].join(' · '),
+                style: TextStyle(color: SG.textSoft)),
+            const SizedBox(height: 16),
+            FilledButton.icon(
+              icon: const Icon(Icons.directions),
+              label: const Text('Ir até lá'),
+              onPressed: () {
+                Navigator.pop(ctx);
+                _navigateTo(p);
+              },
+            ),
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              icon: const Icon(Icons.share),
+              label: const Text('Compartilhar'),
+              onPressed: () {
+                Navigator.pop(ctx);
+                _sharePark(p);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _sharePark(Park p) async {
     final title = p.name.isNotEmpty ? '${p.name} (${p.kindLabel})' : p.kindLabel;
     final f = p.features;
@@ -2726,6 +2767,41 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                       ),
                   ],
                 ),
+              // Parks adicionados pelos motoristas (1.29.30): "P+" verde no
+              // mapa, até 50 km de você.
+              if (pos != null && _parks.userParks.isNotEmpty)
+                MarkerLayer(markers: [
+                  for (final p in _parks.userParks)
+                    if (Geolocator.distanceBetween(
+                            pos.latitude, pos.longitude, p.lat, p.lon) <
+                        50000)
+                      Marker(
+                        point: LatLng(p.lat, p.lon),
+                        width: 34,
+                        height: 34,
+                        rotate: true,
+                        child: GestureDetector(
+                          onTap: () => _showUserPark(p),
+                          child: Container(
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF2E7D32),
+                              borderRadius: BorderRadius.circular(7),
+                              border:
+                                  Border.all(color: Colors.white, width: 2),
+                              boxShadow: const [
+                                BoxShadow(color: Colors.black45, blurRadius: 4)
+                              ],
+                            ),
+                            child: const Text('P+',
+                                style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w900)),
+                          ),
+                        ),
+                      ),
+                ]),
               if (pos != null)
                 MarkerLayer(markers: [
                   Marker(
