@@ -104,6 +104,31 @@ jobs:
           fi
           grep -n -A6 "signingConfigs" "$F" | head -12
 
+      # 1.29.47: flutter_local_notifications precisa de "desugaring".
+      - name: Ativar desugaring (notificações)
+        run: |
+          python3 - <<'PY'
+          import os, re
+          f = "android/app/build.gradle.kts"
+          if os.path.exists(f):
+              s = open(f).read()
+              if "isCoreLibraryDesugaringEnabled" not in s:
+                  s = s.replace("compileOptions {",
+                                "compileOptions {\n        isCoreLibraryDesugaringEnabled = true", 1)
+                  s += ('\ndependencies {\n'
+                        '    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")\n}\n')
+          else:
+              f = "android/app/build.gradle"
+              s = open(f).read()
+              if "coreLibraryDesugaringEnabled" not in s:
+                  s = s.replace("compileOptions {",
+                                "compileOptions {\n        coreLibraryDesugaringEnabled true", 1)
+                  s += ("\ndependencies {\n"
+                        "    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.4'\n}\n")
+          open(f, "w").write(s)
+          PY
+          grep -n -B1 -A2 "esugar" android/app/build.gradle* | head -20
+
       - name: Compilar APK
         run: flutter build apk --release
 

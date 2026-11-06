@@ -30,6 +30,7 @@ import 'presence_service.dart';
 import 'radar_service.dart';
 import 'splash_screen.dart';
 import 'layers.dart';
+import 'live_bg.dart';
 import 'live_service.dart';
 import 'theme.dart';
 import 'tutorial_page.dart';
@@ -344,6 +345,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     };
     _liveTimer = Timer.periodic(LiveService.every, (_) => _liveTick());
     Future.delayed(const Duration(seconds: 6), () => _liveTick(photo: true));
+    LiveBorder.schedule(_isTruck && _live.hasGroup);
     // 1.29.39: app fechado no meio da navegação: oferece continuar.
     Future.delayed(const Duration(seconds: 4), () async {
       final l = await _lastNav();
@@ -1095,13 +1097,118 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     if (_live.sharing && _live.hasGroup && pos != null) {
       final ok = await _live.push(pos.latitude, pos.longitude, pos.heading,
           pos.speed * 3.6,
-          withPhoto: photo || !_livePhotoSent);
+          withPhoto: photo || !_livePhotoSent,
+          country: _country);
       if (ok) _livePhotoSent = true;
     }
     if (_live.hasGroup) {
-      await _live.refresh();
+      if (await _live.refresh()) {
+        // Colega atravessou fronteira (1.29.47): notificação + voz.
+        for (final (nick, cc) in await _live.borderEvents()) {
+          LiveBorder.notify(nick, cc);
+          final txt = '$nick está ${LiveService.inCountry(cc)}';
+          if (_voice) {
+            _tts.speak(txt.replaceAll(RegExp(r'[^\p{L}\p{N} ]', unicode: true), ''));
+          }
+          _snack(txt);
+        }
+      }
       if (mounted) setState(() {});
     }
+  }
+
+  /// Lista dos colegas do grupo (1.29.47): toque leva o mapa até ele.
+  void _groupList() {
+    final pos = _pos;
+    final list = _live.members.values.toList()
+      ..sort((a, b) {
+        if (pos == null) return a.nick.compareTo(b.nick);
+        final da = Geolocator.distanceBetween(
+            pos.latitude, pos.longitude, a.lat, a.lon);
+        final db = Geolocator.distanceBetween(
+            pos.latitude, pos.longitude, b.lat, b.lon);
+        return da.compareTo(db);
+      });
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      constraints:
+          BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.75),
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.fromLTRB(
+            16, 12, 16, 16 + MediaQuery.viewPaddingOf(ctx).bottom),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text('Grupo (${list.length} no mapa)',
+                style:
+                    const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            Text('Toque num colega para ver no mapa.',
+                style: TextStyle(color: SG.textSoft, fontSize: 12)),
+            const SizedBox(height: 8),
+            if (list.isEmpty)
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: Text(
+                    'Ninguém do grupo compartilhando agora.\n'
+                    'Os colegas aparecem aqui quando ligam o compartilhamento '
+                    'com o mesmo código.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: SG.textSoft)),
+              )
+            else
+              Flexible(
+                child: ListView(shrinkWrap: true, children: [
+                  for (final m in list)
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: SizedBox(
+                          width: 48,
+                          child: FittedBox(
+                              child: _livePin(m.photo, m.nick,
+                                  const Color(0xFF7E57C2)))),
+                      title: Text(m.nick.isEmpty ? 'Motorista' : m.nick,
+                          style: const TextStyle(fontWeight: FontWeight.w700)),
+                      subtitle: Text([
+                        if (m.country.isNotEmpty)
+                          '${PresenceService.flag(m.country)} '
+                              '${LiveService.countryName(m.country)}',
+                        '${m.kmh.round()} km/h',
+                        if (pos != null)
+                          '${(Geolocator.distanceBetween(pos.latitude, pos.longitude, m.lat, m.lon) / 1000).toStringAsFixed(0)} km',
+                        () {
+                          final ago = DateTime.now().difference(
+                              DateTime.fromMillisecondsSinceEpoch(m.updatedAt));
+                          return ago.inMinutes < 1
+                              ? 'agora'
+                              : 'há ${ago.inMinutes} min';
+                        }(),
+                      ].join(' · ')),
+                      trailing: IconButton(
+                        tooltip: 'Ir até lá (Google Maps)',
+                        icon: const Icon(Icons.directions),
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          _navigateTo(Park(
+                              'live', m.nick, m.lat, m.lon, 'parking', const {}));
+                        },
+                      ),
+                      onTap: () {
+                        Navigator.pop(ctx);
+                        setState(() {
+                          _follow = false;
+                          _mapView = true;
+                        });
+                        _map.move(LatLng(m.lat, m.lon), 14);
+                      },
+                    ),
+                ]),
+              ),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _livePin(Uint8List? photo, String nick, Color color,
@@ -1318,6 +1425,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     if (wasSharing && !share) await _live.remove();
     _livePhotoSent = false;
     if (share && !_running) await _start();
+    if (group.length >= 4) await LiveBorder.askPermission();
+    LiveBorder.schedule(_isTruck && group.length >= 4);
     await _liveTick(photo: true);
     if (_live.rulesMissing) {
       _snack('Falta publicar a regra "live" no Firebase (veja o README).');
@@ -4259,13 +4368,29 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               child: _navPanel(),
             ),
           if (_placing == null &&
-              _nav == null &&
-              (_shownTrack != null || _rec.recording))
+              (_nav == null && (_shownTrack != null || _rec.recording) ||
+                  (_isTruck && _live.hasGroup)))
             Positioned(
               right: 12,
               top: MediaQuery.paddingOf(context).top + 64,
               child: Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-                if (_rec.recording)
+                // 1.29.47: botão do grupo (lista dos colegas).
+                if (_isTruck && _live.hasGroup) ...[
+                  Badge(
+                    label: Text('${_live.members.length}'),
+                    isLabelVisible: _live.members.isNotEmpty,
+                    child: FloatingActionButton.small(
+                      heroTag: 'grupo',
+                      tooltip: 'Grupo',
+                      backgroundColor: const Color(0xFF7E57C2),
+                      foregroundColor: Colors.white,
+                      onPressed: _groupList,
+                      child: const Icon(Icons.groups),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                ],
+                if (_nav == null && _rec.recording)
                   Container(
                     padding:
                         const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -4277,7 +4402,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                             color: Colors.white,
                             fontWeight: FontWeight.w800)),
                   ),
-                if (_shownTrack != null) ...[
+                if (_nav == null && _shownTrack != null) ...[
                   const SizedBox(height: 6),
                   InputChip(
                     avatar: const Icon(Icons.route, size: 18),

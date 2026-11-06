@@ -12,6 +12,7 @@ import 'firebase_config.dart';
 class LiveMember {
   final String id;
   String nick;
+  String country = ''; // ISO2 (1.29.47)
   Uint8List? photo;
   int photoAt = -1; // versão da foto baixada
   double lat, lon, heading, kmh;
@@ -128,8 +129,24 @@ class LiveService {
   }
 
   /// Manda a sua posição (e a foto/apelido, quando [withPhoto]).
+  /// A regra do Firebase ainda não aceita o país (falta publicar).
+  bool countryRuleMissing = false;
+
   Future<bool> push(double lat, double lon, double heading, double kmh,
-      {bool withPhoto = false}) async {
+      {bool withPhoto = false, String? country}) async {
+    final ok = await _push(lat, lon, heading, kmh,
+        withPhoto: withPhoto,
+        country: countryRuleMissing ? null : country);
+    if (!ok && rulesMissing && country != null && !countryRuleMissing) {
+      // Regra antiga (sem "country"): manda sem o país.
+      countryRuleMissing = true;
+      return _push(lat, lon, heading, kmh, withPhoto: withPhoto);
+    }
+    return ok;
+  }
+
+  Future<bool> _push(double lat, double lon, double heading, double kmh,
+      {bool withPhoto = false, String? country}) async {
     if (!communityEnabled || !sharing || !hasGroup) return false;
     final id = await _deviceId();
     final fields = <String, dynamic>{
@@ -141,6 +158,8 @@ class LiveService {
       'lon': {'doubleValue': lon},
       'heading': {'doubleValue': heading < 0 ? 0 : heading},
       'speed': {'doubleValue': kmh},
+      if (country != null && country.isNotEmpty)
+        'country': {'stringValue': country.toLowerCase()},
       'updatedAt': {
         'integerValue': '${DateTime.now().millisecondsSinceEpoch}'
       },
@@ -175,6 +194,66 @@ class LiveService {
           .timeout(const Duration(seconds: 15));
     } catch (_) {}
   }
+
+  /// Colegas que mudaram de país desde a última olhada (1.29.47): lista de
+  /// (apelido, país). O último país de cada um fica guardado no aparelho,
+  /// então cada travessia avisa uma vez só (app aberto ou em segundo plano).
+  Future<List<(String, String)>> borderEvents() async {
+    final p = await SharedPreferences.getInstance();
+    await p.reload();
+    Map<String, dynamic> last;
+    try {
+      last = jsonDecode(p.getString('live_countries') ?? '{}') as Map<String, dynamic>;
+    } catch (_) {
+      last = {};
+    }
+    final out = <(String, String)>[];
+    for (final m in members.values) {
+      if (m.country.isEmpty) continue;
+      final before = last[m.id] as String?;
+      if (before != null && before != m.country) {
+        out.add((m.nick.isEmpty ? 'Um colega' : m.nick, m.country));
+      }
+      last[m.id] = m.country;
+    }
+    await p.setString('live_countries', jsonEncode(last));
+    return out;
+  }
+
+  /// "na França 🇫🇷", "em Portugal 🇵🇹"…
+  static String inCountry(String cc) {
+    final c = cc.toLowerCase();
+    final (name, prep) = _names[c] ?? (c.toUpperCase(), 'em');
+    final flag = c.length == 2
+        ? String.fromCharCodes(
+            c.toUpperCase().codeUnits.map((u) => u - 0x41 + 0x1F1E6))
+        : '';
+    return '$prep $name $flag'.trim();
+  }
+
+  static String countryName(String cc) =>
+      (_names[cc.toLowerCase()] ?? (cc.toUpperCase(), '')).$1;
+
+  static const _names = <String, (String, String)>{
+    'pt': ('Portugal', 'em'), 'es': ('Espanha', 'na'), 'fr': ('França', 'na'),
+    'de': ('Alemanha', 'na'), 'it': ('Itália', 'na'), 'be': ('Bélgica', 'na'),
+    'nl': ('Holanda', 'na'), 'lu': ('Luxemburgo', 'em'), 'ch': ('Suíça', 'na'),
+    'at': ('Áustria', 'na'), 'pl': ('Polônia', 'na'), 'cz': ('Chéquia', 'na'),
+    'sk': ('Eslováquia', 'na'), 'hu': ('Hungria', 'na'),
+    'si': ('Eslovênia', 'na'), 'hr': ('Croácia', 'na'), 'ro': ('Romênia', 'na'),
+    'bg': ('Bulgária', 'na'), 'gr': ('Grécia', 'na'), 'dk': ('Dinamarca', 'na'),
+    'se': ('Suécia', 'na'), 'no': ('Noruega', 'na'), 'fi': ('Finlândia', 'na'),
+    'gb': ('Reino Unido', 'no'), 'ie': ('Irlanda', 'na'), 'ad': ('Andorra', 'em'),
+    'mc': ('Mônaco', 'em'), 'li': ('Liechtenstein', 'em'),
+    'rs': ('Sérvia', 'na'), 'ba': ('Bósnia', 'na'), 'me': ('Montenegro', 'em'),
+    'mk': ('Macedônia do Norte', 'na'), 'al': ('Albânia', 'na'),
+    'lt': ('Lituânia', 'na'), 'lv': ('Letônia', 'na'), 'ee': ('Estônia', 'na'),
+    'ua': ('Ucrânia', 'na'), 'md': ('Moldávia', 'na'), 'tr': ('Turquia', 'na'),
+    'ma': ('Marrocos', 'em'), 'br': ('Brasil', 'no'), 'ar': ('Argentina', 'na'),
+    'uy': ('Uruguai', 'no'), 'py': ('Paraguai', 'no'), 'cl': ('Chile', 'no'),
+    'bo': ('Bolívia', 'na'), 'pe': ('Peru', 'no'), 'us': ('Estados Unidos', 'nos'),
+    'ca': ('Canadá', 'no'), 'mx': ('México', 'no'),
+  };
 
   /// Baixa só a foto de um motorista (quando ela muda).
   Future<void> _photo(LiveMember m) async {
@@ -219,7 +298,8 @@ class LiveService {
         'select': {
           'fields': [
             for (final k in [
-              'nick', 'lat', 'lon', 'heading', 'speed', 'updatedAt', 'photoAt'
+              'nick', 'lat', 'lon', 'heading', 'speed', 'updatedAt', 'photoAt',
+              'country'
             ])
               {'fieldPath': k}
           ]
@@ -255,6 +335,7 @@ class LiveService {
         if (lat == null || lon == null || now - at > staleMs) continue;
         seen.add(docId);
         final pAt = n('photoAt')?.toInt() ?? 0;
+        final cc = s('country');
         var m = members[docId];
         if (m == null) {
           m = members[docId] = LiveMember(
@@ -279,6 +360,7 @@ class LiveService {
             ..nick = s('nick')
             ..receivedAt = now;
         }
+        m.country = cc;
         if (pAt != m.photoAt) {
           m.photoAt = pAt;
           _photo(m);
