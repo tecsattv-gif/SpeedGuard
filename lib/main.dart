@@ -1017,15 +1017,15 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     if (mounted) setState(() {});
   }
 
+  /// Marcando o park no mapa (1.29.32): tipo e nome já escolhidos.
+  (String, String)? _placing;
+
   Future<void> _addPark() async {
     final pos = _pos ?? await _currentPos();
     if (!mounted) return;
-    if (pos == null) {
-      _snack('Aguardando o sinal do GPS…');
-      return;
-    }
     final nameCtrl = TextEditingController();
     String? type;
+    var onMap = pos == null; // sem GPS: só marcando no mapa
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => StatefulBuilder(
@@ -1050,6 +1050,24 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 opt('park_free', Icons.money_off, 'Park free', 'Grátis'),
                 opt('park_zona', Icons.factory_outlined, 'Zona industrial',
                     'Onde caminhão estaciona, entra e sai'),
+                const SizedBox(height: 8),
+                // 1.29.32: onde fica o park.
+                SegmentedButton<bool>(
+                  segments: const [
+                    ButtonSegment(
+                        value: false,
+                        icon: Icon(Icons.my_location),
+                        label: Text('Onde estou')),
+                    ButtonSegment(
+                        value: true,
+                        icon: Icon(Icons.touch_app),
+                        label: Text('Marcar no mapa')),
+                  ],
+                  selected: {onMap},
+                  onSelectionChanged: pos == null
+                      ? null
+                      : (v) => setD(() => onMap = v.first),
+                ),
                 const SizedBox(height: 8),
                 TextField(
                   controller: nameCtrl,
@@ -1077,10 +1095,25 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     final name = nameCtrl.text.trim();
     nameCtrl.dispose();
     if (ok != true || type == null) return;
+    if (onMap || pos == null) {
+      // Marca no mapa: alfinete no centro; toque no mapa leva o alfinete.
+      setState(() {
+        _placing = (type!, name);
+        _mapView = true;
+        _follow = false;
+      });
+      _snack('Toque no mapa (ou arraste) até o local exato e confirme.');
+      return;
+    }
+    await _savePark(pos.latitude, pos.longitude, type!, name);
+  }
+
+  Future<void> _savePark(
+      double lat, double lon, String type, String name) async {
     final id = await _community.reportPark(
-            pos.latitude, pos.longitude, type!, name, _goodHeading) ??
+            lat, lon, type, name, _goodHeading) ??
         'local_${DateTime.now().millisecondsSinceEpoch}';
-    final park = Park.user(id, pos.latitude, pos.longitude, type!, name);
+    final park = Park.user(id, lat, lon, type, name);
     _parks.userParks = [..._parks.userParks, park];
     final p = await SharedPreferences.getInstance();
     List mine;
@@ -1091,8 +1124,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     }
     mine.add({
       'id': id,
-      'lat': pos.latitude,
-      'lon': pos.longitude,
+      'lat': lat,
+      'lon': lon,
       't': type,
       'n': name,
     });
@@ -2759,6 +2792,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             options: MapOptions(
               initialCenter: const LatLng(-15.79, -47.88),
               initialZoom: 15,
+              // Marcando park: o toque leva o alfinete (centro) até o ponto.
+              onTap: (_, p) {
+                if (_placing != null) _map.move(p, _map.camera.zoom);
+              },
               onPositionChanged: (camera, hasGesture) {
                 if (hasGesture && _follow) setState(() => _follow = false);
                 // Soltou o mapa em outra região: baixa os radares de lá.
@@ -2946,11 +2983,74 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             ),
           ),
 
+          // Marcando park no mapa (1.29.32): alfinete no centro + botões.
+          if (_placing != null) ...[
+            const IgnorePointer(
+              child: Center(
+                child: Padding(
+                  padding: EdgeInsets.only(bottom: 44),
+                  child: Icon(Icons.location_on,
+                      size: 48,
+                      color: Color(0xFF2E7D32),
+                      shadows: [Shadow(color: Colors.black, blurRadius: 6)]),
+                ),
+              ),
+            ),
+            Positioned(
+              left: 12,
+              right: 12,
+              bottom: 12,
+              child: Material(
+                color: SG.card,
+                borderRadius: BorderRadius.circular(16),
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(mainAxisSize: MainAxisSize.min, children: [
+                    Text(
+                        'Toque no mapa ou arraste até o local exato do '
+                        '${_placing!.$2.isNotEmpty ? _placing!.$2 : Park.userTypeLabel(_placing!.$1).$1}',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 10),
+                    Row(children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => setState(() => _placing = null),
+                          child: const Text('Cancelar'),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: FilledButton.icon(
+                          style: FilledButton.styleFrom(
+                              backgroundColor: const Color(0xFF2E7D32),
+                              foregroundColor: Colors.white),
+                          icon: const Icon(Icons.check),
+                          label: const Text('Confirmar'),
+                          onPressed: () {
+                            final c = _map.camera.center;
+                            final (t, n) = _placing!;
+                            setState(() => _placing = null);
+                            _savePark(c.latitude, c.longitude, t, n);
+                          },
+                        ),
+                      ),
+                    ]),
+                  ]),
+                ),
+              ),
+            ),
+          ],
+
           // Parks à frente, logo acima dos botões.
-          if (_running && _showParks && _parksAhead.isNotEmpty)
+          if (_placing == null &&
+              _running &&
+              _showParks &&
+              _parksAhead.isNotEmpty)
             Positioned(left: 12, right: 12, bottom: 72, child: _parkCard()),
 
           // Botões "Opções" (camadas do mapa) e "Navegar" (Google/Waze).
+          if (_placing == null)
           Positioned(
             left: 12,
             bottom: 12,
