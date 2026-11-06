@@ -1086,6 +1086,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   Future<void> _liveTick({bool photo = false}) async {
     if (!mounted) return;
+    // 1.29.45: só com Caminhão escolhido nas Configurações.
+    if (!_isTruck) {
+      if (_live.members.isNotEmpty) setState(() => _live.members.clear());
+      return;
+    }
     final pos = _pos;
     if (_live.sharing && _live.hasGroup && pos != null) {
       final ok = await _live.push(pos.latitude, pos.longitude, pos.heading,
@@ -3698,6 +3703,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   }
                 },
               ),
+              if (_isTruck)
               ListTile(
                 leading: const Icon(Icons.groups),
                 title: const Text('Localização em grupo'),
@@ -3983,7 +3989,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 ]),
               // Localização em grupo (1.29.43): caminhãozinho de cada
               // colega e a gota com a foto em cima.
-              if (_live.members.isNotEmpty)
+              if (_isTruck && _live.members.isNotEmpty)
                 MarkerLayer(markers: [
                   for (final m in _live.members.values)
                     Marker(
@@ -4002,8 +4008,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                       ),
                     ),
                 ]),
-              if (_live.members.isNotEmpty ||
-                  (_live.sharing && _live.hasGroup && pos != null))
+              if (_isTruck &&
+                  (_live.members.isNotEmpty ||
+                      (_live.sharing && _live.hasGroup && pos != null)))
                 MarkerLayer(markers: [
                   for (final m in _live.members.values)
                     Marker(
