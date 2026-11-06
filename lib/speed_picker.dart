@@ -186,11 +186,20 @@ class SpeedSign extends StatelessWidget {
           border: Border.all(color: SG.red, width: size / 10),
         ),
         alignment: Alignment.center,
-        child: Text(label,
-            style: TextStyle(
-                fontSize: size * 0.34,
-                fontWeight: FontWeight.w900,
-                color: Colors.black)),
+        // 1.29.42: 3 algarismos (120, 130) sempre cabem — encolhe se
+        // precisar e ignora o tamanho de letra grande do celular.
+        padding: EdgeInsets.all(size * 0.06),
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(label,
+              maxLines: 1,
+              softWrap: false,
+              textScaler: TextScaler.noScaling,
+              style: TextStyle(
+                  fontSize: size * 0.34,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.black)),
+        ),
     );
   }
 }

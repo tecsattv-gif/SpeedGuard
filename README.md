@@ -99,6 +99,7 @@ Autor: Luiz Alberto Cardoso
   - **1.29.39 — Continuar rota**: a navegação que foi parada (✕ no painel, app fechado ou celular reiniciado) fica guardada até chegar ao destino. Em **Rotas** aparece **Continuar rota: <nome>**, e ao abrir o app aparece "Continuar a rota …?" com o botão **CONTINUAR**. Ela continua **do ponto da rota onde você está** (fala quantos km faltam), no mesmo sentido (ida ou volta). A gravação de rota interrompida já continuava sozinha desde a 1.29.35
   - **1.29.40**: a janela de cada rota agora **rola** (Compartilhar, Renomear e Excluir ficavam escondidos embaixo) e mostra **Continuar rota** no alto quando aquela rota tem navegação parada
   - **1.29.41 — Continuar gravando**: em Rotas → escolha a rota → **Continuar gravando esta rota**. A gravação recomeça e o caminho novo entra **no fim da mesma rota** (mesmo nome; ao parar, ela é regravada com os km e a duração somados). Se o app fechar no meio, continua de onde parou, na mesma rota
+  - **1.29.42**: placa de limite com 3 algarismos (120, 130) cortava o último ("12") com letra grande no celular; agora o número sempre cabe na placa (encolhe se precisar)
   - O fundo do painel é sólido desde a 1.29.5 (antes deixava ver um pouco do app de baixo)
   - Depois do pop-up "VELOCIDADE EXCEDIDA" e da janela do **+**, o painel volta ao tamanho certo e confere o tamanho real (desde a 1.29.3). Antes, a janela ficava ~2,5× maior que o painel, com uma área **invisível** que descia até o rodapé e roubava os toques nos botões de baixo da tela
 
