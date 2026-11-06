@@ -1433,15 +1433,43 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   }
 
   void _trackActions(SavedTrack t) {
+    // 1.29.40: rola (antes os últimos botões ficavam escondidos embaixo).
     showModalBottomSheet(
       context: context,
-      builder: (ctx) => Padding(
+      isScrollControlled: true,
+      constraints:
+          BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.85),
+      builder: (ctx) => SingleChildScrollView(
         padding: EdgeInsets.fromLTRB(
-            20, 16, 20, 20 + MediaQuery.viewPaddingOf(ctx).bottom),
+            20, 16, 20, 24 + MediaQuery.viewPaddingOf(ctx).bottom),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            // Continuar a navegação desta rota que foi parada.
+            FutureBuilder<(SavedTrack, bool)?>(
+              future: _lastNav(),
+              builder: (c, snap) {
+                final l = snap.data;
+                if (l == null || l.$1.id != t.id || _nav != null) {
+                  return const SizedBox.shrink();
+                }
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: FilledButton.icon(
+                    style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFF0B8F5A),
+                        foregroundColor: Colors.white),
+                    icon: const Icon(Icons.play_arrow),
+                    label: Text('Continuar rota${l.$2 ? ' (volta)' : ''}'),
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      _continueNav();
+                    },
+                  ),
+                );
+              },
+            ),
             Text(t.name,
                 style:
                     const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
