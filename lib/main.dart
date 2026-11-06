@@ -3491,6 +3491,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                                     height: 1.05,
                                     fontWeight: FontWeight.w900)),
                           ),
+                        // 1.29.36: as faixas da bolha (verdes = caminho
+                        // livre; a cada aviso uma fica vermelha) com o
+                        // limite e a distância do radar, no mapa.
+                        // Só com radar à frente.
+                        if (_mapView && _running && a.radar != null)
+                          _radarBandsCard(a),
                       ]),
                       const SizedBox(width: 10),
                       Expanded(
@@ -3784,6 +3790,54 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _radarBandsCard(AlertState a) {
+    const green = Color(0xFF4ED636);
+    final d = a.radar != null ? a.distance : null;
+    final over = a.overLimit;
+    final border = d == null
+        ? SG.violet
+        : over
+            ? SG.red
+            : SG.orange;
+    return GestureDetector(
+      onTap: a.radar != null ? () => _showRadar(a.radar!) : null,
+      child: Container(
+        margin: const EdgeInsets.only(top: 10),
+        width: 96,
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [SG.palette.value.deepTop, SG.bg],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: border, width: 3),
+          boxShadow: SG.glow(border, 10),
+        ),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          RadarBands(
+              green: green,
+              red: d == null ? 0 : RadarBands.redFor(d),
+              size: 72),
+          if (d != null) ...[
+            const SizedBox(height: 6),
+            if (a.radar!.maxSpeed != null)
+              SpeedSign(label: '${a.radar!.maxSpeed}', size: 40),
+            Text(
+                d >= 1000
+                    ? '${(d / 1000).toStringAsFixed(1)} km'
+                    : '${d.round()} m',
+                style: TextStyle(
+                    color: over ? SG.red : SG.orange,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900)),
+          ],
+        ]),
       ),
     );
   }
