@@ -1075,6 +1075,23 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   Future<void> _startTrackNav(SavedTrack t, {bool reverse = false}) async {
     var pts = await _rec.points0(t);
     if (pts.length < 2 || !mounted) return;
+    // Está no fim da rota: navega o caminho de volta.
+    final pos0 = _pos;
+    if (!reverse && pos0 != null) {
+      var best = double.infinity, at = 0;
+      for (var i = 0; i < pts.length; i++) {
+        final d = Geolocator.distanceBetween(
+            pos0.latitude, pos0.longitude, pts[i].$1, pts[i].$2);
+        if (d < best) {
+          best = d;
+          at = i;
+        }
+      }
+      if (best <= 3000 && at > pts.length * 0.8) {
+        _snack('Você está no fim desta rota: navegando o caminho de volta.');
+        reverse = true;
+      }
+    }
     if (reverse) pts = reversedTrack(pts);
     final name = reverse ? '${t.name} (volta)' : t.name;
     _route.setTrack(name, pts);
@@ -1290,9 +1307,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     _parks.clearRoute();
   }
 
-  Future<void> _trackToGoogle(SavedTrack t) async {
-    final pts = await _rec.points0(t);
+  Future<void> _trackToGoogle(SavedTrack t, {bool reverse = false}) async {
+    var pts = await _rec.points0(t);
     if (pts.length < 2) return;
+    if (reverse) pts = reversedTrack(pts);
     var from = 0;
     final pos = _pos;
     if (pos != null) {
@@ -1306,6 +1324,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         }
       }
       if (best > 3000) from = 0;
+      // 1.29.38: está no fim da rota (ex.: gravou até aqui) → o Google
+      // abria só os últimos metros. Abre o caminho de volta.
+      if (!reverse && best <= 3000 && from > pts.length * 0.8) {
+        _snack('Você está no fim desta rota: abrindo o caminho de volta.');
+        return _trackToGoogle(t, reverse: true);
+      }
     }
     final url = TrackRecorder.googleUrl(pts, from: from);
     try {
@@ -1417,6 +1441,15 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               onPressed: () {
                 Navigator.pop(ctx);
                 _trackToGoogle(t);
+              },
+            ),
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              icon: const Icon(Icons.swap_vert),
+              label: const Text('Google Maps no sentido contrário (volta)'),
+              onPressed: () {
+                Navigator.pop(ctx);
+                _trackToGoogle(t, reverse: true);
               },
             ),
             const SizedBox(height: 8),
