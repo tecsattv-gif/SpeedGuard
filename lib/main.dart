@@ -40,6 +40,7 @@ import 'removed_radars.dart';
 import 'section_watch.dart';
 import 'speed_watch.dart';
 import 'speed_picker.dart';
+import 'track_nav.dart';
 import 'track_recorder.dart';
 
 Future<void> main() async {
@@ -784,6 +785,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     if (_rec.recording) {
       _rec.add(pos).catchError((_) {});
     }
+    if (_nav != null) _safe('navegação', () => _navTick(pos));
     if (pos.speed > 2.5 && pos.heading >= 0) _goodHeading = pos.heading;
     // Velocidade e posição na tela primeiro, aconteça o que acontecer depois.
     if (mounted) setState(() {});
@@ -847,7 +849,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   double? _routeProgress(Position pos) {
     if (!_route.active || !_parks.hasRoute) return null;
     final prog = _route.progress(pos.latitude, pos.longitude);
-    if (prog != null && _route.total - prog < 300) {
+    if (prog != null && _route.total - prog < 300 && _nav == null) {
       _route.clear();
       _parks.clearRoute();
       return null;
@@ -857,6 +859,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   /// Calcula a rota até o destino digitado e busca os parks nela.
   Future<void> _planRoute(String dest) async {
+    _nav = null; // rota nova do Navegar encerra a navegação gravada
     _parks.onRouteUpdate = () {
       if (mounted) setState(() {});
     };
@@ -1056,6 +1059,150 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   // ---------- Rotas gravadas (1.29.35) ----------
 
   final _rec = TrackRecorder();
+
+  // ---------- Navegar pela rota gravada (1.29.38) ----------
+  TrackNav? _nav;
+  int _navOff = 0;
+  bool _navOffRoute = false;
+  DateTime? _navOffSaid;
+  double _navKmh = 0;
+  double _navProg = 0;
+
+  void _navSay(String t) {
+    if (_voice) _tts.speak(t);
+  }
+
+  Future<void> _startTrackNav(SavedTrack t, {bool reverse = false}) async {
+    var pts = await _rec.points0(t);
+    if (pts.length < 2 || !mounted) return;
+    if (reverse) pts = reversedTrack(pts);
+    final name = reverse ? '${t.name} (volta)' : t.name;
+    _route.setTrack(name, pts);
+    _nav = TrackNav(_route.pts, _route.cum);
+    _navOff = 0;
+    _navOffRoute = false;
+    _navProg = 0;
+    setState(() {
+      _shownTrack = [for (final p in pts) LatLng(p.$1, p.$2)];
+      _shownTrackName = name;
+      _mapView = true;
+      _follow = true;
+    });
+    final pos = _pos;
+    if (pos != null) _camTo(pos, 16);
+    _parks.clearRoute();
+    _parks.loadRoute(_route, country: _country).then((_) {
+      if (mounted) setState(() {});
+    });
+    if (!_running) await _start();
+    _navSay('Navegação iniciada pela rota $name. '
+        '${(_route.total / 1000).round()} quilômetros.');
+  }
+
+  void _stopTrackNav({bool arrived = false}) {
+    _nav = null;
+    _navOffRoute = false;
+    if (arrived) _navSay('Você chegou ao destino.');
+    _hideTrack();
+  }
+
+  void _navTick(Position pos) {
+    final nav = _nav;
+    if (nav == null) return;
+    final kmh = pos.speed * 3.6;
+    if (kmh > 5) _navKmh = _navKmh == 0 ? kmh : _navKmh * 0.97 + kmh * 0.03;
+    final (i, d, _) = _route.nearest(pos.latitude, pos.longitude);
+    // Fora da rota: mais de 80 m da linha em 3 leituras seguidas.
+    _navOff = d > 80 ? _navOff + 1 : 0;
+    final off = _navOff >= 3;
+    if (off != _navOffRoute) setState(() => _navOffRoute = off);
+    if (off) {
+      final now = DateTime.now();
+      if (_navOffSaid == null ||
+          now.difference(_navOffSaid!) > const Duration(seconds: 45)) {
+        _navOffSaid = now;
+        _navSay('Fora da rota. Volte para a linha azul.');
+      }
+      return;
+    }
+    final prog = _route.progress(pos.latitude, pos.longitude) ?? _route.cum[i];
+    _navProg = prog;
+    if (nav.total - prog < 80) {
+      _stopTrackNav(arrived: true);
+      return;
+    }
+    final say = nav.speak(prog, kmh);
+    if (say != null) _navSay(say);
+    if (mounted) setState(() {});
+  }
+
+  Widget _navPanel() {
+    final nav = _nav!;
+    final t = nav.next(_navProg);
+    final left = (nav.total - _navProg).clamp(0, double.infinity);
+    final kmh = _navKmh > 20 ? _navKmh : 70.0;
+    final eta = DateTime.now()
+        .add(Duration(minutes: (left / 1000 / kmh * 60).round()));
+    final dist = t == null ? null : t.at - _navProg;
+    String km(double m) => m >= 1000
+        ? '${(m / 1000).toStringAsFixed(m >= 10000 ? 0 : 1)} km'
+        : '${(m / 10).round() * 10} m';
+    return Material(
+      color: _navOffRoute ? SG.red : const Color(0xFF0B5D3B),
+      borderRadius: BorderRadius.circular(16),
+      elevation: 6,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 8, 4, 8),
+        child: Row(children: [
+          Icon(
+              _navOffRoute
+                  ? Icons.wrong_location
+                  : (t?.icon ?? Icons.straight),
+              color: Colors.white,
+              size: 44),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                    _navOffRoute
+                        ? 'Fora da rota'
+                        : dist == null
+                            ? 'Siga até o destino'
+                            : km(dist),
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 26,
+                        fontWeight: FontWeight.w900,
+                        height: 1.1)),
+                Text(
+                    _navOffRoute
+                        ? 'Volte para a linha azul'
+                        : t == null
+                            ? _route.destName
+                            : t.phrase,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        color: Colors.white, fontWeight: FontWeight.w600)),
+                Text(
+                    'Faltam ${km(left.toDouble())} · chegada '
+                    '${_two(eta.hour)}:${_two(eta.minute)}',
+                    style: const TextStyle(color: Colors.white70, fontSize: 12)),
+              ],
+            ),
+          ),
+          IconButton(
+            tooltip: 'Encerrar navegação',
+            icon: const Icon(Icons.close, color: Colors.white),
+            onPressed: () => _stopTrackNav(),
+          ),
+        ]),
+      ),
+    );
+  }
   List<LatLng>? _shownTrack;
   String? _shownTrackName;
 
@@ -1111,6 +1258,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   }
 
   Future<void> _showTrack(SavedTrack t) async {
+    _nav = null;
     final pts = await _rec.points0(t);
     if (pts.length < 2 || !mounted) return;
     final ll = [for (final p in pts) LatLng(p.$1, p.$2)];
@@ -1232,7 +1380,29 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 '${t.duration.inMinutes > 0 ? ' · ${_dur(t.duration)}' : ''}',
                 style: TextStyle(color: SG.textSoft)),
             const SizedBox(height: 14),
+            // 1.29.38: navegar pela rota dentro do app.
             FilledButton.icon(
+              style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFF0B8F5A),
+                  foregroundColor: Colors.white),
+              icon: const Icon(Icons.navigation),
+              label: const Text('Navegar por esta rota (no app)'),
+              onPressed: () {
+                Navigator.pop(ctx);
+                _startTrackNav(t);
+              },
+            ),
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              icon: const Icon(Icons.swap_vert),
+              label: const Text('Navegar no sentido contrário (volta)'),
+              onPressed: () {
+                Navigator.pop(ctx);
+                _startTrackNav(t, reverse: true);
+              },
+            ),
+            const SizedBox(height: 8),
+            FilledButton.tonalIcon(
               icon: const Icon(Icons.map),
               label: const Text('Ver no mapa'),
               onPressed: () {
@@ -3593,7 +3763,20 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           ],
 
           // Rota gravada aberta no mapa / gravando (1.29.35).
-          if (_placing == null && (_shownTrack != null || _rec.recording))
+          // Navegação pela rota gravada (1.29.38): painel no alto.
+          if (_placing == null && _nav != null)
+            Positioned(
+              left: 12,
+              right: 12,
+              // Acima do card do park (quando ele aparece) e dos botões.
+              bottom: _running && _showParks && _parksAhead.isNotEmpty
+                  ? 166
+                  : 72,
+              child: _navPanel(),
+            ),
+          if (_placing == null &&
+              _nav == null &&
+              (_shownTrack != null || _rec.recording))
             Positioned(
               right: 12,
               top: MediaQuery.paddingOf(context).top + 64,
