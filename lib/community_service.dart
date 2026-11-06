@@ -277,11 +277,14 @@ class CommunityService {
           .timeout(const Duration(seconds: 25));
       if (res.statusCode != 200) return null;
       final out = <(String, double, double, String, String)>[];
+      final now = DateTime.now().millisecondsSinceEpoch;
       for (final item in jsonDecode(utf8.decode(res.bodyBytes)) as List) {
         final doc = (item as Map)['document'] as Map?;
         if (doc == null) continue;
         final r = _fromDoc(doc.cast<String, dynamic>());
         if (r == null) continue;
+        // Excluído/mudado de lugar pelo dono (prazo vencido): não mostra.
+        if (r.checkAfter != null && r.checkAfter! < now) continue;
         final cell = ((doc['fields'] as Map?)?['cell'] as Map?)?['stringValue']
                 ?.toString() ??
             '';
@@ -291,6 +294,29 @@ class CommunityService {
       return out;
     } catch (_) {
       return null;
+    }
+  }
+
+  /// O dono excluiu (ou mudou de lugar) o park (1.29.34): as regras só
+  /// deixam mudar o prazo, então o prazo vai para o passado e o park some
+  /// para todos.
+  Future<bool> expirePark(String id) async {
+    if (!communityEnabled || !id.startsWith('cm_')) return false;
+    try {
+      final res = await http
+          .patch(
+              Uri.parse('$_base/radars/${id.substring(3)}'
+                  '?updateMask.fieldPaths=checkAfter&key=$firebaseApiKey'),
+              headers: {'Content-Type': 'application/json'},
+              body: jsonEncode({
+                'fields': {
+                  'checkAfter': {'integerValue': '1'}
+                }
+              }))
+          .timeout(const Duration(seconds: 20));
+      return res.statusCode == 200;
+    } catch (_) {
+      return false;
     }
   }
 

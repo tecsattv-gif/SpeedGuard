@@ -923,6 +923,31 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 _sharePark(p);
               },
             ),
+            // Só quem adicionou (neste aparelho) muda de lugar ou exclui.
+            if (_myParkIds.contains(p.id)) ...[
+              const SizedBox(height: 16),
+              Text('Este park foi você que adicionou',
+                  style: TextStyle(color: SG.textSoft, fontSize: 12)),
+              const SizedBox(height: 6),
+              OutlinedButton.icon(
+                icon: const Icon(Icons.open_with),
+                label: const Text('Mudar de lugar'),
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  _startMove(p);
+                },
+              ),
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(foregroundColor: SG.red),
+                icon: const Icon(Icons.delete_outline),
+                label: const Text('Excluir park'),
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  _deletePark(p);
+                },
+              ),
+            ],
           ],
         ),
       ),
@@ -993,6 +1018,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     }
 
     final mine = fromJson(p.getString('my_parks'));
+    _myParkIds
+      ..clear()
+      ..addAll(mine.map((e) => e.id));
     if (_parks.userParks.isEmpty) {
       _parks.userParks = [...fromJson(p.getString('user_parks')), ...mine];
     }
@@ -1019,6 +1047,90 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   /// Marcando o park no mapa (1.29.32): tipo e nome já escolhidos.
   (String, String)? _placing;
+  /// Mudando de lugar um park seu (1.29.34).
+  Park? _moving;
+  /// Ids dos parks adicionados neste aparelho (só o dono muda/exclui).
+  final Set<String> _myParkIds = {};
+
+  Future<List> _myParksJson() async {
+    final p = await SharedPreferences.getInstance();
+    try {
+      return jsonDecode(p.getString('my_parks') ?? '[]') as List;
+    } catch (_) {
+      return [];
+    }
+  }
+
+  Future<void> _forgetMine(String id) async {
+    final mine = await _myParksJson()..removeWhere((e) => e['id'] == id);
+    final p = await SharedPreferences.getInstance();
+    await p.setString('my_parks', jsonEncode(mine));
+    _myParkIds.remove(id);
+    _parks.userParks = [
+      for (final x in _parks.userParks)
+        if (x.id != id) x
+    ];
+  }
+
+  Future<void> _deletePark(Park park) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Excluir park?'),
+        content: Text('"${park.name}" some para todos os motoristas.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancelar')),
+          FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: SG.red),
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Excluir')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    if (park.id.startsWith('cm_') && !await _community.expirePark(park.id)) {
+      _snack('Sem internet: não consegui excluir. Tente de novo.');
+      return;
+    }
+    await _forgetMine(park.id);
+    if (mounted) setState(() {});
+    _snack('Park excluído.');
+  }
+
+  void _startMove(Park park) {
+    setState(() {
+      _moving = park;
+      _placing = (park.tags['ptype'] ?? 'park_zona',
+          park.name == Park.userTypeLabel(park.tags['ptype'] ?? '').$1
+              ? ''
+              : park.name);
+      _mapView = true;
+      _follow = false;
+    });
+    _map.move(LatLng(park.lat, park.lon), 17);
+    _snack('Toque no mapa (ou arraste) até o lugar certo e confirme.');
+  }
+
+  Future<void> _confirmPlace(double lat, double lon) async {
+    final (t, n) = _placing!;
+    final old = _moving;
+    setState(() {
+      _placing = null;
+      _moving = null;
+    });
+    if (old != null) {
+      // Mudar de lugar: o antigo some e entra o novo (as regras do
+      // Firebase não deixam mudar a posição de um documento).
+      if (old.id.startsWith('cm_') && !await _community.expirePark(old.id)) {
+        _snack('Sem internet: não consegui mudar o park. Tente de novo.');
+        return;
+      }
+      await _forgetMine(old.id);
+    }
+    await _savePark(lat, lon, t, n);
+  }
 
   /// Aviso antes de adicionar park (1.29.33): balão com X para fechar.
   Future<bool> _parkWarning() async {
@@ -1168,6 +1280,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       'n': name,
     });
     await p.setString('my_parks', jsonEncode(mine));
+    _myParkIds.add(id);
     if (mounted) setState(() {});
     _snack(id.startsWith('local_')
         ? 'Park salvo neste aparelho (sem internet para enviar).'
@@ -1278,6 +1391,14 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                     Navigator.pop(ctx);
                     _navigateTo(a.park);
                   },
+                  // Park de motorista: toque longo abre as opções (o dono
+                  // muda de lugar ou exclui).
+                  onLongPress: a.park.isUser
+                      ? () {
+                          Navigator.pop(ctx);
+                          _showUserPark(a.park);
+                        }
+                      : null,
                   // Park adicionado por motorista: "P+" verde (1.29.30).
                   leading: Container(
                     width: 40,
@@ -3045,7 +3166,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   padding: const EdgeInsets.all(12),
                   child: Column(mainAxisSize: MainAxisSize.min, children: [
                     Text(
-                        'Toque no mapa ou arraste até o local exato do '
+                        '${_moving != null ? 'Novo lugar: t' : 'T'}oque no mapa ou arraste até o local exato do '
                         '${_placing!.$2.isNotEmpty ? _placing!.$2 : Park.userTypeLabel(_placing!.$1).$1}',
                         textAlign: TextAlign.center,
                         style: const TextStyle(fontWeight: FontWeight.w600)),
@@ -3053,7 +3174,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                     Row(children: [
                       Expanded(
                         child: OutlinedButton(
-                          onPressed: () => setState(() => _placing = null),
+                          onPressed: () => setState(() {
+                            _placing = null;
+                            _moving = null;
+                          }),
                           child: const Text('Cancelar'),
                         ),
                       ),
@@ -3067,9 +3191,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                           label: const Text('Confirmar'),
                           onPressed: () {
                             final c = _map.camera.center;
-                            final (t, n) = _placing!;
-                            setState(() => _placing = null);
-                            _savePark(c.latitude, c.longitude, t, n);
+                            _confirmPlace(c.latitude, c.longitude);
                           },
                         ),
                       ),
