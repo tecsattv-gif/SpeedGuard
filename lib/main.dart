@@ -1104,9 +1104,30 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     }
   }
 
-  Widget _livePin(Uint8List? photo, String nick, Color color) => Column(
+  Widget _livePin(Uint8List? photo, String nick, Color color,
+          {bool label = false}) =>
+      Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          // 1.29.46: apelido em cima da gota, no mapa.
+          if (label && nick.isNotEmpty)
+            Container(
+              margin: const EdgeInsets.only(bottom: 2),
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+              constraints: const BoxConstraints(maxWidth: 110),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.75),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(nick,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textScaler: TextScaler.noScaling,
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800)),
+            ),
           Container(
             width: 44,
             height: 44,
@@ -4015,8 +4036,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   for (final m in _live.members.values)
                     Marker(
                       point: LatLng(m.shown.$1, m.shown.$2),
-                      width: 56,
-                      height: 80,
+                      width: 110,
+                      height: 100,
                       rotate: true,
                       alignment: Alignment.topCenter,
                       child: GestureDetector(
@@ -4024,20 +4045,22 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                             Park('live', m.nick, m.lat, m.lon, 'parking', const {})),
                         onLongPress: () => _showMember(m),
                         child: _livePin(
-                            m.photo, m.nick, const Color(0xFF7E57C2)),
+                            m.photo, m.nick, const Color(0xFF7E57C2),
+                            label: true),
                       ),
                     ),
                   if (_live.sharing && _live.hasGroup && pos != null)
                     Marker(
                       point: LatLng(pos.latitude, pos.longitude),
-                      width: 56,
-                      height: 90,
+                      width: 110,
+                      height: 110,
                       rotate: true,
                       alignment: Alignment.topCenter,
                       // Sua gota: abre o Google Maps na sua posição.
                       child: GestureDetector(
                           onTap: () => _openMapAt(pos.latitude, pos.longitude),
-                          child: _livePin(_live.photo, _live.nick, SG.pink)),
+                          child: _livePin(_live.photo, _live.nick, SG.pink,
+                              label: true)),
                     ),
                 ]),
               const SimpleAttributionWidget(
