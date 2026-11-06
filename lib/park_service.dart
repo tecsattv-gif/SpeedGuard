@@ -81,8 +81,8 @@ class Park {
         'services' => 'Área de serviço',
         'rest_area' => 'Área de descanso',
         'user' => tags['ptype'] == 'park_zona'
-            ? 'Zona industrial · adicionado por motorista'
-            : 'Adicionado por motorista',
+            ? 'Zona industrial · PARK ADICIONADO por motorista'
+            : 'PARK ADICIONADO por motorista',
         _ => 'Estacionamento de caminhão',
       };
 

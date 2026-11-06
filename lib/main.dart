@@ -1145,14 +1145,17 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                     Navigator.pop(ctx);
                     _navigateTo(a.park);
                   },
+                  // Park adicionado por motorista: "P+" verde (1.29.30).
                   leading: Container(
                     width: 40,
                     height: 40,
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
-                        color: const Color(0xFF1565C0),
+                        color: a.park.isUser
+                            ? const Color(0xFF2E7D32)
+                            : const Color(0xFF1565C0),
                         borderRadius: BorderRadius.circular(8)),
-                    child: const Text('P',
+                    child: Text(a.park.isUser ? 'P+' : 'P',
                         style: TextStyle(
                             color: Colors.white,
                             fontSize: 24,
@@ -1296,12 +1299,14 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             height: 34,
             alignment: Alignment.center,
             decoration: BoxDecoration(
-                color: const Color(0xFF1565C0),
+                color: p.isUser
+                    ? const Color(0xFF2E7D32)
+                    : const Color(0xFF1565C0),
                 borderRadius: BorderRadius.circular(6)),
-            child: const Text('P',
+            child: Text(p.isUser ? 'P+' : 'P',
                 style: TextStyle(
                     color: Colors.white,
-                    fontSize: 22,
+                    fontSize: p.isUser ? 17 : 22,
                     fontWeight: FontWeight.w900)),
           ),
           const SizedBox(width: 10),
