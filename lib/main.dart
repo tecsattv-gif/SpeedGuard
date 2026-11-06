@@ -3005,8 +3005,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                         width: 34,
                         height: 34,
                         rotate: true,
+                        // 1.29.34: toque abre o Google Maps até o park;
+                        // toque longo abre as opções (dono: mudar/excluir).
                         child: GestureDetector(
-                          onTap: () => _showUserPark(p),
+                          onTap: () => _navigateTo(p),
+                          onLongPress: () => _showUserPark(p),
                           child: Container(
                             alignment: Alignment.center,
                             decoration: BoxDecoration(
