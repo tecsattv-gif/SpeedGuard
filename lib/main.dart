@@ -1131,6 +1131,19 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         ],
       );
 
+  Future<void> _openMapAt(double lat, double lon) async {
+    try {
+      await AndroidIntent(
+        action: 'action_view',
+        data: 'geo:$lat,$lon?q=$lat,$lon',
+        package: 'com.google.android.apps.maps',
+        flags: const [Flag.FLAG_ACTIVITY_NEW_TASK],
+      ).launch();
+    } catch (_) {
+      _snack('Não foi possível abrir o Google Maps.');
+    }
+  }
+
   void _showMember(LiveMember m) {
     final ago = DateTime.now()
         .difference(DateTime.fromMillisecondsSinceEpoch(m.updatedAt));
@@ -3978,7 +3991,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                       width: 40,
                       height: 40,
                       child: GestureDetector(
-                        onTap: () => _showMember(m),
+                        onTap: () => _navigateTo(
+                            Park('live', m.nick, m.lat, m.lon, 'parking', const {})),
+                        onLongPress: () => _showMember(m),
                         child: Transform.rotate(
                           angle: m.heading * 3.14159265 / 180,
                           child: const VehicleMarker(
@@ -3998,7 +4013,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                       rotate: true,
                       alignment: Alignment.topCenter,
                       child: GestureDetector(
-                        onTap: () => _showMember(m),
+                        onTap: () => _navigateTo(
+                            Park('live', m.nick, m.lat, m.lon, 'parking', const {})),
+                        onLongPress: () => _showMember(m),
                         child: _livePin(
                             m.photo, m.nick, const Color(0xFF7E57C2)),
                       ),
@@ -4010,7 +4027,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                       height: 90,
                       rotate: true,
                       alignment: Alignment.topCenter,
-                      child: IgnorePointer(
+                      // Sua gota: abre o Google Maps na sua posição.
+                      child: GestureDetector(
+                          onTap: () => _openMapAt(pos.latitude, pos.longitude),
                           child: _livePin(_live.photo, _live.nick, SG.pink)),
                     ),
                 ]),
