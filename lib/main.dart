@@ -336,6 +336,16 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     final p = await SharedPreferences.getInstance();
     await _removed.load();
     await _rec.load();
+    // 1.29.39: app fechado no meio da navegação: oferece continuar.
+    Future.delayed(const Duration(seconds: 4), () async {
+      final l = await _lastNav();
+      if (l == null || !mounted || _nav != null) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        duration: const Duration(seconds: 12),
+        content: Text('Continuar a rota "${l.$1.name}"?'),
+        action: SnackBarAction(label: 'CONTINUAR', onPressed: _continueNav),
+      ));
+    });
     _loadUserParks();
     Timer.periodic(const Duration(minutes: 30), (_) => _loadUserParks());
     _voice = p.getBool('voice') ?? true;
@@ -1072,7 +1082,29 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     if (_voice) _tts.speak(t);
   }
 
-  Future<void> _startTrackNav(SavedTrack t, {bool reverse = false}) async {
+  /// Última navegação que não chegou ao fim (1.29.39).
+  Future<(SavedTrack, bool)?> _lastNav() async {
+    final p = await SharedPreferences.getInstance();
+    try {
+      final j = jsonDecode(p.getString('nav_last') ?? '') as Map;
+      final t = _rec.tracks.firstWhere((x) => x.id == j['id']);
+      return (t, j['rev'] == true);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _continueNav() async {
+    final l = await _lastNav();
+    if (l == null) {
+      _snack('Nenhuma rota parada para continuar.');
+      return;
+    }
+    await _startTrackNav(l.$1, reverse: l.$2, resume: true);
+  }
+
+  Future<void> _startTrackNav(SavedTrack t,
+      {bool reverse = false, bool resume = false}) async {
     var pts = await _rec.points0(t);
     if (pts.length < 2 || !mounted) return;
     // Está no fim da rota: navega o caminho de volta.
@@ -1087,13 +1119,16 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           at = i;
         }
       }
-      if (best <= 3000 && at > pts.length * 0.8) {
+      if (!resume && best <= 3000 && at > pts.length * 0.8) {
         _snack('Você está no fim desta rota: navegando o caminho de volta.');
         reverse = true;
       }
     }
     if (reverse) pts = reversedTrack(pts);
     final name = reverse ? '${t.name} (volta)' : t.name;
+    // 1.29.39: lembra a navegação para "Continuar rota".
+    SharedPreferences.getInstance().then((p) => p.setString(
+        'nav_last', jsonEncode({'id': t.id, 'rev': reverse})));
     _route.setTrack(name, pts);
     _nav = TrackNav(_route.pts, _route.cum);
     _navOff = 0;
@@ -1112,14 +1147,24 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       if (mounted) setState(() {});
     });
     if (!_running) await _start();
-    _navSay('Navegação iniciada pela rota $name. '
-        '${(_route.total / 1000).round()} quilômetros.');
+    final pos1 = _pos;
+    final left = pos1 == null
+        ? _route.total
+        : _route.total -
+            (_route.progress(pos1.latitude, pos1.longitude) ?? 0);
+    _navSay(resume
+        ? 'Continuando a rota $name. Faltam ${(left / 1000).round()} quilômetros.'
+        : 'Navegação iniciada pela rota $name. '
+            '${(_route.total / 1000).round()} quilômetros.');
   }
 
   void _stopTrackNav({bool arrived = false}) {
     _nav = null;
     _navOffRoute = false;
-    if (arrived) _navSay('Você chegou ao destino.');
+    if (arrived) {
+      _navSay('Você chegou ao destino.');
+      SharedPreferences.getInstance().then((p) => p.remove('nav_last'));
+    }
     _hideTrack();
   }
 
@@ -1554,6 +1599,30 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                     await _startRecording();
                   },
                 ),
+              // 1.29.39: continuar a navegação que foi parada.
+              FutureBuilder<(SavedTrack, bool)?>(
+                future: _lastNav(),
+                builder: (c, snap) {
+                  final l = snap.data;
+                  if (l == null || _nav != null) return const SizedBox.shrink();
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: FilledButton.icon(
+                      style: FilledButton.styleFrom(
+                          backgroundColor: const Color(0xFF0B8F5A),
+                          foregroundColor: Colors.white),
+                      icon: const Icon(Icons.play_arrow),
+                      label: Text(
+                          'Continuar rota: ${l.$1.name}${l.$2 ? ' (volta)' : ''}',
+                          overflow: TextOverflow.ellipsis),
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        _continueNav();
+                      },
+                    ),
+                  );
+                },
+              ),
               const SizedBox(height: 8),
               OutlinedButton.icon(
                 icon: const Icon(Icons.file_open),
