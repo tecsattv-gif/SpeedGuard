@@ -445,7 +445,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     _tts.stop();
     _player.dispose();
     _voicePlayer.dispose();
-    _rec.dispose();
+    _voiceRec.dispose();
     _countTimer?.cancel();
     _areaTimer?.cancel();
     WakelockPlus.disable();
@@ -1317,7 +1317,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   final Map<String, List<_ChatItem>> _chat = {};
 
   // Mensagens de voz (1.33.0).
-  final _rec = AudioRecorder();
+  final _voiceRec = AudioRecorder();
   final _voicePlayer = AudioPlayer();
   String? _playing; // arquivo tocando agora
   bool _voiceClean = false;
@@ -1442,7 +1442,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           final dur = recMs;
           String? path;
           try {
-            path = await _rec.stop();
+            path = await _voiceRec.stop();
           } catch (_) {}
           recording = false;
           if (ctx.mounted) setS(() {});
@@ -1475,7 +1475,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         Future<void> startRec() async {
           if (recording || sending) return;
           try {
-            if (!await _rec.hasPermission()) {
+            if (!await _voiceRec.hasPermission()) {
               _snack(tr('Permita o microfone para gravar mensagem de voz.'));
               return;
             }
@@ -1486,7 +1486,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 '${dir.path}/me_${DateTime.now().millisecondsSinceEpoch}.m4a';
             await _voicePlayer.stop();
             _playing = null;
-            await _rec.start(
+            await _voiceRec.start(
                 const RecordConfig(
                     encoder: AudioEncoder.aacLc,
                     bitRate: 32000,
@@ -1704,7 +1704,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     recTimer?.cancel();
     if (recording) {
       try {
-        await _rec.cancel();
+        await _voiceRec.cancel();
       } catch (_) {}
     }
     _chatOpen = null;
