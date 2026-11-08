@@ -277,6 +277,20 @@ class RoadLimitService {
     return nearestGood <= nearestAny + 4 || identical(nearestWay, cur);
   }
 
+  /// Via onde o veículo está (tipo e números/nome) ou, sem ela, a última
+  /// conhecida até 800 m atrás; null quando não se sabe (1.35.0, pedágio).
+  (String, Set<String>)? myRoad() {
+    if (_current != null) return (_current!.type, _current!.ids);
+    if (_lastType != null &&
+        _posLat != null &&
+        Geolocator.distanceBetween(
+                _posLat!, _posLon!, _lastAtLat!, _lastAtLon!) <
+            800) {
+      return (_lastType!, _lastIds);
+    }
+    return null;
+  }
+
   static double _axisDiff(double a, double b) {
     final d = _angleDiff(a, b);
     return math.min(d, 180 - d);

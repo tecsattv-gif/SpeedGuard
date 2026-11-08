@@ -915,8 +915,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   void _checkToll(Position pos) {
     if (!_tolls.enabled) return;
     _tolls.update(pos.latitude, pos.longitude);
+    // 1.35.0: só o pedágio da via onde você está (não o da saída ao lado).
+    final mine = _roads.myRoad();
     final d = _tolls.check(
-        pos.latitude, pos.longitude, pos.heading, pos.speed * 3.6);
+        pos.latitude, pos.longitude, pos.heading, pos.speed * 3.6,
+        sameRoad: _sameRoad, myType: mine?.$1, myIds: mine?.$2 ?? const {});
     if (d == null) return;
     final m = (d / 100).round() * 100;
     final km = m >= 900;
