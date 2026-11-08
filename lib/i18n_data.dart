@@ -3,6 +3,12 @@
 
 const Map<String, Map<String, String>> kTr = {
   'en': {
+    'O aviso do radar aparece com o app minimizado?': 'Does the camera alert appear with the app minimised?',
+    'Sim. Com a Bolha flutuante desligada e o monitoramento ligado, quando chega um radar aparece por cima do app que estiver aberto (Google Maps, YouTube…) só o card do aviso: distância, tipo do radar e limite. Ele some depois que você passa o radar. Para testar: Configurações → Testar pop-up do radar e da contagem.': 'Yes. With the Floating bubble off and monitoring on, when a camera is ahead only the alert card appears on top of the open app (Google Maps, YouTube…): distance, camera type and limit. It disappears after you pass the camera. To test: Settings → Test the camera and countdown pop-up.',
+    'Avisos de radar por cima dos outros apps': 'Speed camera alerts on top of other apps',
+    'limite': 'limit',
+    'Testar pop-up do radar e da contagem': 'Test the camera and countdown pop-up',
+    'Radar e contagem de mentira (35 s): toque, minimize o app e abra outro (ex.: YouTube) — o aviso do radar e o círculo vermelho têm de aparecer por cima': 'Fake camera and countdown (35 s): tap, minimise the app and open another (e.g. YouTube) — the camera alert and the red circle must appear on top',
     'Atenção. Zona de perigo à frente.': 'Warning. Danger zone ahead.',
     '{0} metros': '{0} metres',
     ' Limite {0}.': ' Limit {0}.',
@@ -562,6 +568,12 @@ const Map<String, Map<String, String>> kTr = {
     'EXCEDIDA': 'EXCEEDED',
   },
   'es': {
+    'O aviso do radar aparece com o app minimizado?': '¿El aviso del radar aparece con la app minimizada?',
+    'Sim. Com a Bolha flutuante desligada e o monitoramento ligado, quando chega um radar aparece por cima do app que estiver aberto (Google Maps, YouTube…) só o card do aviso: distância, tipo do radar e limite. Ele some depois que você passa o radar. Para testar: Configurações → Testar pop-up do radar e da contagem.': 'Sí. Con la Burbuja flotante desactivada y la vigilancia activa, cuando se acerca un radar aparece encima de la app abierta (Google Maps, YouTube…) solo la tarjeta del aviso: distancia, tipo de radar y límite. Desaparece después de pasar el radar. Para probar: Ajustes → Probar el aviso emergente del radar y de la cuenta.',
+    'Avisos de radar por cima dos outros apps': 'Avisos de radar encima de otras apps',
+    'limite': 'límite',
+    'Testar pop-up do radar e da contagem': 'Probar el aviso emergente del radar y de la cuenta',
+    'Radar e contagem de mentira (35 s): toque, minimize o app e abra outro (ex.: YouTube) — o aviso do radar e o círculo vermelho têm de aparecer por cima': 'Radar y cuenta de prueba (35 s): toque, minimice la app y abra otra (ej.: YouTube) — el aviso del radar y el círculo rojo deben aparecer encima',
     'Atenção. Zona de perigo à frente.': 'Atención. Zona de peligro adelante.',
     '{0} metros': '{0} metros',
     ' Limite {0}.': ' Límite {0}.',
@@ -1121,6 +1133,12 @@ const Map<String, Map<String, String>> kTr = {
     'EXCEDIDA': 'EXCEDIDA',
   },
   'fr': {
+    'O aviso do radar aparece com o app minimizado?': 'L’alerte radar s’affiche-t-elle avec l’appli réduite ?',
+    'Sim. Com a Bolha flutuante desligada e o monitoramento ligado, quando chega um radar aparece por cima do app que estiver aberto (Google Maps, YouTube…) só o card do aviso: distância, tipo do radar e limite. Ele some depois que você passa o radar. Para testar: Configurações → Testar pop-up do radar e da contagem.': 'Oui. Avec la Bulle flottante désactivée et la surveillance active, à l’approche d’un radar seule la carte d’alerte s’affiche par-dessus l’appli ouverte (Google Maps, YouTube…) : distance, type de radar et limite. Elle disparaît après le radar. Pour tester : Réglages → Tester la fenêtre du radar et du compte à rebours.',
+    'Avisos de radar por cima dos outros apps': 'Alertes radar par-dessus les autres applis',
+    'limite': 'limite',
+    'Testar pop-up do radar e da contagem': 'Tester la fenêtre du radar et du compte à rebours',
+    'Radar e contagem de mentira (35 s): toque, minimize o app e abra outro (ex.: YouTube) — o aviso do radar e o círculo vermelho têm de aparecer por cima': 'Radar et compte à rebours fictifs (35 s) : touchez, réduisez l’appli et ouvrez-en une autre (ex. : YouTube) — l’alerte radar et le cercle rouge doivent apparaître par-dessus',
     'Atenção. Zona de perigo à frente.': 'Attention. Zone de danger devant.',
     '{0} metros': '{0} mètres',
     ' Limite {0}.': ' Limite {0}.',

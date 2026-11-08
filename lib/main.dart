@@ -467,7 +467,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       // círculo da contagem, minúscula e invisível; ela cresce quando a
       // contagem começa. Aberta depois, com o app em segundo plano, o
       // Android 15 bloqueava e o pop-up não aparecia.
-      if (!_bubble && ((_running && _speedWarn) || _testSecs != null)) {
+      // 1.31.0: a mesma janela mostra também o card do aviso de radar,
+      // então abre sempre que o monitoramento está ligado.
+      if (!_bubble && (_running || _testSecs != null)) {
         _showRing();
       }
     } else if (state == AppLifecycleState.resumed) {
@@ -538,9 +540,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         !_bubble &&
         (_testSecs != null ||
             (_running &&
-                _speedWarn &&
                 _rule.mode != RadarMode.disabled &&
-                _watch.seconds != null));
+                ((_speedWarn && _watch.seconds != null) ||
+                    _alert.radar != null)));
     // A janela fica aberta (minúscula) enquanto o app está minimizado;
     // aqui só tenta abrir se ainda não abriu (Android antigo deixa).
     if (want && !_overlayShown) _showRing();
@@ -570,15 +572,16 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       // depois que recebe a contagem. Aberta direto "sem toque" e no
       // centro, a janela não desenhava nada.
       final w = mounted ? MediaQuery.sizeOf(context).width : 400.0;
+      // 1.31.0: janela do card do radar + círculo da contagem.
       await FlutterOverlayWindow.showOverlay(
-        height: overlayUnits(kPopRingD),
-        width: overlayUnits(kPopRingD),
+        height: overlayUnits(kPopH),
+        width: overlayUnits(kPopW),
         alignment: OverlayAlignment.topLeft,
         enableDrag: true,
         positionGravity: PositionGravity.none,
-        startPosition: OverlayPosition((w - kPopRingD) / 2, 0),
+        startPosition: OverlayPosition((w - kPopW) / 2, 0),
         overlayTitle: 'SpeedGuard',
-        overlayContent: tr('Contagem dos 30 s'),
+        overlayContent: tr('Avisos de radar por cima dos outros apps'),
       );
       _overlayShown = true;
       _ringPopup = true;
@@ -619,10 +622,21 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     final pos = _pos;
     final a = _alert;
     final show = a.radar != null;
+    // Teste dos pop-ups (1.31.0): radar fixo de mentira, limite 50, que vai
+    // chegando de 1000 m até 20 m junto com a contagem.
+    final test = _testSecs;
+    final testDist = test == null ? null : (1000 - test * 28).clamp(20, 1000);
     FlutterOverlayWindow.shareData(jsonEncode({
       'speed': pos == null ? 0 : (pos.speed.clamp(0, 400) * 3.6).round(),
-      'dist': show ? a.distance : null,
-      'limit': show ? a.radar!.maxSpeed : null,
+      'dist': testDist ?? (show ? a.distance : null),
+      'limit': test != null ? 50 : (show ? a.radar!.maxSpeed : null),
+      'sub': test != null
+          ? '${tr('Radar fixo')} • ${tr('limite')} 50'
+          : !show
+              ? null
+              : a.radar!.maxSpeed != null
+                  ? '${a.radar!.typeLabel} • ${tr('limite')} ${a.radar!.maxSpeed}'
+                  : a.radar!.typeLabel,
       'over': a.overLimit || _watch.seconds != null,
       // Segundos acima do limite (contagem dos 30 s e pop-up na bolha).
       'overSecs': _countSecs,
@@ -2801,6 +2815,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         _status = tr('{0} radares carregados na região', [_allRadars.length]);
       }
     });
+    _syncRingPopup();
     _sendBubble();
   }
 
@@ -3624,9 +3639,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               if (!_bubble)
                 ListTile(
                   leading: Icon(Icons.timer_outlined, color: SG.red),
-                  title: Text(tr('Testar pop-up da contagem')),
+                  title: Text(tr('Testar pop-up do radar e da contagem')),
                   subtitle: Text(
-                      tr('Conta 35 s de mentira: toque, minimize o app e abra outro (ex.: YouTube) — o círculo vermelho tem de aparecer por cima')),
+                      tr('Radar e contagem de mentira (35 s): toque, minimize o app e abra outro (ex.: YouTube) — o aviso do radar e o círculo vermelho têm de aparecer por cima')),
                   onTap: () async {
                     if (!await FlutterOverlayWindow.isPermissionGranted()) {
                       final ok = await FlutterOverlayWindow.requestPermission();
@@ -4734,7 +4749,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           ? '${(d / 1000).toStringAsFixed(1)} km'
           : '${d.round()} m';
       subtitle = a.radar!.maxSpeed != null
-          ? '${a.radar!.typeLabel} • limite ${a.radar!.maxSpeed}'
+          ? '${a.radar!.typeLabel} • ${tr('limite')} ${a.radar!.maxSpeed}'
           : a.radar!.typeLabel;
     }
     final accent = !hasAlert

@@ -30,6 +30,12 @@ const double kRingD = 120, kRingGap = 6;
 /// Pop-up só com o círculo (bolha desligada): 50% maior (1.29.26).
 const double kPopRingD = 180;
 
+/// Pop-up do aviso de radar com o app minimizado e a bolha desligada
+/// (1.31.0): o mesmo card laranja da tela do app ("883 m / Radar fixo •
+/// limite 50"), no alto e no centro; o círculo da contagem fica embaixo dele.
+const double kPopCardW = 320, kPopCardH = 92, kPopGap = 8;
+const double kPopW = kPopCardW, kPopH = kPopCardH + kPopGap + kPopRingD;
+
 /// Tamanhos que o usuário escolhe em Configurações.
 const Map<String, double> kPanelScales = {
   'Pequeno': 0.8,
@@ -73,10 +79,12 @@ class _OverlayBubbleState extends State<OverlayBubble> {
   bool _excShown = false; // já mostrou neste excesso
   bool _ringOn = false; // janela com o círculo da contagem
   bool _only = false; // 1.29.15: janela só com o círculo (sem a bolha)
+  bool _cardOn = false; // 1.31.0: card do radar no pop-up (sem a bolha)
   DateTime? _lastMsg;
   bool _clickThrough = false;
   Timer? _excTimer;
   String? _park; // distância do próximo park
+  String? _sub; // tipo do radar e limite ("Radar fixo • limite 50")
   bool _ask = false;
   bool _picker = false;
   bool _sent = false;
@@ -108,6 +116,7 @@ class _OverlayBubbleState extends State<OverlayBubble> {
           _road = (m['road'] as num?)?.toInt();
           _overSecs = (m['overSecs'] as num?)?.toInt();
           _park = m['park'] as String?;
+          _sub = m['sub'] as String?;
           _ask = m['ask'] == true;
           _only = m['ringOnly'] == true;
           if (m['scale'] is num) _scale = (m['scale'] as num).toDouble();
@@ -123,6 +132,7 @@ class _OverlayBubbleState extends State<OverlayBubble> {
         // Círculo da contagem: aumenta/diminui a janela quando começa/acaba.
         final ring = _overSecs != null;
         if (_only) {
+          final card = _dist != null;
           // Só o círculo (1.29.17): janela fixa do tamanho do círculo,
           // transparente e sem toque; o círculo só é desenhado na contagem.
           final now = DateTime.now();
@@ -139,11 +149,18 @@ class _OverlayBubbleState extends State<OverlayBubble> {
               return null;
             });
           }
-          if (ring != _ringOn || gap) {
-            setState(() => _ringOn = ring);
+          if (ring != _ringOn || card != _cardOn || gap) {
+            setState(() {
+              _ringOn = ring;
+              _cardOn = card;
+            });
             // Registro do Diagnóstico (gravado pela janela).
-            _olog(ring
-                ? 'janela: contagem ${_overSecs}s, círculo na tela '
+            final what = [
+              if (card) 'radar a ${_dist!.round()} m',
+              if (ring) 'contagem ${_overSecs}s',
+            ];
+            _olog(what.isNotEmpty
+                ? 'janela: ${what.join(' + ')} na tela '
                     '(${_windowWidthDp().round()} dp)'
                 : 'janela: em espera (${_windowWidthDp().round()} dp)');
           }
@@ -206,7 +223,7 @@ class _OverlayBubbleState extends State<OverlayBubble> {
 
   /// Tamanho da janela: o painel e, durante a contagem, o círculo ao lado.
   Size _windowDp() {
-    if (_only) return const Size(kPopRingD, kPopRingD);
+    if (_only) return const Size(kPopW, kPopH);
     final p = panelDp(_land, _scale);
     if (!_ringOn) return p;
     return Size(p.width + kRingGap + kRingD,
@@ -389,14 +406,18 @@ class _OverlayBubbleState extends State<OverlayBubble> {
     // Antes do primeiro dado não sabe se é a bolha ou só o círculo.
     if (!_gotConfig) return const SizedBox.shrink();
     if (_only) {
+      // 1.31.0: card do radar em cima e círculo da contagem embaixo; a
+      // janela é transparente e deixa os toques passarem.
       return Material(
         color: Colors.transparent,
         child: Align(
-          alignment: Alignment.topLeft,
-          // Toque duplo abre o SpeedGuard.
-          child: _overSecs == null
-              ? const SizedBox.shrink()
-              : _ring(_overSecs!, kPopRingD),
+          alignment: Alignment.topCenter,
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            if (_dist != null) _radarCard(_dist!),
+            if (_dist != null && _overSecs != null)
+              const SizedBox(height: kPopGap),
+            if (_overSecs != null) _ring(_overSecs!, kPopRingD),
+          ]),
         ),
       );
     }
@@ -440,6 +461,58 @@ class _OverlayBubbleState extends State<OverlayBubble> {
                 ],
               ),
             ),
+    );
+  }
+
+  /// Card do aviso de radar no pop-up (igual ao da tela do app): distância
+  /// grande e embaixo o tipo do radar com o limite. Laranja; vermelho se
+  /// estiver acima do limite.
+  Widget _radarCard(double d) {
+    final accent = _over ? SG.red : SG.orange;
+    final title =
+        d >= 1000 ? '${(d / 1000).toStringAsFixed(1)} km' : '${d.round()} m';
+    return Container(
+      width: kPopCardW,
+      height: kPopCardH,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(colors: [
+          accent.withValues(alpha: 0.97),
+          (_over ? SG.pink : SG.red).withValues(alpha: 0.92),
+        ]),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.85), width: 2),
+        boxShadow: SG.glow(accent, 14),
+      ),
+      child: Row(children: [
+        if (_limit != null) ...[
+          SpeedSign(label: '$_limit', size: 52),
+          const SizedBox(width: 12),
+        ],
+        Expanded(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title,
+                  maxLines: 1,
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 30,
+                      height: 1.05,
+                      fontWeight: FontWeight.w900)),
+              if (_sub != null)
+                Text(_sub!,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600)),
+            ],
+          ),
+        ),
+      ]),
     );
   }
 

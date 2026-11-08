@@ -88,6 +88,8 @@ const _groups = <_Group>[
         'Sim. Parado, o GPS "anda" sozinho alguns metros, então abaixo de 4 km/h o app mostra 0 e não conta como excesso.'),
     _Faq('Como testo se a contagem aparece por cima de outros apps?',
         'Com a Bolha flutuante desligada, toque em Configurações → Testar pop-up da contagem, minimize o SpeedGuard e abra outro app (ex.: YouTube). O círculo vermelho com a contagem tem de aparecer por cima. Se não aparecer, libere a permissão "Sobrepor a outros apps".'),
+    _Faq('O aviso do radar aparece com o app minimizado?',
+        'Sim. Com a Bolha flutuante desligada e o monitoramento ligado, quando chega um radar aparece por cima do app que estiver aberto (Google Maps, YouTube…) só o card do aviso: distância, tipo do radar e limite. Ele some depois que você passa o radar. Para testar: Configurações → Testar pop-up do radar e da contagem.'),
   ]),
   _Group('Painel flutuante e navegação', Icons.picture_in_picture_alt, [
     _Faq('Como ligo o painel flutuante por cima do Google Maps?',
