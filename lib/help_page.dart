@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'i18n.dart';
 import 'theme.dart';
 
 /// Ajuda offline (Configurações → Ajuda): perguntas e respostas prontas,
@@ -12,16 +13,19 @@ class HelpPage extends StatefulWidget {
 }
 
 class _Faq {
-  final String q;
-  final String a;
-  const _Faq(this.q, this.a);
+  final String _q;
+  final String _a;
+  String get q => tr(_q);
+  String get a => tr(_a);
+  const _Faq(this._q, this._a);
 }
 
 class _Group {
-  final String title;
+  final String _title;
   final IconData icon;
   final List<_Faq> items;
-  const _Group(this.title, this.icon, this.items);
+  String get title => tr(_title);
+  const _Group(this._title, this.icon, this.items);
 }
 
 const _groups = <_Group>[
@@ -156,8 +160,8 @@ class _HelpPageState extends State<HelpPage> {
   }
 
   static String _norm(String s) {
-    const from = 'áàâãäéèêëíìîïóòôõöúùûüç';
-    const to = 'aaaaaeeeeiiiiooooouuuuc';
+    const from = 'áàâãäéèêëíìîïóòôõöúùûüçñ';
+    const to = 'aaaaaeeeeiiiiooooouuuucn';
     final b = StringBuffer();
     for (final ch in s.toLowerCase().split('')) {
       final i = from.indexOf(ch);
@@ -184,7 +188,7 @@ class _HelpPageState extends State<HelpPage> {
     ];
     return Scaffold(
       backgroundColor: SG.page,
-      appBar: AppBar(title: const Text('Ajuda')),
+      appBar: AppBar(title: Text(tr('Ajuda'))),
       body: Column(
         children: [
           Padding(
@@ -193,7 +197,7 @@ class _HelpPageState extends State<HelpPage> {
               controller: _search,
               onChanged: (v) => setState(() => _q = v.trim()),
               decoration: InputDecoration(
-                hintText: 'Procurar (ex.: limitador, park, bipe)',
+                hintText: tr('Procurar (ex.: limitador, park, bipe)'),
                 prefixIcon: const Icon(Icons.search),
                 suffixIcon: _q.isEmpty
                     ? null
@@ -223,7 +227,7 @@ class _HelpPageState extends State<HelpPage> {
                     child: Padding(
                       padding: const EdgeInsets.all(24),
                       child: Text(
-                        'Nada encontrado. Tente outra palavra ou veja o vídeo em Configurações → Tutorial.',
+                        tr('Nada encontrado. Tente outra palavra ou veja o vídeo em Configurações → Tutorial.'),
                         textAlign: TextAlign.center,
                         style: TextStyle(color: SG.textSoft),
                       ),

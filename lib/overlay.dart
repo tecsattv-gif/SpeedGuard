@@ -12,6 +12,7 @@ import 'alert_view.dart';
 import 'layers.dart';
 import 'speed_picker.dart';
 import 'theme.dart';
+import 'i18n.dart';
 
 /// Tamanho base do painel, em dp. "Médio" = mesmo tamanho do painel do CamSam.
 const double kBaseW = 64, kBaseH = 250; // vertical (retrato)
@@ -113,6 +114,9 @@ class _OverlayBubbleState extends State<OverlayBubble> {
           if (m['land'] is bool) _land = m['land'] as bool;
           if (m['palette'] is String) {
             SG.palette.value = AppPalette.byName(m['palette'] as String);
+          }
+          if (m['lang'] is String && kLangs.containsKey(m['lang'])) {
+            appLang = m['lang'] as String;
           }
           _gotConfig = true;
         });
@@ -334,7 +338,7 @@ class _OverlayBubbleState extends State<OverlayBubble> {
           child: Column(mainAxisSize: MainAxisSize.min, children: [
             const Icon(Icons.warning_amber_rounded,
                 color: Colors.white, size: 30),
-            const Text('VELOCIDADE\nEXCEDIDA',
+            Text(tr('VELOCIDADE\nEXCEDIDA'),
                 textAlign: TextAlign.center,
                 style: TextStyle(
                     color: Colors.white,
@@ -471,7 +475,7 @@ class _OverlayBubbleState extends State<OverlayBubble> {
                     height: 1,
                     fontWeight: FontWeight.w900,
                     shadows: shadow))
-            : Text('EXCEDIDA',
+            : Text(tr('EXCEDIDA'),
                 style: TextStyle(
                     color: SG.red,
                     fontSize: 17 * k,
@@ -502,7 +506,7 @@ class _OverlayBubbleState extends State<OverlayBubble> {
                     fontSize: 32,
                     fontWeight: FontWeight.bold,
                     height: 1)),
-            Text('Km/h',
+            Text(tr('Km/h'),
                 style: TextStyle(
                     color: SG.violetLight,
                     fontSize: 13,
@@ -515,7 +519,7 @@ class _OverlayBubbleState extends State<OverlayBubble> {
                 decoration: BoxDecoration(
                     color: SG.red, borderRadius: BorderRadius.circular(8)),
                 child: Text(
-                    _overSecs! >= 30 ? 'EXCEDIDA' : '${30 - _overSecs!} s',
+                    _overSecs! >= 30 ? tr('EXCEDIDA') : '${30 - _overSecs!} s',
                     style: const TextStyle(
                         color: Colors.white,
                         fontSize: 12,
@@ -614,7 +618,7 @@ class _OverlayBubbleState extends State<OverlayBubble> {
 
     if (_ask) {
       return flow([
-        Text(_land ? 'Ainda aí?' : 'Ainda\naí?',
+        Text(_land ? tr('Ainda aí?') : tr('Ainda\naí?'),
             textAlign: TextAlign.center,
             style: const TextStyle(
                 color: Colors.white,
@@ -631,7 +635,7 @@ class _OverlayBubbleState extends State<OverlayBubble> {
       return flow([
         const Icon(Icons.check_circle, color: Colors.lightGreenAccent, size: 34),
         gap,
-        const Text('Enviado',
+        Text(tr('Enviado'),
             style: TextStyle(
                 color: Colors.white,
                 fontSize: 12,

@@ -2,6 +2,7 @@ import 'package:geolocator/geolocator.dart';
 
 import 'country_rules.dart';
 import 'models.dart';
+import 'i18n.dart';
 
 /// Resultado do cálculo para a posição atual.
 class AlertState {
@@ -111,7 +112,7 @@ class AlertEngine {
     if (mode == RadarMode.dangerZone) {
       if (!_announced.contains(best.id) &&
           DateTime.now().difference(_lastZoneAlert).inMinutes >= 3) {
-        speak = 'Atenção. Zona de perigo à frente.';
+        speak = tr('Atenção. Zona de perigo à frente.');
         _lastZoneAlert = DateTime.now();
       }
       _announced.add(best.id);
@@ -130,17 +131,17 @@ class AlertEngine {
       // — e ele sai completo, com o limite.
       _stage[best.id] = stage;
       beeps = stage;
-      final m = '${stages[stage - 1]} metros';
-      final limit = best.maxSpeed != null ? ' Limite ${best.maxSpeed}.' : '';
+      final m = tr('{0} metros', [stages[stage - 1]]);
+      final limit = best.maxSpeed != null ? tr(' Limite {0}.', [best.maxSpeed]) : '';
       // 1º aviso completo; depois só a distância; o último repete o limite.
       speak = done == 0
-          ? '${best.typeLabel} a $m.$limit'
+          ? tr('{0} a {1}.', [best.typeLabel, m]) + limit
           : stage == stages.length
               ? '$m.$limit'
               : '$m.';
     } else if (over && !_warnedSpeed.contains(best.id) && bestDist < 500) {
       _warnedSpeed.add(best.id);
-      speak = 'Reduza a velocidade.';
+      speak = tr('Reduza a velocidade.');
       beeps = overBeep;
     }
 

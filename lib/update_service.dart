@@ -8,6 +8,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
 
 import 'theme.dart';
+import 'i18n.dart';
 
 /// Atualização do app pelo próprio app (1.27.0).
 ///
@@ -111,14 +112,14 @@ class UpdateService {
     try {
       info = await check();
     } catch (_) {
-      error = 'Sem conexão para procurar atualização.';
+      error = tr('Sem conexão para procurar atualização.');
     }
     if (!context.mounted) return;
     if (info == null) {
       final v = await installed();
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(error ?? 'Você já está na versão mais nova ($v).')));
+          content: Text(error ?? tr('Você já está na versão mais nova ({0}).', [v]))));
       return;
     }
     await ask(context, info);
@@ -132,18 +133,15 @@ class UpdateService {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Nova versão do SpeedGuard'),
-        content: Text('A versão ${info.version} está disponível '
-            '(você tem a $current).\n\n'
-            'Quer baixar$mb e instalar agora? Suas configurações e radares '
-            'reportados continuam.'),
+        title: Text(tr('Nova versão do SpeedGuard')),
+        content: Text(tr('A versão {0} está disponível (você tem a {1}).\n\nQuer baixar{2} e instalar agora? Suas configurações e radares reportados continuam.', [info.version, current, mb])),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Agora não')),
+              child: Text(tr('Agora não'))),
           FilledButton(
               onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Atualizar')),
+              child: Text(tr('Atualizar'))),
         ],
       ),
     );
@@ -158,7 +156,7 @@ class UpdateService {
       context: context,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
-        title: Text('Baixando ${info.version}…'),
+        title: Text(tr('Baixando {0}…', [info.version])),
         content: ValueListenableBuilder<double?>(
           valueListenable: progress,
           builder: (_, v, __) => Column(
@@ -166,7 +164,7 @@ class UpdateService {
             children: [
               LinearProgressIndicator(value: v, color: SG.accent),
               const SizedBox(height: 10),
-              Text(v == null ? 'Conectando…' : '${(v * 100).round()}%'),
+              Text(v == null ? tr('Conectando…') : '${(v * 100).round()}%'),
             ],
           ),
         ),
@@ -176,7 +174,7 @@ class UpdateService {
                 cancelled = true;
                 Navigator.pop(ctx);
               },
-              child: const Text('Cancelar')),
+              child: Text(tr('Cancelar'))),
         ],
       ),
     );
@@ -204,13 +202,13 @@ class UpdateService {
           type: 'application/vnd.android.package-archive');
       if (r.type != ResultType.done && context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text('Não foi possível abrir o instalador: ${r.message}')));
+            content: Text(tr('Não foi possível abrir o instalador: {0}', [r.message]))));
       }
     } catch (_) {
       if (cancelled || !context.mounted) return;
       Navigator.of(context, rootNavigator: true).pop();
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Falha ao baixar a atualização. Tente de novo.')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(tr('Falha ao baixar a atualização. Tente de novo.'))));
     } finally {
       client.close();
     }

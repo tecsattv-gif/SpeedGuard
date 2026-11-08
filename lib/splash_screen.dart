@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'i18n.dart';
 
 /// Tela de abertura: arte do SpeedGuard + créditos, por 2,5 segundos.
 class SplashScreen extends StatefulWidget {
@@ -52,8 +53,8 @@ class _SplashScreenState extends State<SplashScreen> {
               top: false,
               child: Column(
                 mainAxisSize: MainAxisSize.min,
-                children: const [
-                  Text('Desenvolvido por',
+                children: [
+                  Text(tr('Desenvolvido por'),
                       textAlign: TextAlign.center,
                       style: TextStyle(color: Colors.white60, fontSize: 13)),
                   SizedBox(height: 2),

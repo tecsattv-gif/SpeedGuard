@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:workmanager/workmanager.dart';
 
 import 'live_service.dart';
+import 'i18n.dart';
 
 /// Aviso de fronteira do grupo (1.29.47).
 ///
@@ -29,14 +30,14 @@ class LiveBorder {
       await _init();
       await _notif.show(
         _nid++,
-        'Grupo SpeedGuard',
-        '$nick está ${LiveService.inCountry(cc)}',
-        const NotificationDetails(
+        tr('Grupo SpeedGuard'),
+        tr('{0} está {1}', [nick, LiveService.inCountry(cc)]),
+        NotificationDetails(
           android: AndroidNotificationDetails(
             'grupo_fronteira',
-            'Grupo: fronteiras',
+            tr('Grupo: fronteiras'),
             channelDescription:
-                'Avisa quando um colega do grupo entra em outro país',
+                tr('Avisa quando um colega do grupo entra em outro país'),
             importance: Importance.high,
             priority: Priority.high,
           ),
@@ -77,6 +78,7 @@ void liveBgDispatcher() {
   Workmanager().executeTask((task, input) async {
     try {
       DartPluginRegistrant.ensureInitialized();
+      await loadLang();
       final p = await SharedPreferences.getInstance();
       if (p.getString('vehicle') != 'truck') return true;
       final live = LiveService();

@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'firebase_config.dart';
+import 'i18n.dart';
 
 /// Um motorista do grupo no mapa.
 class LiveMember {
@@ -212,7 +213,7 @@ class LiveService {
       if (m.country.isEmpty) continue;
       final before = last[m.id] as String?;
       if (before != null && before != m.country) {
-        out.add((m.nick.isEmpty ? 'Um colega' : m.nick, m.country));
+        out.add((m.nick.isEmpty ? tr('Um colega') : m.nick, m.country));
       }
       last[m.id] = m.country;
     }
@@ -228,31 +229,34 @@ class LiveService {
         ? String.fromCharCodes(
             c.toUpperCase().codeUnits.map((u) => u - 0x41 + 0x1F1E6))
         : '';
-    return '$prep $name $flag'.trim();
+    // Preposição ("na", "em"…) só em português; nos outros idiomas
+    // a frase já traz a sua ("is in", "está en", "est en").
+    final p = appLang == 'pt' ? '$prep ' : '';
+    return '$p$name $flag'.trim();
   }
 
   static String countryName(String cc) =>
       (_names[cc.toLowerCase()] ?? (cc.toUpperCase(), '')).$1;
 
-  static const _names = <String, (String, String)>{
-    'pt': ('Portugal', 'em'), 'es': ('Espanha', 'na'), 'fr': ('França', 'na'),
-    'de': ('Alemanha', 'na'), 'it': ('Itália', 'na'), 'be': ('Bélgica', 'na'),
-    'nl': ('Holanda', 'na'), 'lu': ('Luxemburgo', 'em'), 'ch': ('Suíça', 'na'),
-    'at': ('Áustria', 'na'), 'pl': ('Polônia', 'na'), 'cz': ('Chéquia', 'na'),
-    'sk': ('Eslováquia', 'na'), 'hu': ('Hungria', 'na'),
-    'si': ('Eslovênia', 'na'), 'hr': ('Croácia', 'na'), 'ro': ('Romênia', 'na'),
-    'bg': ('Bulgária', 'na'), 'gr': ('Grécia', 'na'), 'dk': ('Dinamarca', 'na'),
-    'se': ('Suécia', 'na'), 'no': ('Noruega', 'na'), 'fi': ('Finlândia', 'na'),
-    'gb': ('Reino Unido', 'no'), 'ie': ('Irlanda', 'na'), 'ad': ('Andorra', 'em'),
-    'mc': ('Mônaco', 'em'), 'li': ('Liechtenstein', 'em'),
-    'rs': ('Sérvia', 'na'), 'ba': ('Bósnia', 'na'), 'me': ('Montenegro', 'em'),
-    'mk': ('Macedônia do Norte', 'na'), 'al': ('Albânia', 'na'),
-    'lt': ('Lituânia', 'na'), 'lv': ('Letônia', 'na'), 'ee': ('Estônia', 'na'),
-    'ua': ('Ucrânia', 'na'), 'md': ('Moldávia', 'na'), 'tr': ('Turquia', 'na'),
-    'ma': ('Marrocos', 'em'), 'br': ('Brasil', 'no'), 'ar': ('Argentina', 'na'),
-    'uy': ('Uruguai', 'no'), 'py': ('Paraguai', 'no'), 'cl': ('Chile', 'no'),
-    'bo': ('Bolívia', 'na'), 'pe': ('Peru', 'no'), 'us': ('Estados Unidos', 'nos'),
-    'ca': ('Canadá', 'no'), 'mx': ('México', 'no'),
+  static Map<String, (String, String)> get _names => {
+    'pt': (tr('Portugal'), 'em'), 'es': (tr('Espanha'), 'na'), 'fr': (tr('França'), 'na'),
+    'de': (tr('Alemanha'), 'na'), 'it': (tr('Itália'), 'na'), 'be': (tr('Bélgica'), 'na'),
+    'nl': (tr('Holanda'), 'na'), 'lu': (tr('Luxemburgo'), 'em'), 'ch': (tr('Suíça'), 'na'),
+    'at': (tr('Áustria'), 'na'), 'pl': (tr('Polônia'), 'na'), 'cz': (tr('Chéquia'), 'na'),
+    'sk': (tr('Eslováquia'), 'na'), 'hu': (tr('Hungria'), 'na'),
+    'si': (tr('Eslovênia'), 'na'), 'hr': (tr('Croácia'), 'na'), 'ro': (tr('Romênia'), 'na'),
+    'bg': (tr('Bulgária'), 'na'), 'gr': (tr('Grécia'), 'na'), 'dk': (tr('Dinamarca'), 'na'),
+    'se': (tr('Suécia'), 'na'), 'no': (tr('Noruega'), 'na'), 'fi': (tr('Finlândia'), 'na'),
+    'gb': (tr('Reino Unido'), 'no'), 'ie': (tr('Irlanda'), 'na'), 'ad': (tr('Andorra'), 'em'),
+    'mc': (tr('Mônaco'), 'em'), 'li': (tr('Liechtenstein'), 'em'),
+    'rs': (tr('Sérvia'), 'na'), 'ba': (tr('Bósnia'), 'na'), 'me': (tr('Montenegro'), 'em'),
+    'mk': (tr('Macedônia do Norte'), 'na'), 'al': (tr('Albânia'), 'na'),
+    'lt': (tr('Lituânia'), 'na'), 'lv': (tr('Letônia'), 'na'), 'ee': (tr('Estônia'), 'na'),
+    'ua': (tr('Ucrânia'), 'na'), 'md': (tr('Moldávia'), 'na'), 'tr': (tr('Turquia'), 'na'),
+    'ma': (tr('Marrocos'), 'em'), 'br': (tr('Brasil'), 'no'), 'ar': (tr('Argentina'), 'na'),
+    'uy': (tr('Uruguai'), 'no'), 'py': (tr('Paraguai'), 'no'), 'cl': (tr('Chile'), 'no'),
+    'bo': (tr('Bolívia'), 'na'), 'pe': (tr('Peru'), 'no'), 'us': (tr('Estados Unidos'), 'nos'),
+    'ca': (tr('Canadá'), 'no'), 'mx': (tr('México'), 'no'),
   };
 
   /// Baixa só a foto de um motorista (quando ela muda).
