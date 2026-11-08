@@ -46,6 +46,28 @@ class LiveBorder {
     } catch (_) {}
   }
 
+  /// Mensagem direta de um colega (1.32.0).
+  static Future<void> notifyMsg(String nick, String text) async {
+    try {
+      await _init();
+      await _notif.show(
+        _nid++,
+        tr('Mensagem de {0}', [nick.isEmpty ? tr('Um colega') : nick]),
+        text,
+        NotificationDetails(
+          android: AndroidNotificationDetails(
+            'grupo_mensagens',
+            tr('Grupo: mensagens'),
+            channelDescription:
+                tr('Mensagens dos colegas do grupo'),
+            importance: Importance.high,
+            priority: Priority.high,
+          ),
+        ),
+      );
+    } catch (_) {}
+  }
+
   /// Android 13+: pede permissão de notificação.
   static Future<void> askPermission() async {
     try {
@@ -84,6 +106,9 @@ void liveBgDispatcher() {
       final live = LiveService();
       await live.load();
       if (!live.hasGroup) return true;
+      for (final m in await live.inbox()) {
+        await LiveBorder.notifyMsg(m.nick, m.text);
+      }
       if (!await live.refresh()) return true;
       for (final (nick, cc) in await live.borderEvents()) {
         await LiveBorder.notify(nick, cc);

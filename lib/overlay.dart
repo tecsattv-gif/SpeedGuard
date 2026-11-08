@@ -87,6 +87,12 @@ class _OverlayBubbleState extends State<OverlayBubble> {
   bool _cardOn = false; // 1.31.0: card do radar no pop-up (sem a bolha)
   DateTime? _lastMsg;
   bool _clickThrough = false;
+  // 1.32.0: trava de segurança. A janela roda separada do app; se o app
+  // for fechado (ou parar de mandar dados), ela não pode ficar por cima
+  // travando a tela dos outros apps.
+  Timer? _watchdog;
+  DateTime _lastAny = DateTime.now();
+  bool _stale = false;
   Timer? _excTimer;
   String? _park; // distância do próximo park
   String? _radarSub; // tipo do radar e limite ("Radar fixo • limite 50")
@@ -104,6 +110,7 @@ class _OverlayBubbleState extends State<OverlayBubble> {
   void initState() {
     super.initState();
     _olog('janela: iniciou');
+    _watchdog = Timer.periodic(const Duration(seconds: 2), (_) => _checkAlive());
     _sub = FlutterOverlayWindow.overlayListener.listen((event) {
       try {
         final m = jsonDecode(event.toString()) as Map;
@@ -113,6 +120,17 @@ class _OverlayBubbleState extends State<OverlayBubble> {
         // app: sem "speed", ignora — antes zerava a contagem e o modo "só o
         // círculo" e o círculo sumia.
         if (!m.containsKey('speed')) return;
+        _lastAny = DateTime.now();
+        if (_stale) {
+          _stale = false;
+          _olog('janela: app voltou a mandar dados');
+          // Bolha: volta a aceitar toque (arrastar, botões).
+          if (m['ringOnly'] != true && _clickThrough) {
+            _clickThrough = false;
+            FlutterOverlayWindow.updateFlag(OverlayFlag.defaultFlag)
+                .catchError((_) => null);
+          }
+        }
         setState(() {
           _speed = (m['speed'] as num?)?.toInt() ?? 0;
           _dist = (m['dist'] as num?)?.toDouble();
@@ -202,8 +220,33 @@ class _OverlayBubbleState extends State<OverlayBubble> {
     } catch (_) {}
   }
 
+  /// Sem notícia do app há 6 s: deixa os toques passarem e esconde tudo.
+  /// Há 60 s: o app foi fechado — a janela se fecha sozinha.
+  void _checkAlive() {
+    final idle = DateTime.now().difference(_lastAny);
+    if (idle > const Duration(seconds: 60)) {
+      _olog('janela: app sem resposta há 60 s, fechando');
+      _watchdog?.cancel();
+      FlutterOverlayWindow.closeOverlay().catchError((_) => null);
+      return;
+    }
+    // Janela que nunca recebeu dado nenhum: libera os toques já em 2 s.
+    final limit = Duration(seconds: _gotConfig ? 6 : 2);
+    if (idle > limit && !_stale) {
+      _stale = true;
+      _olog('janela: app sem resposta, toques passam');
+      if (!_clickThrough) {
+        _clickThrough = true;
+        FlutterOverlayWindow.updateFlag(OverlayFlag.clickThrough)
+            .catchError((_) => null);
+      }
+      if (mounted) setState(() {});
+    }
+  }
+
   @override
   void dispose() {
+    _watchdog?.cancel();
     _sub?.cancel();
     _pickerTimer?.cancel();
     _sentTimer?.cancel();
@@ -409,7 +452,8 @@ class _OverlayBubbleState extends State<OverlayBubble> {
       WidgetsBinding.instance.addPostFrameCallback((_) => _calibrate(w));
     }
     // Antes do primeiro dado não sabe se é a bolha ou só o círculo.
-    if (!_gotConfig) return const SizedBox.shrink();
+    // Sem notícia do app (fechado/travado): não desenha nada (1.32.0).
+    if (!_gotConfig || _stale) return const SizedBox.shrink();
     if (_only) {
       // 1.31.0: card do radar em cima e círculo da contagem embaixo; a
       // janela é transparente e deixa os toques passarem.

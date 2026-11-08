@@ -36,6 +36,13 @@ class LiveMember {
   }
 }
 
+/// Mensagem direta entre colegas do grupo (1.32.0).
+class LiveMsg {
+  final String id, from, nick, text;
+  final int at;
+  LiveMsg(this.id, this.from, this.nick, this.text, this.at);
+}
+
 /// Localização em grupo (1.29.43): quem liga "Compartilhar" manda a posição
 /// a cada 30 s para a coleção `live` do Firebase; quem tem o mesmo código
 /// de grupo vê os outros no mapa. O código vai como "impressão digital"
@@ -374,6 +381,96 @@ class LiveService {
       return true;
     } catch (_) {
       return false;
+    }
+  }
+
+  // ---------- Mensagens diretas (1.32.0) ----------
+
+  /// A regra `msgs` ainda não foi publicada no Firebase.
+  bool msgRulesMissing = false;
+
+  /// Manda [text] (com emojis) para o colega [toId] (id do aparelho dele).
+  Future<bool> sendMsg(String toId, String text) async {
+    if (!communityEnabled || !hasGroup) return false;
+    final t = text.trim();
+    if (t.isEmpty) return false;
+    final id = await _deviceId();
+    final fields = {
+      'to': {'stringValue': toId},
+      'from': {'stringValue': id},
+      'group': {'stringValue': groupKey(group)},
+      'nick': {
+        'stringValue': nick.length > 30 ? nick.substring(0, 30) : nick
+      },
+      'text': {'stringValue': t.length > 300 ? t.substring(0, 300) : t},
+      'at': {'integerValue': '${DateTime.now().millisecondsSinceEpoch}'},
+    };
+    try {
+      final r = await http
+          .post(Uri.parse('$_base/msgs?key=$firebaseApiKey'),
+              headers: {'Content-Type': 'application/json'},
+              body: jsonEncode({'fields': fields}))
+          .timeout(const Duration(seconds: 20));
+      msgRulesMissing = r.statusCode == 403;
+      return r.statusCode == 200;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Mensagens que chegaram para você (do seu grupo). Cada uma é apagada do
+  /// Firebase depois de baixada, então só chega uma vez; com mais de 24 h
+  /// é apagada sem mostrar.
+  Future<List<LiveMsg>> inbox() async {
+    if (!communityEnabled || !hasGroup) return const [];
+    final id = await _deviceId();
+    final body = {
+      'structuredQuery': {
+        'from': [
+          {'collectionId': 'msgs'}
+        ],
+        'where': {
+          'fieldFilter': {
+            'field': {'fieldPath': 'to'},
+            'op': 'EQUAL',
+            'value': {'stringValue': id}
+          }
+        },
+        'limit': 30,
+      }
+    };
+    try {
+      final r = await http
+          .post(Uri.parse('$_base:runQuery?key=$firebaseApiKey'),
+              headers: {'Content-Type': 'application/json'},
+              body: jsonEncode(body))
+          .timeout(const Duration(seconds: 20));
+      if (r.statusCode == 403) msgRulesMissing = true;
+      if (r.statusCode != 200) return const [];
+      final now = DateTime.now().millisecondsSinceEpoch;
+      final out = <LiveMsg>[];
+      for (final item in jsonDecode(utf8.decode(r.bodyBytes)) as List) {
+        final doc = (item as Map)['document'] as Map?;
+        if (doc == null) continue;
+        final docId = doc['name'].toString().split('/').last;
+        final f = (doc['fields'] as Map).cast<String, dynamic>();
+        String s(String k) => (f[k] as Map?)?['stringValue']?.toString() ?? '';
+        final at = int.tryParse(
+                '${(f['at'] as Map?)?['integerValue'] ?? 0}') ??
+            0;
+        // Apaga do Firebase (já foi entregue).
+        http
+            .delete(Uri.parse('$_base/msgs/$docId?key=$firebaseApiKey'))
+            .timeout(const Duration(seconds: 15))
+            .catchError((_) => http.Response('', 0));
+        if (s('group') != groupKey(group)) continue;
+        if (now - at > 24 * 3600 * 1000) continue;
+        out.add(LiveMsg(docId, s('from'), s('nick'), s('text'), at));
+      }
+      out.sort((a, b) => a.at.compareTo(b.at));
+      return out;
+    } catch (_) {
+      return const [];
     }
   }
 }

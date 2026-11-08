@@ -428,6 +428,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
     _presenceTimer?.cancel();
     _liveTimer?.cancel();
+    _trackTimer?.cancel();
     _closeBubble();
     _overlaySub?.cancel();
     _askTimer?.cancel();
@@ -503,6 +504,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         overlayContent: tr('Bolha de radares ativa'),
       );
       _overlayShown = true;
+      _keepOverlay();
       // Voltou para o app enquanto o painel abria: fecha de novo.
       if (_inFront) {
         await _closeBubble();
@@ -586,6 +588,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       _overlayShown = true;
       _ringPopup = true;
       _plog('abrir círculo: Android aceitou');
+      // 1.32.0: a janela só passa a deixar os toques passarem quando recebe
+      // a 1ª mensagem; parado, o GPS não manda nada (filtro de 5 m) e a
+      // janela transparente travava o alto da tela dos outros apps. Manda
+      // o estado a cada segundo enquanto a janela estiver aberta.
+      _keepOverlay();
       Future.delayed(const Duration(milliseconds: 1500), () async {
         try {
           _plog('janela ativa: ${await FlutterOverlayWindow.isActive()}');
@@ -607,7 +614,26 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     }
   }
 
+  Timer? _popKeep;
+
+  /// 1.32.0: manda o estado para a janela flutuante a cada segundo (mesmo
+  /// parado, sem GPS novo). A janela usa isso para saber que o app está
+  /// vivo; sem notícia ela libera os toques e se fecha sozinha.
+  void _keepOverlay() {
+    _popKeep?.cancel();
+    _popKeep = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!_overlayShown) {
+        _popKeep?.cancel();
+        _popKeep = null;
+        return;
+      }
+      _sendBubble();
+    });
+  }
+
   Future<void> _closeBubble() async {
+    _popKeep?.cancel();
+    _popKeep = null;
     if (!_overlayShown) return;
     if (_ringPopup) _plog('fechar círculo');
     _overlayShown = false;
@@ -1131,6 +1157,354 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   Timer? _liveTimer;
   bool _livePhotoSent = false;
 
+  // ---------- Localizar colega (1.32.0) ----------
+  String? _trackId; // colega que o mapa está seguindo
+  String _trackNick = '';
+  bool _trackCam = true; // false quando você arrasta o mapa
+  Timer? _trackTimer;
+
+  void _locate(LiveMember m) {
+    _trackTimer?.cancel();
+    setState(() {
+      _trackId = m.id;
+      _trackNick = m.nick;
+      _trackCam = true;
+      _follow = false;
+      _mapView = true;
+    });
+    final (la, lo) = m.shown;
+    _map.move(LatLng(la, lo), 15);
+    _trackTimer =
+        Timer.periodic(const Duration(seconds: 1), (_) => _trackStep());
+  }
+
+  void _trackStep() {
+    if (!mounted || _trackId == null) return;
+    final m = _live.members[_trackId];
+    if (m == null) {
+      final n = _trackNick.isEmpty ? tr('O colega') : _trackNick;
+      _stopLocate();
+      _snack(tr('{0} saiu do mapa (parou de compartilhar ou ficou sem sinal).', [n]));
+      return;
+    }
+    if (_trackCam && !_follow) {
+      final (la, lo) = m.shown;
+      _safe('localizar', () => _map.move(LatLng(la, lo), _map.camera.zoom));
+    }
+    setState(() {});
+  }
+
+  void _stopLocate() {
+    _trackTimer?.cancel();
+    _trackTimer = null;
+    if (mounted) setState(() => _trackId = null);
+  }
+
+  /// Card no rodapé do mapa com o colega que está sendo localizado.
+  Widget _locateCard(LiveMember m) {
+    final pos = _pos;
+    final ago = DateTime.now()
+        .difference(DateTime.fromMillisecondsSinceEpoch(m.updatedAt));
+    final km = pos == null
+        ? null
+        : Geolocator.distanceBetween(
+                pos.latitude, pos.longitude, m.lat, m.lon) /
+            1000;
+    return Material(
+      color: SG.card,
+      elevation: 6,
+      borderRadius: BorderRadius.circular(16),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(10, 8, 4, 8),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Row(children: [
+            SizedBox(
+                width: 40,
+                child: FittedBox(
+                    child: _livePin(m.photo, m.nick, const Color(0xFFFF9800)))),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                      tr('Localizando {0}',
+                          [m.nick.isEmpty ? tr('Motorista') : m.nick]),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          fontSize: 16, fontWeight: FontWeight.w800)),
+                  Text(
+                      [
+                        if (m.country.isNotEmpty)
+                          PresenceService.flag(m.country),
+                        '${m.kmh.round()} km/h',
+                        if (km != null)
+                          '${km < 10 ? km.toStringAsFixed(1) : km.toStringAsFixed(0)} km',
+                        ago.inMinutes < 1
+                            ? tr('agora')
+                            : tr('há {0} min', [ago.inMinutes]),
+                      ].join(' · '),
+                      style: TextStyle(color: SG.textSoft, fontSize: 12)),
+                ],
+              ),
+            ),
+            IconButton(
+              tooltip: tr('Fechar'),
+              icon: const Icon(Icons.close),
+              onPressed: _stopLocate,
+            ),
+          ]),
+          const SizedBox(height: 6),
+          Row(children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 6)),
+                icon: Icon(_trackCam ? Icons.gps_fixed : Icons.center_focus_strong,
+                    size: 18),
+                label: Text(_trackCam ? tr('Seguindo') : tr('Centralizar'),
+                    overflow: TextOverflow.ellipsis),
+                onPressed: () {
+                  setState(() {
+                    _trackCam = true;
+                    _follow = false;
+                  });
+                  final (la, lo) = m.shown;
+                  _map.move(LatLng(la, lo), _map.camera.zoom);
+                },
+              ),
+            ),
+            const SizedBox(width: 6),
+            Expanded(
+              child: OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 6)),
+                icon: const Icon(Icons.chat_bubble_outline, size: 18),
+                label: Text(tr('Mensagem'), overflow: TextOverflow.ellipsis),
+                onPressed: () => _chatWith(m.id, m.nick),
+              ),
+            ),
+            const SizedBox(width: 6),
+            Expanded(
+              child: FilledButton.icon(
+                style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 6)),
+                icon: const Icon(Icons.map, size: 18),
+                label: Text(tr('Google Maps'), overflow: TextOverflow.ellipsis),
+                onPressed: () => _openMapAt(m.lat, m.lon),
+              ),
+            ),
+            const SizedBox(width: 6),
+          ]),
+        ]),
+      ),
+    );
+  }
+
+  // ---------- Mensagens diretas (1.32.0) ----------
+  /// Conversa de cada colega nesta sessão: (minha?, texto, horário).
+  final Map<String, List<(bool, String, int)>> _chat = {};
+  final Set<String> _unread = {};
+  StateSetter? _chatRefresh; // redesenha a conversa aberta
+  String? _chatOpen;
+
+  static const _emojis = [
+    '👍', '👋', '😀', '😂', '😉', '😎', '🙏', '❤️', '👌', '✅', '❌', '⚠️',
+    '🚛', '🅿️', '⛽', '☕', '🍽️', '😴', '🚨', '👮', '🚧', '🛑', '📍', '🕐',
+  ];
+  static const _quick = [
+    'Onde você está?', 'Tudo bem?', 'Vou parar no próximo park 🅿️',
+    'Parando para café ☕', 'Cuidado: polícia à frente 👮',
+    'Fila à frente 🚧', 'Me liga quando puder 📞', 'Boa viagem! 🚛',
+  ];
+
+  void _onInbox(LiveMsg msg) {
+    final nick = msg.nick.isEmpty ? tr('Um colega') : msg.nick;
+    (_chat[msg.from] ??= []).add((false, msg.text, msg.at));
+    final open = _chatOpen == msg.from;
+    if (open) {
+      _chatRefresh?.call(() {});
+    } else {
+      _unread.add(msg.from);
+    }
+    final bg = WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed;
+    if (bg) {
+      LiveBorder.notifyMsg(nick, msg.text);
+    } else if (!open && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        duration: const Duration(seconds: 10),
+        content: Text('💬 $nick: ${msg.text}'),
+        action: SnackBarAction(
+            label: tr('Responder'),
+            onPressed: () => _chatWith(msg.from, msg.nick)),
+      ));
+    }
+    if (_voice) {
+      final clean = msg.text
+          .replaceAll(RegExp(r'[^\p{L}\p{N} .,!?]', unicode: true), '')
+          .trim();
+      _tts.speak(clean.isEmpty
+          ? tr('Mensagem de {0}', [nick])
+          : '${tr('Mensagem de {0}', [nick])}. $clean');
+    }
+  }
+
+  Future<void> _chatWith(String id, String nick) async {
+    final name = nick.isEmpty ? tr('Motorista') : nick;
+    final textC = TextEditingController();
+    var sending = false;
+    _chatOpen = id;
+    setState(() => _unread.remove(id));
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => StatefulBuilder(builder: (ctx, setS) {
+        _chatRefresh = setS;
+        final hist = _chat[id] ?? const [];
+        Future<void> send(String t) async {
+          if (t.trim().isEmpty || sending) return;
+          setS(() => sending = true);
+          final ok = await _live.sendMsg(id, t);
+          sending = false;
+          if (ok) {
+            (_chat[id] ??= [])
+                .add((true, t.trim(), DateTime.now().millisecondsSinceEpoch));
+            textC.clear();
+          } else {
+            _snack(_live.msgRulesMissing
+                ? tr('Falta publicar a regra msgs no Firebase (veja o README).')
+                : tr('Não foi possível enviar. Verifique a internet.'));
+          }
+          if (ctx.mounted) setS(() {});
+        }
+
+        return Padding(
+          padding: EdgeInsets.fromLTRB(16, 12, 16,
+              12 + MediaQuery.viewInsetsOf(ctx).bottom +
+                  MediaQuery.viewPaddingOf(ctx).bottom),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(tr('Mensagem para {0}', [name]),
+                  style: const TextStyle(
+                      fontSize: 20, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              if (hist.isNotEmpty)
+                ConstrainedBox(
+                  constraints: BoxConstraints(
+                      maxHeight: MediaQuery.sizeOf(ctx).height * 0.25),
+                  child: ListView(
+                    shrinkWrap: true,
+                    reverse: true,
+                    children: [
+                      for (final (mine, t, _) in hist.reversed)
+                        Align(
+                          alignment: mine
+                              ? Alignment.centerRight
+                              : Alignment.centerLeft,
+                          child: Container(
+                            margin: const EdgeInsets.symmetric(vertical: 2),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 6),
+                            constraints: BoxConstraints(
+                                maxWidth: MediaQuery.sizeOf(ctx).width * 0.7),
+                            decoration: BoxDecoration(
+                              color: mine
+                                  ? const Color(0xFF7E57C2)
+                                  : SG.line,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(t,
+                                style: TextStyle(
+                                    color: mine ? Colors.white : null)),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              const SizedBox(height: 8),
+              Wrap(
+                alignment: WrapAlignment.center,
+                children: [
+                  for (final e in _emojis)
+                    InkWell(
+                      borderRadius: BorderRadius.circular(8),
+                      onTap: () {
+                        textC.text = '${textC.text}$e';
+                        textC.selection = TextSelection.collapsed(
+                            offset: textC.text.length);
+                        setS(() {});
+                      },
+                      onLongPress: () => send(e), // toque longo: envia já
+                      child: Padding(
+                        padding: const EdgeInsets.all(5),
+                        child: Text(e, style: const TextStyle(fontSize: 26)),
+                      ),
+                    ),
+                ],
+              ),
+              Text(tr('Toque no emoji para escrever; toque longo envia na hora.'),
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: SG.textSoft, fontSize: 11)),
+              const SizedBox(height: 6),
+              SizedBox(
+                height: 40,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  children: [
+                    for (final q in _quick)
+                      Padding(
+                        padding: const EdgeInsets.only(right: 6),
+                        child: ActionChip(
+                          label: Text(tr(q)),
+                          onPressed: () => send(tr(q)),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
+              Row(children: [
+                Expanded(
+                  child: TextField(
+                    controller: textC,
+                    maxLength: 300,
+                    minLines: 1,
+                    maxLines: 3,
+                    textCapitalization: TextCapitalization.sentences,
+                    decoration: InputDecoration(
+                      hintText: tr('Escreva a mensagem'),
+                      counterText: '',
+                      border: const OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                    onSubmitted: send,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                IconButton.filled(
+                  tooltip: tr('Enviar'),
+                  onPressed: sending ? null : () => send(textC.text),
+                  icon: sending
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Icon(Icons.send),
+                ),
+              ]),
+            ],
+          ),
+        );
+      }),
+    );
+    _chatOpen = null;
+    _chatRefresh = null;
+    if (mounted) setState(() => _unread.remove(id));
+  }
+
   Future<void> _liveTick({bool photo = false}) async {
     if (!mounted) return;
     // 1.29.45: só com Caminhão escolhido nas Configurações.
@@ -1147,6 +1521,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       if (ok) _livePhotoSent = true;
     }
     if (_live.hasGroup) {
+      // Mensagens diretas dos colegas (1.32.0).
+      for (final msg in await _live.inbox()) {
+        if (mounted) _onInbox(msg);
+      }
       if (await _live.refresh()) {
         // Colega atravessou fronteira (1.29.47): notificação + voz.
         for (final (nick, cc) in await _live.borderEvents()) {
@@ -1189,7 +1567,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             Text(tr('Grupo ({0} no mapa)', [list.length]),
                 style:
                     const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-            Text(tr('Toque num colega para ver no mapa.'),
+            Text(tr('Toque num colega para localizá-lo no mapa (o mapa segue ele). 💬 manda mensagem.'),
                 style: TextStyle(color: SG.textSoft, fontSize: 12)),
             const SizedBox(height: 8),
             if (list.isEmpty)
@@ -1228,22 +1606,40 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                               : tr('há {0} min', [ago.inMinutes]);
                         }(),
                       ].join(' · ')),
-                      trailing: IconButton(
-                        tooltip: tr('Ir até lá (Google Maps)'),
-                        icon: const Icon(Icons.directions),
-                        onPressed: () {
-                          Navigator.pop(ctx);
-                          _navigateTo(Park(
-                              'live', m.nick, m.lat, m.lon, 'parking', const {}));
-                        },
-                      ),
+                      trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                        IconButton(
+                          tooltip: tr('Localizar no mapa'),
+                          icon: const Icon(Icons.person_search),
+                          onPressed: () {
+                            Navigator.pop(ctx);
+                            _locate(m);
+                          },
+                        ),
+                        IconButton(
+                          tooltip: tr('Mensagem'),
+                          icon: Badge(
+                            isLabelVisible: _unread.contains(m.id),
+                            smallSize: 10,
+                            child: const Icon(Icons.chat_bubble_outline),
+                          ),
+                          onPressed: () {
+                            Navigator.pop(ctx);
+                            _chatWith(m.id, m.nick);
+                          },
+                        ),
+                        IconButton(
+                          tooltip: tr('Ir até lá (Google Maps)'),
+                          icon: const Icon(Icons.directions),
+                          onPressed: () {
+                            Navigator.pop(ctx);
+                            _navigateTo(Park('live', m.nick, m.lat, m.lon,
+                                'parking', const {}));
+                          },
+                        ),
+                      ]),
                       onTap: () {
                         Navigator.pop(ctx);
-                        setState(() {
-                          _follow = false;
-                          _mapView = true;
-                        });
-                        _map.move(LatLng(m.lat, m.lon), 14);
+                        _locate(m);
                       },
                     ),
                 ]),
@@ -1359,6 +1755,30 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 _navigateTo(Park('live', m.nick, m.lat, m.lon, 'parking', const {}));
               },
             ),
+            const SizedBox(height: 8),
+            Row(children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  icon: const Icon(Icons.person_search),
+                  label: Text(tr('Localizar')),
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    _locate(m);
+                  },
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: OutlinedButton.icon(
+                  icon: const Icon(Icons.chat_bubble_outline),
+                  label: Text(tr('Mensagem')),
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    _chatWith(m.id, m.nick);
+                  },
+                ),
+              ),
+            ]),
           ],
         ),
       ),
@@ -4078,6 +4498,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               },
               onPositionChanged: (camera, hasGesture) {
                 if (hasGesture && _follow) setState(() => _follow = false);
+                if (hasGesture && _trackId != null && _trackCam) {
+                  setState(() => _trackCam = false);
+                }
                 // Soltou o mapa em outra região: baixa os radares de lá.
                 if (hasGesture) {
                   _areaTimer?.cancel();
@@ -4211,7 +4634,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                             Park('live', m.nick, m.lat, m.lon, 'parking', const {})),
                         onLongPress: () => _showMember(m),
                         child: _livePin(
-                            m.photo, m.nick, const Color(0xFF7E57C2),
+                            m.photo,
+                            m.nick,
+                            m.id == _trackId
+                                ? const Color(0xFFFF9800)
+                                : const Color(0xFF7E57C2),
                             label: true),
                       ),
                     ),
@@ -4433,8 +4860,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 // 1.29.47: botão do grupo (lista dos colegas).
                 if (_isTruck && _live.hasGroup) ...[
                   Badge(
-                    label: Text('${_live.members.length}'),
-                    isLabelVisible: _live.members.isNotEmpty,
+                    label: Text(_unread.isNotEmpty
+                        ? '💬${_unread.length}'
+                        : '${_live.members.length}'),
+                    backgroundColor: _unread.isNotEmpty ? SG.red : null,
+                    isLabelVisible:
+                        _live.members.isNotEmpty || _unread.isNotEmpty,
                     child: FloatingActionButton.small(
                       heroTag: 'grupo',
                       tooltip: tr('Grupo'),
@@ -4515,6 +4946,20 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               _parksAhead.isNotEmpty)
             Positioned(left: 12, right: 12, bottom: 72, child: _parkCard()),
 
+          // Colega sendo localizado (1.32.0): card com Google Maps.
+          if (_placing == null &&
+              _mapView &&
+              _trackId != null &&
+              _live.members[_trackId] != null)
+            Positioned(
+              left: 12,
+              right: 12,
+              bottom: _running && _showParks && _parksAhead.isNotEmpty
+                  ? 166
+                  : 72,
+              child: _locateCard(_live.members[_trackId]!),
+            ),
+
           // Botões "Opções" (camadas do mapa) e "Navegar" (Google/Waze).
           if (_placing == null)
           Positioned(
@@ -4553,7 +4998,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           ? null
           : FloatingActionButton.small(
               onPressed: () {
-                setState(() => _follow = true);
+                setState(() {
+                  _follow = true;
+                  _trackCam = false;
+                });
                 if (pos != null) _camTo(pos, 16);
               },
               child: const Icon(Icons.my_location),
