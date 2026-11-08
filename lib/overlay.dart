@@ -84,7 +84,7 @@ class _OverlayBubbleState extends State<OverlayBubble> {
   bool _clickThrough = false;
   Timer? _excTimer;
   String? _park; // distância do próximo park
-  String? _sub; // tipo do radar e limite ("Radar fixo • limite 50")
+  String? _radarSub; // tipo do radar e limite ("Radar fixo • limite 50")
   bool _ask = false;
   bool _picker = false;
   bool _sent = false;
@@ -116,7 +116,7 @@ class _OverlayBubbleState extends State<OverlayBubble> {
           _road = (m['road'] as num?)?.toInt();
           _overSecs = (m['overSecs'] as num?)?.toInt();
           _park = m['park'] as String?;
-          _sub = m['sub'] as String?;
+          _radarSub = m['sub'] as String?;
           _ask = m['ask'] == true;
           _only = m['ringOnly'] == true;
           if (m['scale'] is num) _scale = (m['scale'] as num).toDouble();
@@ -501,8 +501,8 @@ class _OverlayBubbleState extends State<OverlayBubble> {
                       fontSize: 30,
                       height: 1.05,
                       fontWeight: FontWeight.w900)),
-              if (_sub != null)
-                Text(_sub!,
+              if (_radarSub != null)
+                Text(_radarSub!,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
