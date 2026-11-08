@@ -33,8 +33,13 @@ const double kPopRingD = 180;
 /// Pop-up do aviso de radar com o app minimizado e a bolha desligada
 /// (1.31.0): o mesmo card laranja da tela do app ("883 m / Radar fixo •
 /// limite 50"), no alto e no centro; o círculo da contagem fica embaixo dele.
+/// 1.31.1: embaixo do card laranja vem também o card das setas (o mesmo do
+/// mapa do app: setas verdes/vermelhas, placa e distância); o círculo da
+/// contagem fica ao lado do card das setas.
+const double kPopBandsW = 96, kPopBandsH = 170;
 const double kPopCardW = 320, kPopCardH = 92, kPopGap = 8;
-const double kPopW = kPopCardW, kPopH = kPopCardH + kPopGap + kPopRingD;
+const double kPopW = kPopCardW,
+    kPopH = kPopCardH + kPopGap + kPopRingD;
 
 /// Tamanhos que o usuário escolhe em Configurações.
 const Map<String, double> kPanelScales = {
@@ -414,9 +419,18 @@ class _OverlayBubbleState extends State<OverlayBubble> {
           alignment: Alignment.topCenter,
           child: Column(mainAxisSize: MainAxisSize.min, children: [
             if (_dist != null) _radarCard(_dist!),
-            if (_dist != null && _overSecs != null)
+            if (_dist != null || _overSecs != null)
               const SizedBox(height: kPopGap),
-            if (_overSecs != null) _ring(_overSecs!, kPopRingD),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (_dist != null) _bandsCard(_dist!),
+                if (_dist != null && _overSecs != null)
+                  const SizedBox(width: kPopGap),
+                if (_overSecs != null) _ring(_overSecs!, kPopRingD),
+              ],
+            ),
           ]),
         ),
       );
@@ -461,6 +475,46 @@ class _OverlayBubbleState extends State<OverlayBubble> {
                 ],
               ),
             ),
+    );
+  }
+
+  /// Card das setas no pop-up (1.31.1), igual ao do mapa do app: as faixas
+  /// ficam vermelhas a cada aviso (1000, 800, 500, 400, 300 e 100 m), com a
+  /// placa do limite e a distância embaixo. Borda laranja; vermelha se
+  /// estiver acima do limite.
+  Widget _bandsCard(double d) {
+    const green = Color(0xFF4ED636);
+    final border = _over ? SG.red : SG.orange;
+    return Container(
+      width: kPopBandsW,
+      height: kPopBandsH,
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [SG.palette.value.deepTop, SG.bg],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        ),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: border, width: 3),
+        boxShadow: SG.glow(border, 10),
+      ),
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          RadarBands(green: green, red: RadarBands.redFor(d), size: 72),
+          const SizedBox(height: 6),
+          if (_limit != null) SpeedSign(label: '$_limit', size: 40),
+          Text(
+              d >= 1000
+                  ? '${(d / 1000).toStringAsFixed(1)} km'
+                  : '${d.round()} m',
+              style: TextStyle(
+                  color: _over ? SG.red : SG.orange,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900)),
+        ]),
+      ),
     );
   }
 
