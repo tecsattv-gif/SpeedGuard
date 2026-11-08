@@ -106,9 +106,13 @@ void liveBgDispatcher() {
       final live = LiveService();
       await live.load();
       if (!live.hasGroup) return true;
-      for (final m in await live.inbox()) {
-        await LiveBorder.notifyMsg(m.nick, m.text);
+      final got = await live.inbox();
+      for (final m in got) {
+        await LiveBorder.notifyMsg(
+            m.nick, m.isVoice ? tr('🎤 Mensagem de voz') : m.text);
       }
+      // Guarda para aparecer na conversa quando o app abrir (1.33.0).
+      await LiveService.savePending(got);
       if (!await live.refresh()) return true;
       for (final (nick, cc) in await live.borderEvents()) {
         await LiveBorder.notify(nick, cc);

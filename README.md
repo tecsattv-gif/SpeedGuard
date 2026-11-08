@@ -6,7 +6,7 @@ Autor: Luiz Alberto Cardoso
 
 **Site do app:** https://tecsattv-gif.github.io/SpeedGuard/ (recursos, vídeo tutorial e passo a passo)
 
-## Funções (versão 1.32.0)
+## Funções (versão 1.33.0)
 
 - **Visual neon** com as cores da tela de abertura: fundo roxo escuro, velocímetro com borda violeta brilhante, botão INICIAR em degradê vermelho→rosa, cartões e botões roxos; o painel flutuante e a janela de reportar seguem a mesma paleta
 - **Aviso de radar por cima de outros apps** (1.31.0): com o SpeedGuard **minimizado**, o monitoramento ligado e a **Bolha flutuante desligada**, quando chega um radar aparece no alto da tela, por cima do app aberto (Google Maps, Waze, YouTube…), **só o pop-up do aviso** — o mesmo card laranja da tela do app: distância grande (ex.: **883 m**), placa do limite e "Radar fixo • limite 50". Fica vermelho se você estiver acima do limite e some depois que passa o radar. **Desde a 1.31.1** aparece também, embaixo do card laranja, o **card das setas** (o mesmo do mapa do app: setas verdes que vão ficando vermelhas a cada aviso — 1000, 800, 500, 400, 300 e 100 m —, placa do limite e distância). Se a contagem dos 30 s estiver correndo, o círculo vermelho aparece ao lado do card das setas. A janela é transparente e deixa os toques passarem para o app de baixo. Precisa da permissão **Sobrepor a outros apps**. Para testar: Configurações → **Testar pop-up do radar e da contagem** (radar fixo de mentira, limite 50, chegando de 1000 m, mais a contagem de 35 s)
@@ -107,6 +107,7 @@ Autor: Luiz Alberto Cardoso
   - **1.29.48 — Aviso de pedágio**: a **1000 m** de um pedágio à frente (cabines `barrier=toll_booth` do OpenStreetMap, buscadas num raio de ~25 km pelo Overpass), o app fala **"Pedágio em 1 quilômetro"** e mostra um aviso amarelo **"Pedágio a 1 km"** por 15 s. **Uma vez** por praça de pedágio (cabines a menos de 600 m contam como uma). Só pedágio à frente (até 25° do seu rumo), andando acima de 15 km/h. Liga/desliga em Configurações → **Aviso de pedágio** (ligado por padrão). Pedágio eletrônico sem cabine (pórtico) só avisa se estiver marcado como toll_booth no mapa
   - **1.29.49 — Ajuda offline**: Configurações → **Ajuda** (logo abaixo do Tutorial) abre perguntas e respostas prontas sobre o uso do app, separadas por assunto (Começar, Avisos de radar, Reportar e confirmar, Velocidade e limitador, Painel flutuante e navegação, Parks e rotas, Aparência — desde a 1.29.50 —, Atualização e problemas). Tem **busca** (ignora acentos; ex.: "limitador", "park", "bipe") que abre as respostas encontradas. Fica dentro do app (`lib/help_page.dart`): funciona **sem internet**, sem limite de uso e sem custo
   - **1.32.0 — Localizar colega e mensagens no grupo**: na lista do **👥 Grupo**, tocar num colega (ou no botão 🔍 **Localizar no mapa**) liga o modo **Localizar**: o mapa vai até ele e **fica seguindo** o colega enquanto ele anda (a gota dele fica **laranja**). No rodapé do mapa aparece o card **"Localizando Fulano"** com bandeira, velocidade, distância e há quanto tempo, e os botões **Seguindo/Centralizar** (arrastar o mapa pausa o seguir), **Mensagem** e **Google Maps** (abre o Google Maps com o alfinete na posição dele). O ✕ fecha; se o colega sair do mapa o card some com aviso. O toque longo na gota também tem **Localizar** e **Mensagem**. **Mensagens diretas**: o botão 💬 (na lista, no card ou no toque longo) abre a conversa com o colega: **24 emojis** (toque escreve, **toque longo envia na hora**), **frases prontas** (Onde você está?, Parando para café ☕, Cuidado: polícia à frente 👮…) e campo de texto (até 300 caracteres). A mensagem vai para a coleção `msgs` do Firebase só para aquele aparelho e é **apagada assim que é entregue** (com mais de 24 h é apagada sem mostrar). Chega em até 30 s: com o app aberto aparece embaixo "💬 Fulano: …" com **Responder** (e é lida em voz alta se a voz estiver ligada); minimizado, vira **notificação**; com o app fechado, o Android confere de tempos em tempos (~15–30 min). O botão 👥 mostra 💬 em vermelho com o número de conversas não lidas. **Precisa publicar a regra `msgs`** (abaixo); sem ela o app avisa "Falta publicar a regra msgs"
+  - **1.33.0 — Mensagens de voz no grupo**: na conversa com um colega (botão 💬) há o botão 🎤 ao lado do campo de texto. **Toque** para começar a gravar (aparece a faixa vermelha **Gravando 0:12 / 1:00**), toque em **Enviar** para mandar ou no **✕** para cancelar; com **60 s** a gravação para e é enviada sozinha. O áudio sai em AAC mono 32 kbps (~240 KB por minuto) e vai **dentro da própria mensagem** na coleção `msgs` do Firebase (sem Firebase Storage, que no plano Spark exigiria o plano pago); como as outras mensagens, é **apagado do Firebase assim que é entregue**. Quem recebe vê a bolha com **▶ e a duração** (toque toca/para). Com o app aberto e a **voz ligada**, o app fala "Mensagem de voz de Fulano" e **toca sozinho** (mãos no volante); minimizado ou fechado vira notificação "🎤 Mensagem de voz" e o áudio fica guardado para ouvir na conversa ao abrir o app (desde esta versão as mensagens que chegam com o app fechado também entram na conversa). Os áudios ficam no celular por 7 dias. Na 1ª gravação o Android pede a permissão do **microfone**. **Precisa republicar a regra `msgs`** (abaixo, com `audio` e `dur`); sem ela o envio de voz falha com o aviso "Falta publicar a regra msgs" (texto continua funcionando). Versões antigas do app recebem só o texto "🎤 Mensagem de voz". Pacote novo: `record`; o build passou a usar minSdk 24 (Android 7)
   - **1.32.0 — Correção: tela travada com o app minimizado ou fechado**: a janela transparente dos pop-ups (card do radar e contagem) abre no alto da tela e só passava a deixar os toques passarem depois do 1º dado do GPS — parado, o GPS não manda nada e o canto de cima da tela dos outros apps ficava sem responder; com o app **fechado** a janela ficava lá para sempre. Agora o app manda o estado para a janela **a cada segundo**, e a janela tem uma **trava de segurança**: sem notícia do app há 2 s (antes do 1º dado) ou 6 s, ela some e deixa os toques passarem; há 60 s, ela se fecha sozinha
   - **1.29.50 — Mais perguntas na Ajuda** (de 33 para 51): celular que fecha o app (bateria **Sem restrições**, Início automático no Xiaomi), cards de conectados, radar da outra pista, radar de semáforo, aviso de pedágio, apagar radar salvo só no celular, testar o pop-up da contagem, adicionar/mudar de lugar/excluir park, navegar pela rota gravada, caminho de volta, continuar rota, continuar gravando, botão **👥 Grupo**, aviso de fronteira e o novo assunto **Aparência** (cores do app, claro/escuro, ícone no mapa)
   - O fundo do painel é sólido desde a 1.29.5 (antes deixava ver um pouco do app de baixo)
@@ -194,7 +195,7 @@ O workflow roda `flutter create` para gerar os arquivos Android que não estão 
 
 ## Radares compartilhados (Firebase)
 
-**Já ativado** desde a versão 1.6.3. Os radares reportados ficam no Cloud Firestore do projeto Firebase **SpeedGuard001** (ID `speedguard001`, plano Spark gratuito), na coleção `radars`; as pessoas conectadas ficam na coleção `presence`. O app acessa pela API REST, com o ID do projeto e a chave de API da Web em `lib/firebase_config.dart`. A chave não é secreta (vai dentro do app); quem protege os dados são as regras abaixo, publicadas no console (na versão 1.19.0 entrou `'acidente'` na lista da regra de apagar; na **1.32.0** entrou o bloco `msgs` das mensagens do grupo; republique em **Firestore → Regras → Publicar**):
+**Já ativado** desde a versão 1.6.3. Os radares reportados ficam no Cloud Firestore do projeto Firebase **SpeedGuard001** (ID `speedguard001`, plano Spark gratuito), na coleção `radars`; as pessoas conectadas ficam na coleção `presence`. O app acessa pela API REST, com o ID do projeto e a chave de API da Web em `lib/firebase_config.dart`. A chave não é secreta (vai dentro do app); quem protege os dados são as regras abaixo, publicadas no console (na versão 1.19.0 entrou `'acidente'` na lista da regra de apagar; na **1.32.0** entrou o bloco `msgs` das mensagens do grupo; na **1.33.0** o bloco `msgs` passou a aceitar `audio` e `dur` (mensagens de voz); republique em **Firestore → Regras → Publicar**):
 
 ```
 rules_version = '2';
@@ -234,7 +235,7 @@ service cloud.firestore {
     match /msgs/{id} {
       allow read: if true;
       allow create: if request.resource.data.keys().hasOnly(
-          ['to','from','group','nick','text','at'])
+          ['to','from','group','nick','text','at','audio','dur'])
         && request.resource.data.to is string
         && request.resource.data.to.size() <= 40
         && request.resource.data.group is string
@@ -243,7 +244,11 @@ service cloud.firestore {
         && request.resource.data.nick.size() <= 30
         && request.resource.data.text is string
         && request.resource.data.text.size() <= 300
-        && request.resource.data.at is int;
+        && request.resource.data.at is int
+        // mensagem de voz (1.33.0): áudio AAC de até 60 s / 300 KB
+        && (!('audio' in request.resource.data)
+            || (request.resource.data.audio is bytes
+                && request.resource.data.audio.size() <= 300000));
       allow delete: if true;
     }
     // pessoas conectadas: um documento por aparelho (país + horário)

@@ -1,9 +1,11 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'firebase_config.dart';
@@ -40,7 +42,24 @@ class LiveMember {
 class LiveMsg {
   final String id, from, nick, text;
   final int at;
-  LiveMsg(this.id, this.from, this.nick, this.text, this.at);
+
+  /// Mensagem de voz (1.33.0): arquivo .m4a salvo no aparelho e duração.
+  final String? audioPath;
+  final int durMs;
+  LiveMsg(this.id, this.from, this.nick, this.text, this.at,
+      {this.audioPath, this.durMs = 0});
+
+  bool get isVoice => audioPath != null;
+
+  Map<String, dynamic> toJson() => {
+        'id': id, 'from': from, 'nick': nick, 'text': text, 'at': at,
+        if (audioPath != null) 'audio': audioPath, 'dur': durMs,
+      };
+  static LiveMsg fromJson(Map m) => LiveMsg(
+      '${m['id']}', '${m['from']}', '${m['nick']}', '${m['text']}',
+      (m['at'] as num?)?.toInt() ?? 0,
+      audioPath: m['audio'] as String?,
+      durMs: (m['dur'] as num?)?.toInt() ?? 0);
 }
 
 /// Localização em grupo (1.29.43): quem liga "Compartilhar" manda a posição
@@ -389,11 +408,19 @@ class LiveService {
   /// A regra `msgs` ainda não foi publicada no Firebase.
   bool msgRulesMissing = false;
 
+  /// Mensagem de voz: no máximo 60 s e ~300 KB (limite da regra `msgs`).
+  static const voiceMaxSec = 60;
+  static const voiceMaxBytes = 300000;
+
   /// Manda [text] (com emojis) para o colega [toId] (id do aparelho dele).
-  Future<bool> sendMsg(String toId, String text) async {
+  /// Com [audio] (1.33.0) vai também a gravação (AAC/m4a) e a duração; o
+  /// texto serve de aviso para quem ainda tem versão sem voz.
+  Future<bool> sendMsg(String toId, String text,
+      {Uint8List? audio, int durMs = 0}) async {
     if (!communityEnabled || !hasGroup) return false;
     final t = text.trim();
     if (t.isEmpty) return false;
+    if (audio != null && audio.length > voiceMaxBytes) return false;
     final id = await _deviceId();
     final fields = {
       'to': {'stringValue': toId},
@@ -404,13 +431,15 @@ class LiveService {
       },
       'text': {'stringValue': t.length > 300 ? t.substring(0, 300) : t},
       'at': {'integerValue': '${DateTime.now().millisecondsSinceEpoch}'},
+      if (audio != null) 'audio': {'bytesValue': base64Encode(audio)},
+      if (audio != null) 'dur': {'integerValue': '$durMs'},
     };
     try {
       final r = await http
           .post(Uri.parse('$_base/msgs?key=$firebaseApiKey'),
               headers: {'Content-Type': 'application/json'},
               body: jsonEncode({'fields': fields}))
-          .timeout(const Duration(seconds: 20));
+          .timeout(Duration(seconds: audio == null ? 20 : 45));
       msgRulesMissing = r.statusCode == 403;
       return r.statusCode == 200;
     } catch (_) {
@@ -465,12 +494,70 @@ class LiveService {
             .catchError((_) => http.Response('', 0));
         if (s('group') != groupKey(group)) continue;
         if (now - at > 24 * 3600 * 1000) continue;
-        out.add(LiveMsg(docId, s('from'), s('nick'), s('text'), at));
+        // Mensagem de voz (1.33.0): grava o áudio num arquivo do aparelho.
+        String? audioPath;
+        var dur = 0;
+        final b64 = (f['audio'] as Map?)?['bytesValue']?.toString();
+        if (b64 != null && b64.isNotEmpty) {
+          try {
+            final dir = Directory('${(await getApplicationDocumentsDirectory()).path}/voice');
+            await dir.create(recursive: true);
+            final file = File('${dir.path}/$docId.m4a');
+            await file.writeAsBytes(base64Decode(b64));
+            audioPath = file.path;
+            dur = int.tryParse('${(f['dur'] as Map?)?['integerValue'] ?? 0}') ?? 0;
+          } catch (_) {}
+        }
+        out.add(LiveMsg(docId, s('from'), s('nick'), s('text'), at,
+            audioPath: audioPath, durMs: dur));
       }
       out.sort((a, b) => a.at.compareTo(b.at));
       return out;
     } catch (_) {
       return const [];
     }
+  }
+
+  /// Mensagens que chegaram com o app fechado (serviço em segundo plano):
+  /// ficam guardadas para entrar na conversa quando o app abrir (1.33.0).
+  static Future<void> savePending(List<LiveMsg> msgs) async {
+    if (msgs.isEmpty) return;
+    try {
+      final p = await SharedPreferences.getInstance();
+      await p.reload();
+      final list = (jsonDecode(p.getString('msg_pending') ?? '[]') as List)
+        ..addAll(msgs.map((m) => m.toJson()));
+      while (list.length > 100) {
+        list.removeAt(0);
+      }
+      await p.setString('msg_pending', jsonEncode(list));
+    } catch (_) {}
+  }
+
+  static Future<List<LiveMsg>> takePending() async {
+    try {
+      final p = await SharedPreferences.getInstance();
+      await p.reload();
+      final raw = p.getString('msg_pending');
+      if (raw == null) return const [];
+      await p.remove('msg_pending');
+      return [for (final m in jsonDecode(raw) as List) LiveMsg.fromJson(m as Map)];
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  /// Apaga áudios recebidos/enviados com mais de 7 dias.
+  static Future<void> cleanVoice() async {
+    try {
+      final dir = Directory('${(await getApplicationDocumentsDirectory()).path}/voice');
+      if (!await dir.exists()) return;
+      final old = DateTime.now().subtract(const Duration(days: 7));
+      await for (final e in dir.list()) {
+        if (e is File && (await e.lastModified()).isBefore(old)) {
+          await e.delete();
+        }
+      }
+    } catch (_) {}
   }
 }

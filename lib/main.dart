@@ -15,6 +15,8 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:record/record.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
@@ -307,6 +309,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    // Mensagem de voz terminou de tocar (1.33.0).
+    _voicePlayer.onPlayerComplete.listen((_) {
+      _playing = null;
+      _chatRefresh?.call(() {});
+      if (mounted) setState(() {});
+    });
     // Respostas vindas da bolha flutuante.
     _overlaySub = FlutterOverlayWindow.overlayListener.listen((event) {
       try {
@@ -436,6 +444,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     _predictTimer?.cancel();
     _tts.stop();
     _player.dispose();
+    _voicePlayer.dispose();
+    _rec.dispose();
     _countTimer?.cancel();
     _areaTimer?.cancel();
     WakelockPlus.disable();
@@ -1303,8 +1313,37 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   }
 
   // ---------- Mensagens diretas (1.32.0) ----------
-  /// Conversa de cada colega nesta sessão: (minha?, texto, horário).
-  final Map<String, List<(bool, String, int)>> _chat = {};
+  /// Conversa de cada colega nesta sessão.
+  final Map<String, List<_ChatItem>> _chat = {};
+
+  // Mensagens de voz (1.33.0).
+  final _rec = AudioRecorder();
+  final _voicePlayer = AudioPlayer();
+  String? _playing; // arquivo tocando agora
+  bool _voiceClean = false;
+
+  Future<void> _playVoice(String path) async {
+    try {
+      if (_playing == path) {
+        await _voicePlayer.stop();
+        _playing = null;
+      } else {
+        await _tts.stop();
+        await _voicePlayer.stop();
+        _playing = path;
+        await _voicePlayer.play(DeviceFileSource(path));
+      }
+    } catch (_) {
+      _playing = null;
+    }
+    _chatRefresh?.call(() {});
+    if (mounted) setState(() {});
+  }
+
+  static String _mmss(int ms) {
+    final s = (ms / 1000).round();
+    return '${s ~/ 60}:${(s % 60).toString().padLeft(2, '0')}';
+  }
   final Set<String> _unread = {};
   StateSetter? _chatRefresh; // redesenha a conversa aberta
   String? _chatOpen;
@@ -1321,7 +1360,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   void _onInbox(LiveMsg msg) {
     final nick = msg.nick.isEmpty ? tr('Um colega') : msg.nick;
-    (_chat[msg.from] ??= []).add((false, msg.text, msg.at));
+    (_chat[msg.from] ??= []).add(_ChatItem(false, msg.text, msg.at,
+        audio: msg.audioPath, durMs: msg.durMs));
+    final shown = msg.isVoice ? tr('🎤 Mensagem de voz') : msg.text;
     final open = _chatOpen == msg.from;
     if (open) {
       _chatRefresh?.call(() {});
@@ -1330,15 +1371,26 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     }
     final bg = WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed;
     if (bg) {
-      LiveBorder.notifyMsg(nick, msg.text);
+      LiveBorder.notifyMsg(nick, shown);
     } else if (!open && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         duration: const Duration(seconds: 10),
-        content: Text('💬 $nick: ${msg.text}'),
+        content: Text('💬 $nick: $shown'),
         action: SnackBarAction(
-            label: tr('Responder'),
+            label: msg.isVoice ? tr('Ouvir') : tr('Responder'),
             onPressed: () => _chatWith(msg.from, msg.nick)),
       ));
+    }
+    if (msg.isVoice) {
+      // Com a voz ligada e o app aberto, anuncia e toca sozinha (mãos no
+      // volante); senão fica na conversa com o botão ▶.
+      if (_voice && !bg) {
+        _tts.speak(tr('Mensagem de voz de {0}', [nick])).then((_) async {
+          await Future.delayed(const Duration(milliseconds: 2500));
+          if (_playing == null) _playVoice(msg.audioPath!);
+        });
+      }
+      return;
     }
     if (_voice) {
       final clean = msg.text
@@ -1354,6 +1406,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     final name = nick.isEmpty ? tr('Motorista') : nick;
     final textC = TextEditingController();
     var sending = false;
+    var recording = false;
+    var recMs = 0;
+    Timer? recTimer;
     _chatOpen = id;
     setState(() => _unread.remove(id));
     await showModalBottomSheet(
@@ -1368,8 +1423,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           final ok = await _live.sendMsg(id, t);
           sending = false;
           if (ok) {
-            (_chat[id] ??= [])
-                .add((true, t.trim(), DateTime.now().millisecondsSinceEpoch));
+            (_chat[id] ??= []).add(_ChatItem(
+                true, t.trim(), DateTime.now().millisecondsSinceEpoch));
             textC.clear();
           } else {
             _snack(_live.msgRulesMissing
@@ -1377,6 +1432,84 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 : tr('Não foi possível enviar. Verifique a internet.'));
           }
           if (ctx.mounted) setS(() {});
+        }
+
+        // ---- Mensagem de voz (1.33.0): toque no 🎤 grava, toque de novo
+        // envia; ✕ cancela; para sozinha em 60 s e envia.
+        Future<void> stopRec({required bool sendIt}) async {
+          if (!recording) return;
+          recTimer?.cancel();
+          final dur = recMs;
+          String? path;
+          try {
+            path = await _rec.stop();
+          } catch (_) {}
+          recording = false;
+          if (ctx.mounted) setS(() {});
+          if (!sendIt || path == null) return;
+          if (dur < 800) {
+            _snack(tr('Gravação muito curta.'));
+            return;
+          }
+          final bytes = await File(path).readAsBytes();
+          if (bytes.length > LiveService.voiceMaxBytes) {
+            _snack(tr('Gravação muito grande.'));
+            return;
+          }
+          if (ctx.mounted) setS(() => sending = true);
+          final ok = await _live.sendMsg(id, tr('🎤 Mensagem de voz'),
+              audio: bytes, durMs: dur);
+          sending = false;
+          if (ok) {
+            (_chat[id] ??= []).add(_ChatItem(true, tr('🎤 Mensagem de voz'),
+                DateTime.now().millisecondsSinceEpoch,
+                audio: path, durMs: dur));
+          } else {
+            _snack(_live.msgRulesMissing
+                ? tr('Falta publicar a regra msgs no Firebase (veja o README).')
+                : tr('Não foi possível enviar. Verifique a internet.'));
+          }
+          if (ctx.mounted) setS(() {});
+        }
+
+        Future<void> startRec() async {
+          if (recording || sending) return;
+          try {
+            if (!await _rec.hasPermission()) {
+              _snack(tr('Permita o microfone para gravar mensagem de voz.'));
+              return;
+            }
+            final dir = Directory(
+                '${(await getApplicationDocumentsDirectory()).path}/voice');
+            await dir.create(recursive: true);
+            final path =
+                '${dir.path}/me_${DateTime.now().millisecondsSinceEpoch}.m4a';
+            await _voicePlayer.stop();
+            _playing = null;
+            await _rec.start(
+                const RecordConfig(
+                    encoder: AudioEncoder.aacLc,
+                    bitRate: 32000,
+                    sampleRate: 16000,
+                    numChannels: 1),
+                path: path);
+            HapticFeedback.mediumImpact();
+            recording = true;
+            recMs = 0;
+            final t0 = DateTime.now();
+            recTimer = Timer.periodic(const Duration(milliseconds: 250), (_) {
+              recMs = DateTime.now().difference(t0).inMilliseconds;
+              if (recMs >= LiveService.voiceMaxSec * 1000) {
+                stopRec(sendIt: true);
+              } else if (ctx.mounted) {
+                setS(() {});
+              }
+            });
+            if (ctx.mounted) setS(() {});
+          } catch (_) {
+            recording = false;
+            _snack(tr('Não foi possível gravar.'));
+          }
         }
 
         return Padding(
@@ -1399,9 +1532,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                     shrinkWrap: true,
                     reverse: true,
                     children: [
-                      for (final (mine, t, _) in hist.reversed)
+                      for (final it in hist.reversed)
                         Align(
-                          alignment: mine
+                          alignment: it.mine
                               ? Alignment.centerRight
                               : Alignment.centerLeft,
                           child: Container(
@@ -1411,14 +1544,42 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                             constraints: BoxConstraints(
                                 maxWidth: MediaQuery.sizeOf(ctx).width * 0.7),
                             decoration: BoxDecoration(
-                              color: mine
+                              color: it.mine
                                   ? const Color(0xFF7E57C2)
                                   : SG.line,
                               borderRadius: BorderRadius.circular(12),
                             ),
-                            child: Text(t,
-                                style: TextStyle(
-                                    color: mine ? Colors.white : null)),
+                            child: it.audio == null
+                                ? Text(it.text,
+                                    style: TextStyle(
+                                        color: it.mine ? Colors.white : null))
+                                : InkWell(
+                                    onTap: () => _playVoice(it.audio!),
+                                    child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(
+                                              _playing == it.audio
+                                                  ? Icons.stop_circle
+                                                  : Icons.play_circle_fill,
+                                              size: 34,
+                                              color: it.mine
+                                                  ? Colors.white
+                                                  : const Color(0xFF7E57C2)),
+                                          const SizedBox(width: 6),
+                                          Icon(Icons.graphic_eq,
+                                              color: it.mine
+                                                  ? Colors.white70
+                                                  : null),
+                                          const SizedBox(width: 6),
+                                          Text(_mmss(it.durMs),
+                                              style: TextStyle(
+                                                  fontWeight: FontWeight.bold,
+                                                  color: it.mine
+                                                      ? Colors.white
+                                                      : null)),
+                                        ]),
+                                  ),
                           ),
                         ),
                     ],
@@ -1466,7 +1627,46 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 ),
               ),
               const SizedBox(height: 8),
+              if (recording)
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.red.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.red),
+                  ),
+                  child: Row(children: [
+                    const Icon(Icons.fiber_manual_record, color: Colors.red),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                          '${tr('Gravando')} ${_mmss(recMs)} / ${_mmss(LiveService.voiceMaxSec * 1000)}',
+                          style: const TextStyle(
+                              fontSize: 16, fontWeight: FontWeight.bold)),
+                    ),
+                    IconButton(
+                      tooltip: tr('Cancelar'),
+                      onPressed: () => stopRec(sendIt: false),
+                      icon: const Icon(Icons.close),
+                    ),
+                    IconButton.filled(
+                      tooltip: tr('Enviar'),
+                      style: IconButton.styleFrom(
+                          backgroundColor: Colors.red),
+                      onPressed: () => stopRec(sendIt: true),
+                      icon: const Icon(Icons.send),
+                    ),
+                  ]),
+                )
+              else
               Row(children: [
+                IconButton.filledTonal(
+                  tooltip: tr('Gravar mensagem de voz'),
+                  onPressed: sending ? null : startRec,
+                  icon: const Icon(Icons.mic),
+                ),
+                const SizedBox(width: 6),
                 Expanded(
                   child: TextField(
                     controller: textC,
@@ -1500,6 +1700,13 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         );
       }),
     );
+    // Fechou a janela gravando: descarta a gravação.
+    recTimer?.cancel();
+    if (recording) {
+      try {
+        await _rec.cancel();
+      } catch (_) {}
+    }
     _chatOpen = null;
     _chatRefresh = null;
     if (mounted) setState(() => _unread.remove(id));
@@ -1521,8 +1728,16 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       if (ok) _livePhotoSent = true;
     }
     if (_live.hasGroup) {
-      // Mensagens diretas dos colegas (1.32.0).
-      for (final msg in await _live.inbox()) {
+      // Mensagens diretas dos colegas (1.32.0). Primeiro as que chegaram
+      // com o app fechado (1.33.0), depois as novas.
+      if (!_voiceClean) {
+        _voiceClean = true;
+        LiveService.cleanVoice();
+      }
+      for (final msg in [
+        ...await LiveService.takePending(),
+        ...await _live.inbox()
+      ]) {
         if (mounted) _onInbox(msg);
       }
       if (await _live.refresh()) {
@@ -5487,4 +5702,14 @@ class _RoundAction extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Uma mensagem na conversa com um colega (1.33.0: pode ser de voz).
+class _ChatItem {
+  final bool mine;
+  final String text;
+  final int at;
+  final String? audio; // arquivo .m4a
+  final int durMs;
+  _ChatItem(this.mine, this.text, this.at, {this.audio, this.durMs = 0});
 }

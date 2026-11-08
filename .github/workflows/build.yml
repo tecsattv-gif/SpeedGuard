@@ -129,6 +129,15 @@ jobs:
           PY
           grep -n -B1 -A2 "esugar" android/app/build.gradle* | head -20
 
+      # 1.33.0: o pacote `record` (mensagem de voz) pede Android 6+; fixa API 24 (Android 7).
+      - name: minSdk 24 (gravação de voz)
+        run: |
+          for F in android/app/build.gradle.kts android/app/build.gradle; do
+            [ -f "$F" ] || continue
+            sed -i -E 's/minSdk( =|Version)? *flutter\.minSdkVersion/minSdk = 24/' "$F"
+            grep -n "minSdk" "$F"
+          done
+
       - name: Compilar APK
         run: flutter build apk --release
 
