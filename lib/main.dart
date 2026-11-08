@@ -357,6 +357,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       if (mounted) setState(() {});
     };
     _liveTimer = Timer.periodic(LiveService.every, (_) => _liveTick());
+    // 1.34.0: tocar na notificação de mensagem abre a conversa de quem mandou.
+    LiveBorder.listenTaps((from, nick) {
+      if (mounted) _openChatFrom(from, nick);
+    });
     Future.delayed(const Duration(seconds: 6), () => _liveTick(photo: true));
     LiveBorder.schedule(_isTruck && _live.hasGroup);
     // 1.29.39: app fechado no meio da navegação: oferece continuar.
@@ -437,6 +441,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     _presenceTimer?.cancel();
     _liveTimer?.cancel();
     _trackTimer?.cancel();
+    _msgPopTimer?.cancel();
     _closeBubble();
     _overlaySub?.cancel();
     _askTimer?.cancel();
@@ -1371,15 +1376,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     }
     final bg = WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed;
     if (bg) {
-      LiveBorder.notifyMsg(nick, shown);
+      LiveBorder.notifyMsg(nick, shown, from: msg.from, voice: msg.isVoice);
     } else if (!open && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        duration: const Duration(seconds: 10),
-        content: Text('💬 $nick: $shown'),
-        action: SnackBarAction(
-            label: msg.isVoice ? tr('Ouvir') : tr('Responder'),
-            onPressed: () => _chatWith(msg.from, msg.nick)),
-      ));
+      _msgPopup(msg.from, msg.nick, shown, msg.isVoice);
     }
     if (msg.isVoice) {
       // Com a voz ligada e o app aberto, anuncia e toca sozinha (mãos no
@@ -1402,7 +1401,148 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     }
   }
 
+  // ---------- Pop-up de mensagem nova (1.34.0) ----------
+  OverlayEntry? _msgPop;
+  Timer? _msgPopTimer;
+
+  void _closeMsgPopup() {
+    _msgPopTimer?.cancel();
+    _msgPopTimer = null;
+    _msgPop?.remove();
+    _msgPop = null;
+  }
+
+  /// Card no alto da tela com a foto, o nome e a mensagem do colega.
+  /// Tocar abre direto a conversa com ele; deslizar para cima ou o ✕
+  /// fecha; some sozinho em 10 s.
+  void _msgPopup(String from, String nick, String text, bool voice) {
+    _closeMsgPopup();
+    final ov = Overlay.maybeOf(context);
+    if (ov == null) return;
+    final name = nick.isEmpty ? tr('Um colega') : nick;
+    final photo = _live.members[from]?.photo;
+    _msgPop = OverlayEntry(
+      builder: (ctx) => Positioned(
+        top: 0,
+        left: 0,
+        right: 0,
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(10, 8, 10, 0),
+            child: Dismissible(
+              key: ValueKey('msgpop$from${DateTime.now().millisecondsSinceEpoch}'),
+              direction: DismissDirection.up,
+              onDismissed: (_) {
+                _msgPop?.remove();
+                _msgPop = null;
+                _msgPopTimer?.cancel();
+              },
+              child: Material(
+                elevation: 10,
+                color: SG.card,
+                borderRadius: BorderRadius.circular(16),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(16),
+                  onTap: () {
+                    _closeMsgPopup();
+                    _openChatFrom(from, nick);
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 10, 4, 10),
+                    child: Row(children: [
+                      CircleAvatar(
+                        radius: 22,
+                        backgroundColor: SG.accent,
+                        backgroundImage:
+                            photo == null ? null : MemoryImage(photo),
+                        child: photo == null
+                            ? Text(name.characters.first.toUpperCase(),
+                                style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold))
+                            : null,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('💬 $name',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                    color: SG.text,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 15)),
+                            const SizedBox(height: 2),
+                            Text(text,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(color: SG.text)),
+                            const SizedBox(height: 2),
+                            Text(
+                                voice
+                                    ? tr('Toque para ouvir')
+                                    : tr('Toque para abrir a conversa'),
+                                style: TextStyle(
+                                    fontSize: 11, color: SG.textSoft)),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        icon: Icon(Icons.close, size: 20, color: SG.textSoft),
+                        tooltip: tr('Fechar'),
+                        onPressed: _closeMsgPopup,
+                      ),
+                    ]),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    ov.insert(_msgPop!);
+    _msgPopTimer = Timer(const Duration(seconds: 10), _closeMsgPopup);
+  }
+
+  /// Abre a conversa com [from] vindo do pop-up ou da notificação: fecha o
+  /// que estiver aberto por cima (outra conversa, lista do grupo,
+  /// Configurações…) e abre direto a conversa de quem mandou.
+  bool _openingChat = false;
+  Future<void> _openChatFrom(String from, String nick) async {
+    if (_openingChat || !mounted) return;
+    _openingChat = true;
+    try {
+      _closeMsgPopup();
+      LiveBorder.clearChat(from);
+      // Veio da notificação: espera o app voltar para a frente.
+      for (var i = 0;
+          i < 20 &&
+              WidgetsBinding.instance.lifecycleState !=
+                  AppLifecycleState.resumed;
+          i++) {
+        await Future.delayed(const Duration(milliseconds: 150));
+      }
+      if (!mounted || _chatOpen == from) return;
+      final nav = Navigator.of(context);
+      if (nav.canPop()) {
+        nav.popUntil((r) => r.isFirst);
+        await Future.delayed(const Duration(milliseconds: 350));
+        if (!mounted) return;
+      }
+      final m = _live.members[from];
+      await _chatWith(from, m != null && m.nick.isNotEmpty ? m.nick : nick);
+    } finally {
+      _openingChat = false;
+    }
+  }
+
   Future<void> _chatWith(String id, String nick) async {
+    _openingChat = false;
+    LiveBorder.clearChat(id);
     final name = nick.isEmpty ? tr('Motorista') : nick;
     final textC = TextEditingController();
     var sending = false;
