@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 
 import 'theme.dart';
+import 'i18n.dart';
 
 /// Vídeo tutorial (Configurações → Tutorial). O vídeo vai dentro do app,
 /// então funciona sem internet.
@@ -84,7 +85,7 @@ class _TutorialPageState extends State<TutorialPage> {
       appBar: AppBar(
         backgroundColor: Colors.black,
         foregroundColor: Colors.white,
-        title: const Text('Tutorial'),
+        title: Text(tr('Tutorial')),
       ),
       body: !_ready
           ? Center(child: CircularProgressIndicator(color: SG.violet))

@@ -1,3 +1,4 @@
+import 'i18n.dart';
 /// Vigia a velocidade acima do limite e decide o que avisar.
 ///
 /// Igual ao limitador do caminhão: passou do limite, o motorista tem
@@ -40,11 +41,11 @@ class SpeedWatch {
     if (_step == 1 && s >= 20) {
       _step = 2;
       // 1.28.6: aos 20 s fala só "Atenção." (antes a frase dos 10 segundos).
-      return const SpeedEvent(2, 'Atenção.');
+      return SpeedEvent(2, tr('Atenção.'));
     }
     if (_step == 2 && s >= 30) {
       _step = 3;
-      return const SpeedEvent(3, 'Velocidade excedida. Tempo excedido.');
+      return SpeedEvent(3, tr('Velocidade excedida. Tempo excedido.'));
     }
     return null;
   }

@@ -3,6 +3,7 @@ import 'dart:math' as math;
 
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
+import 'i18n.dart';
 
 /// Rota até o destino digitado em "Navegar", calculada pelo OSRM
 /// (OpenStreetMap). O Google Maps não deixa outros apps lerem a rota dele,
@@ -36,19 +37,19 @@ class RouteService {
           Uri.parse('https://nominatim.openstreetmap.org/search'
               '?format=json&limit=1&q=${Uri.encodeComponent(dest)}'),
           headers: {'User-Agent': _ua}).timeout(const Duration(seconds: 15));
-      if (g.statusCode != 200) return 'Não achei o destino.';
+      if (g.statusCode != 200) return tr('Não achei o destino.');
       final found = jsonDecode(utf8.decode(g.bodyBytes)) as List;
-      if (found.isEmpty) return 'Não achei "$dest" no mapa.';
+      if (found.isEmpty) return tr('Não achei "{0}" no mapa.', [dest]);
       final dLat = double.parse(found.first['lat'].toString());
       final dLon = double.parse(found.first['lon'].toString());
       final r = await http.get(
           Uri.parse('https://router.project-osrm.org/route/v1/driving/'
               '$lon,$lat;$dLon,$dLat?overview=full&geometries=geojson'),
           headers: {'User-Agent': _ua}).timeout(const Duration(seconds: 20));
-      if (r.statusCode != 200) return 'Não consegui calcular a rota.';
+      if (r.statusCode != 200) return tr('Não consegui calcular a rota.');
       final data = jsonDecode(utf8.decode(r.bodyBytes)) as Map;
       final routes = data['routes'] as List?;
-      if (routes == null || routes.isEmpty) return 'Sem rota até o destino.';
+      if (routes == null || routes.isEmpty) return tr('Sem rota até o destino.');
       final coords = routes.first['geometry']['coordinates'] as List;
       final p = <(double, double)>[
         for (final c in coords)
@@ -68,7 +69,7 @@ class RouteService {
       _offCount = 0;
       return null;
     } catch (_) {
-      return 'Sem conexão para calcular a rota.';
+      return tr('Sem conexão para calcular a rota.');
     }
   }
 

@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'i18n.dart';
 
 /// Curva da rota gravada: onde (m desde o início) e para que lado.
 class TrackTurn {
@@ -13,10 +14,10 @@ class TrackTurn {
 
   String get phrase {
     final side = right ? 'direita' : 'esquerda';
-    if (abs >= 150) return 'faça o retorno';
-    if (abs >= 110) return 'vire bem à $side';
-    if (abs >= 60) return 'vire à $side';
-    return 'mantenha-se à $side';
+    if (abs >= 150) return tr('faça o retorno');
+    if (abs >= 110) return tr('vire bem à {0}', [tr(side)]);
+    if (abs >= 60) return tr('vire à {0}', [tr(side)]);
+    return tr('mantenha-se à {0}', [tr(side)]);
   }
 
   IconData get icon {
@@ -122,10 +123,10 @@ class TrackNav {
     final d = t.at - progress;
     // Da faixa mais perto para a mais longe: vale a menor que contém d.
     final stages = <(double, String)>[
-      (40, 'Agora'),
-      (150, 'Em 150 metros'),
-      (400, 'Em 400 metros'),
-      if (kmh > 70) (1000, 'Em 1 quilômetro'),
+      (40, tr('Agora')),
+      (150, tr('Em 150 metros')),
+      (400, tr('Em 400 metros')),
+      if (kmh > 70) (1000, tr('Em 1 quilômetro')),
     ];
     for (final (lim, txt) in stages) {
       if (d <= lim) {

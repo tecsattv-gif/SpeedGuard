@@ -9,6 +9,7 @@ Autor: Luiz Alberto Cardoso
 ## Funções (versão 1.26.2)
 
 - **Visual neon** com as cores da tela de abertura: fundo roxo escuro, velocímetro com borda violeta brilhante, botão INICIAR em degradê vermelho→rosa, cartões e botões roxos; o painel flutuante e a janela de reportar seguem a mesma paleta
+- **Idiomas** (1.30.0): **Português, English, Español e Français**. Em Configurações → **Idioma** escolha um deles ou **Auto** (padrão: segue o idioma do celular; celular em outro idioma fica em inglês). Muda na hora todos os textos do app, do painel flutuante, das notificações e da Ajuda, e também a **voz dos avisos** (pt-BR, en-GB, es-ES, fr-FR — se faltar a voz no celular, baixe em Configurações do Android → Saída de texto para fala). O vídeo do Tutorial continua narrado em português. Os textos ficam em `lib/i18n_data.dart` (chave = frase em português; o que não tiver tradução aparece em português)
 - **Tela de abertura** (2,5 s) com a arte do SpeedGuard (velocímetro e rastro de luz) e os créditos do autor
 - **Ícone próprio** com o velocímetro (inclui ícone adaptativo do Android 8+)
 - **Mapa** (OpenStreetMap) com sua posição e os radares da região
@@ -136,6 +137,7 @@ Autor: Luiz Alberto Cardoso
 | Arquivo | O que faz |
 |---|---|
 | `lib/main.dart` | Telas, mapa, GPS e voz |
+| `lib/i18n.dart`, `lib/i18n_data.dart` | Idiomas (pt, en, es, fr): `tr()` traduz cada texto; escolha em Configurações → Idioma |
 | `lib/park_service.dart` | Parks à frente: busca no OpenStreetMap, filtro pelo sentido e aviso a 2 km |
 | `lib/tile_store.dart` | Base própria: baixa e guarda no celular os pedaços de parks e radares |
 | `lib/update_service.dart` | Atualização pelo app: procura a última Release no GitHub, pergunta, baixa o APK e abre o instalador |

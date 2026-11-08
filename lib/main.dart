@@ -47,6 +47,7 @@ import 'speed_picker.dart';
 import 'toll_service.dart';
 import 'track_nav.dart';
 import 'track_recorder.dart';
+import 'i18n.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -58,6 +59,7 @@ Future<void> main() async {
         orElse: () => ThemeMode.system);
     SG.palette.value = AppPalette.byName(p.getString('palette'));
   } catch (_) {}
+  await loadLang();
   runApp(const SpeedGuardApp());
 }
 
@@ -88,6 +90,7 @@ Future<void> overlayMain() async {
     final p = await SharedPreferences.getInstance();
     SG.palette.value = AppPalette.byName(p.getString('palette'));
   } catch (_) {}
+  await loadLang();
   runApp(const MaterialApp(
     debugShowCheckedModeBanner: false,
     home: OverlayBubble(),
@@ -101,7 +104,7 @@ class SpeedGuardApp extends StatelessWidget {
   Widget build(BuildContext context) {
     // Reconstrói o app quando muda o modo (claro/escuro) ou a paleta.
     return ListenableBuilder(
-      listenable: Listenable.merge([SG.mode, SG.palette]),
+      listenable: Listenable.merge([SG.mode, SG.palette, langNotifier]),
       builder: (context, _) => MaterialApp(
         title: 'SpeedGuard',
         debugShowCheckedModeBanner: false,
@@ -223,7 +226,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     _testSecs = null;
     _testArmed = DateTime.now();
     _plog('teste armado');
-    _snack('Teste pronto: agora minimize o SpeedGuard e abra outro app (ex.: YouTube).');
+    _snack(tr('Teste pronto: agora minimize o SpeedGuard e abra outro app (ex.: YouTube).'));
   }
 
   void _startTestCount() {
@@ -251,7 +254,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   Timer? _askTimer;
   final Set<String> _asked = {};
   StreamSubscription? _overlaySub;
-  String _status = 'Toque em INICIAR para monitorar radares';
+  String _status = tr('Toque em INICIAR para monitorar radares');
 
   CountryRule get _rule => ruleFor(_country);
 
@@ -354,8 +357,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       if (l == null || !mounted || _nav != null) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         duration: const Duration(seconds: 12),
-        content: Text('Continuar a rota "${l.$1.name}"?'),
-        action: SnackBarAction(label: 'CONTINUAR', onPressed: _continueNav),
+        content: Text(tr('Continuar a rota "{0}"?', [l.$1.name])),
+        action: SnackBarAction(label: tr('CONTINUAR'), onPressed: _continueNav),
       ));
     });
     _loadUserParks();
@@ -400,7 +403,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     }
     _country = p.getString('country');
     await _service.load();
-    await _tts.setLanguage('pt-BR');
+    await _tts.setLanguage(ttsLang);
     await _tts.setSpeechRate(0.5);
     await _tts.setVolume(_volume);
     await _tts.awaitSpeakCompletion(false);
@@ -474,7 +477,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       if (mounted) UpdateService.autoCheck(context, resumed: true);
       if (_bubbleNoPermission) {
         _bubbleNoPermission = false;
-        _snack('Painel flutuante sem permissão: ative "Sobrepor a outros apps" para o SpeedGuard.');
+        _snack(tr('Painel flutuante sem permissão: ative "Sobrepor a outros apps" para o SpeedGuard.'));
         FlutterOverlayWindow.requestPermission();
       }
     }
@@ -495,7 +498,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         enableDrag: true,
         positionGravity: PositionGravity.none,
         overlayTitle: 'SpeedGuard',
-        overlayContent: 'Bolha de radares ativa',
+        overlayContent: tr('Bolha de radares ativa'),
       );
       _overlayShown = true;
       // Voltou para o app enquanto o painel abria: fecha de novo.
@@ -575,7 +578,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         positionGravity: PositionGravity.none,
         startPosition: OverlayPosition((w - kPopRingD) / 2, 0),
         overlayTitle: 'SpeedGuard',
-        overlayContent: 'Contagem dos 30 s',
+        overlayContent: tr('Contagem dos 30 s'),
       );
       _overlayShown = true;
       _ringPopup = true;
@@ -631,13 +634,14 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       'scale': _bubbleScale,
       'land': _bubbleLand,
       'palette': SG.palette.value.name,
+      'lang': appLang,
       'ringOnly': _ringPopup,
     })).catchError((_) => false);
   }
 
   Future<bool> _ensurePermission() async {
     if (!await Geolocator.isLocationServiceEnabled()) {
-      _snack('Ative o GPS do celular.');
+      _snack(tr('Ative o GPS do celular.'));
       await Geolocator.openLocationSettings();
       return false;
     }
@@ -646,7 +650,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       perm = await Geolocator.requestPermission();
     }
     if (perm == LocationPermission.deniedForever) {
-      _snack('Permissão de localização negada. Libere nas configurações.');
+      _snack(tr('Permissão de localização negada. Libere nas configurações.'));
       await Geolocator.openAppSettings();
       return false;
     }
@@ -662,14 +666,14 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       // deixou as leituras lentas e travadas em alguns celulares).
       distanceFilter: 5,
       intervalDuration: const Duration(seconds: 1),
-      foregroundNotificationConfig: const ForegroundNotificationConfig(
-        notificationTitle: 'SpeedGuard ativo',
-        notificationText: 'Monitorando radares no caminho',
+      foregroundNotificationConfig: ForegroundNotificationConfig(
+        notificationTitle: tr('SpeedGuard ativo'),
+        notificationText: tr('Monitorando radares no caminho'),
         enableWakeLock: true,
       ),
     );
     _sub = Geolocator.getPositionStream(locationSettings: settings)
-        .listen(_onRawPosition, onError: (e) => _snack('Erro no GPS: $e'));
+        .listen(_onRawPosition, onError: (e) => _snack(tr('Erro no GPS: {0}', [e])));
     _gps.reset();
     _predictTimer?.cancel();
     // GPS ficou alguns segundos sem leitura? Os avisos de radar seguem
@@ -681,7 +685,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     await WakelockPlus.enable();
     setState(() {
       _running = true;
-      _status = 'Procurando sinal de GPS…';
+      _status = tr('Procurando sinal de GPS…');
     });
   }
 
@@ -693,7 +697,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     if (camera.zoom < _areaMinZoom) {
       if (!_zoomHintShown) {
         _zoomHintShown = true;
-        _snack('Aproxime o mapa para ver os radares desta região.');
+        _snack(tr('Aproxime o mapa para ver os radares desta região.'));
       }
       return;
     }
@@ -718,7 +722,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       _areaLoading = false;
       if (n != null) _areaBounds = want;
     });
-    if (n == null) _snack('Sem conexão para baixar os radares desta região.');
+    if (n == null) _snack(tr('Sem conexão para baixar os radares desta região.'));
   }
 
   /// Fala avisos gerais (só no modo voz).
@@ -749,7 +753,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     setState(() {
       _running = false;
       _alert = const AlertState();
-      _status = 'Monitoramento parado';
+      _status = tr('Monitoramento parado');
     });
   }
 
@@ -862,10 +866,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     final m = (d / 100).round() * 100;
     final km = m >= 900;
     if (_voice) {
-      _tts.speak(km ? 'Pedágio em 1 quilômetro.' : 'Pedágio em $m metros.');
+      _tts.speak(km ? tr('Pedágio em 1 quilômetro.') : tr('Pedágio em {0} metros.', [m]));
     }
     _tollTimer?.cancel();
-    setState(() => _tollBanner = km ? 'Pedágio a 1 km' : 'Pedágio a $m m');
+    setState(() => _tollBanner = km ? tr('Pedágio a 1 km') : tr('Pedágio a {0} m', [m]));
     _tollTimer = Timer(const Duration(seconds: 15), () {
       if (mounted) setState(() => _tollBanner = null);
     });
@@ -917,7 +921,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     _parks.clearRoute();
     final err = await _route.plan(pos.latitude, pos.longitude, dest);
     if (err != null) {
-      _snack('$err Os parks seguem pelo seu sentido.');
+      _snack(tr('{0} Os parks seguem pelo seu sentido.', [err]));
       return;
     }
     if (mounted) setState(() {});
@@ -936,8 +940,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     if (!mounted) return;
     setState(() {});
     _snack(n == null
-        ? 'Não consegui buscar os parks da rota. Toque no P para tentar de novo.'
-        : 'Parks da rota até ${_route.destName} prontos. Toque no P para ver.');
+        ? tr('Não consegui buscar os parks da rota. Toque no P para tentar de novo.')
+        : tr('Parks da rota até {0} prontos. Toque no P para ver.', [_route.destName]));
   }
 
   static String _km(double m) => m < 1000
@@ -967,7 +971,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             const SizedBox(height: 16),
             FilledButton.icon(
               icon: const Icon(Icons.directions),
-              label: const Text('Ir até lá'),
+              label: Text(tr('Ir até lá')),
               onPressed: () {
                 Navigator.pop(ctx);
                 _navigateTo(p);
@@ -976,7 +980,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             const SizedBox(height: 8),
             OutlinedButton.icon(
               icon: const Icon(Icons.share),
-              label: const Text('Compartilhar'),
+              label: Text(tr('Compartilhar')),
               onPressed: () {
                 Navigator.pop(ctx);
                 _sharePark(p);
@@ -985,12 +989,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             // Só quem adicionou (neste aparelho) muda de lugar ou exclui.
             if (_myParkIds.contains(p.id)) ...[
               const SizedBox(height: 16),
-              Text('Este park foi você que adicionou',
+              Text(tr('Este park foi você que adicionou'),
                   style: TextStyle(color: SG.textSoft, fontSize: 12)),
               const SizedBox(height: 6),
               OutlinedButton.icon(
                 icon: const Icon(Icons.open_with),
-                label: const Text('Mudar de lugar'),
+                label: Text(tr('Mudar de lugar')),
                 onPressed: () {
                   Navigator.pop(ctx);
                   _startMove(p);
@@ -1000,7 +1004,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               OutlinedButton.icon(
                 style: OutlinedButton.styleFrom(foregroundColor: SG.red),
                 icon: const Icon(Icons.delete_outline),
-                label: const Text('Excluir park'),
+                label: Text(tr('Excluir park')),
                 onPressed: () {
                   Navigator.pop(ctx);
                   _deletePark(p);
@@ -1017,7 +1021,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     final title = p.name.isNotEmpty ? '${p.name} (${p.kindLabel})' : p.kindLabel;
     final f = p.features;
     final text = [
-      'Park: $title',
+      tr('Park: {0}', [title]),
       if (f.isNotEmpty) f.join(', '),
       'https://www.google.com/maps/search/?api=1&query=${p.lat},${p.lon}',
     ].join('\n');
@@ -1026,10 +1030,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         action: 'android.intent.action.SEND',
         type: 'text/plain',
         arguments: {'android.intent.extra.TEXT': text},
-      ).launchChooser('Compartilhar park');
+      ).launchChooser(tr('Compartilhar park'));
     } catch (_) {
       await Clipboard.setData(ClipboardData(text: text));
-      _snack('Link do park copiado.');
+      _snack(tr('Link do park copiado.'));
     }
   }
 
@@ -1052,7 +1056,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           flags: const [Flag.FLAG_ACTIVITY_NEW_TASK],
         ).launch();
       } catch (_) {
-        _snack('Não foi possível abrir o Google Maps nem o Waze.');
+        _snack(tr('Não foi possível abrir o Google Maps nem o Waze.'));
       }
     }
   }
@@ -1133,7 +1137,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         // Colega atravessou fronteira (1.29.47): notificação + voz.
         for (final (nick, cc) in await _live.borderEvents()) {
           LiveBorder.notify(nick, cc);
-          final txt = '$nick está ${LiveService.inCountry(cc)}';
+          final txt = tr('{0} está {1}', [nick, LiveService.inCountry(cc)]);
           if (_voice) {
             _tts.speak(txt.replaceAll(RegExp(r'[^\p{L}\p{N} ]', unicode: true), ''));
           }
@@ -1168,19 +1172,17 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text('Grupo (${list.length} no mapa)',
+            Text(tr('Grupo ({0} no mapa)', [list.length]),
                 style:
                     const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-            Text('Toque num colega para ver no mapa.',
+            Text(tr('Toque num colega para ver no mapa.'),
                 style: TextStyle(color: SG.textSoft, fontSize: 12)),
             const SizedBox(height: 8),
             if (list.isEmpty)
               Padding(
                 padding: const EdgeInsets.all(20),
                 child: Text(
-                    'Ninguém do grupo compartilhando agora.\n'
-                    'Os colegas aparecem aqui quando ligam o compartilhamento '
-                    'com o mesmo código.',
+                    tr('Ninguém do grupo compartilhando agora.\nOs colegas aparecem aqui quando ligam o compartilhamento com o mesmo código.'),
                     textAlign: TextAlign.center,
                     style: TextStyle(color: SG.textSoft)),
               )
@@ -1195,7 +1197,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                           child: FittedBox(
                               child: _livePin(m.photo, m.nick,
                                   const Color(0xFF7E57C2)))),
-                      title: Text(m.nick.isEmpty ? 'Motorista' : m.nick,
+                      title: Text(m.nick.isEmpty ? tr('Motorista') : m.nick,
                           style: const TextStyle(fontWeight: FontWeight.w700)),
                       subtitle: Text([
                         if (m.country.isNotEmpty)
@@ -1208,12 +1210,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                           final ago = DateTime.now().difference(
                               DateTime.fromMillisecondsSinceEpoch(m.updatedAt));
                           return ago.inMinutes < 1
-                              ? 'agora'
-                              : 'há ${ago.inMinutes} min';
+                              ? tr('agora')
+                              : tr('há {0} min', [ago.inMinutes]);
                         }(),
                       ].join(' · ')),
                       trailing: IconButton(
-                        tooltip: 'Ir até lá (Google Maps)',
+                        tooltip: tr('Ir até lá (Google Maps)'),
                         icon: const Icon(Icons.directions),
                         onPressed: () {
                           Navigator.pop(ctx);
@@ -1300,7 +1302,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         flags: const [Flag.FLAG_ACTIVITY_NEW_TASK],
       ).launch();
     } catch (_) {
-      _snack('Não foi possível abrir o Google Maps.');
+      _snack(tr('Não foi possível abrir o Google Maps.'));
     }
   }
 
@@ -1323,12 +1325,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(m.nick.isEmpty ? 'Motorista' : m.nick,
+                    Text(m.nick.isEmpty ? tr('Motorista') : m.nick,
                         style: const TextStyle(
                             fontSize: 20, fontWeight: FontWeight.bold)),
                     Text(
                         '${m.kmh.round()} km/h · '
-                        '${ago.inMinutes < 1 ? 'agora' : 'há ${ago.inMinutes} min'}',
+                        '${ago.inMinutes < 1 ? tr('agora') : tr('há {0} min', [ago.inMinutes])}',
                         style: TextStyle(color: SG.textSoft)),
                   ],
                 ),
@@ -1337,7 +1339,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             const SizedBox(height: 16),
             FilledButton.icon(
               icon: const Icon(Icons.directions),
-              label: const Text('Ir até lá (Google Maps)'),
+              label: Text(tr('Ir até lá (Google Maps)')),
               onPressed: () {
                 Navigator.pop(ctx);
                 _navigateTo(Park('live', m.nick, m.lat, m.lon, 'parking', const {}));
@@ -1367,13 +1369,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Text('Localização em grupo',
+                Text(tr('Localização em grupo'),
                     style:
                         TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                 Text(
-                    'Só quem tem o mesmo código de grupo vê você no mapa '
-                    '(e você vê eles). Some do mapa ao desligar ou 5 min '
-                    'sem sinal. Nada fica gravado.',
+                    tr('Só quem tem o mesmo código de grupo vê você no mapa (e você vê eles). Some do mapa ao desligar ou 5 min sem sinal. Nada fica gravado.'),
                     style: TextStyle(color: SG.textSoft, fontSize: 12)),
                 const SizedBox(height: 14),
                 Row(children: [
@@ -1382,7 +1382,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   Expanded(
                     child: OutlinedButton.icon(
                       icon: const Icon(Icons.photo),
-                      label: const Text('Escolher foto'),
+                      label: Text(tr('Escolher foto')),
                       onPressed: () async {
                         try {
                           final r = await FilePicker.platform.pickFiles(
@@ -1401,30 +1401,29 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   controller: nickC,
                   maxLength: 30,
                   onChanged: (_) => setS(() {}),
-                  decoration: const InputDecoration(
-                      labelText: 'Apelido (nome que os outros veem)'),
+                  decoration: InputDecoration(
+                      labelText: tr('Apelido (nome que os outros veem)')),
                 ),
                 TextField(
                   controller: groupC,
                   maxLength: 40,
-                  decoration: const InputDecoration(
-                      labelText: 'Código do grupo',
+                  decoration: InputDecoration(
+                      labelText: tr('Código do grupo'),
                       helperText:
-                          'Combine com os colegas. Mínimo 4 letras/números. '
-                          'Quem não sabe o código não vê o grupo.'),
+                          tr('Combine com os colegas. Mínimo 4 letras/números. Quem não sabe o código não vê o grupo.')),
                 ),
                 const SizedBox(height: 6),
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
-                  title: const Text('Compartilhar minha localização'),
-                  subtitle: const Text('Desligado: você só vê o grupo.'),
+                  title: Text(tr('Compartilhar minha localização')),
+                  subtitle: Text(tr('Desligado: você só vê o grupo.')),
                   value: share,
                   onChanged: (v) => setS(() => share = v),
                 ),
                 const SizedBox(height: 8),
                 FilledButton(
                   onPressed: () => Navigator.pop(ctx, true),
-                  child: const Text('Salvar'),
+                  child: Text(tr('Salvar')),
                 ),
               ],
             ),
@@ -1437,7 +1436,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     groupC.dispose();
     if (ok != true) return;
     if (share && group.length < 4) {
-      _snack('O código do grupo precisa ter pelo menos 4 letras ou números.');
+      _snack(tr('O código do grupo precisa ter pelo menos 4 letras ou números.'));
       return;
     }
     final wasSharing = _live.sharing;
@@ -1456,13 +1455,13 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     LiveBorder.schedule(_isTruck && group.length >= 4);
     await _liveTick(photo: true);
     if (_live.rulesMissing) {
-      _snack('Falta publicar a regra "live" no Firebase (veja o README).');
+      _snack(tr('Falta publicar a regra "live" no Firebase (veja o README).'));
     } else {
       _snack(share
-          ? 'Compartilhando com o grupo.'
+          ? tr('Compartilhando com o grupo.')
           : group.length >= 4
-              ? 'Você está vendo o grupo (sem compartilhar).'
-              : 'Localização em grupo desligada.');
+              ? tr('Você está vendo o grupo (sem compartilhar).')
+              : tr('Localização em grupo desligada.'));
     }
   }
 
@@ -1493,7 +1492,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   Future<void> _continueNav() async {
     final l = await _lastNav();
     if (l == null) {
-      _snack('Nenhuma rota parada para continuar.');
+      _snack(tr('Nenhuma rota parada para continuar.'));
       return;
     }
     await _startTrackNav(l.$1, reverse: l.$2, resume: true);
@@ -1516,12 +1515,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         }
       }
       if (!resume && best <= 3000 && at > pts.length * 0.8) {
-        _snack('Você está no fim desta rota: navegando o caminho de volta.');
+        _snack(tr('Você está no fim desta rota: navegando o caminho de volta.'));
         reverse = true;
       }
     }
     if (reverse) pts = reversedTrack(pts);
-    final name = reverse ? '${t.name} (volta)' : t.name;
+    final name = reverse ? tr('{0} (volta)', [t.name]) : t.name;
     // 1.29.39: lembra a navegação para "Continuar rota".
     SharedPreferences.getInstance().then((p) => p.setString(
         'nav_last', jsonEncode({'id': t.id, 'rev': reverse})));
@@ -1549,16 +1548,15 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         : _route.total -
             (_route.progress(pos1.latitude, pos1.longitude) ?? 0);
     _navSay(resume
-        ? 'Continuando a rota $name. Faltam ${(left / 1000).round()} quilômetros.'
-        : 'Navegação iniciada pela rota $name. '
-            '${(_route.total / 1000).round()} quilômetros.');
+        ? tr('Continuando a rota {0}. Faltam {1} quilômetros.', [name, (left / 1000).round()])
+        : tr('Navegação iniciada pela rota {0}. {1} quilômetros.', [name, (_route.total / 1000).round()]));
   }
 
   void _stopTrackNav({bool arrived = false}) {
     _nav = null;
     _navOffRoute = false;
     if (arrived) {
-      _navSay('Você chegou ao destino.');
+      _navSay(tr('Você chegou ao destino.'));
       SharedPreferences.getInstance().then((p) => p.remove('nav_last'));
     }
     _hideTrack();
@@ -1579,7 +1577,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       if (_navOffSaid == null ||
           now.difference(_navOffSaid!) > const Duration(seconds: 45)) {
         _navOffSaid = now;
-        _navSay('Fora da rota. Volte para a linha azul.');
+        _navSay(tr('Fora da rota. Volte para a linha azul.'));
       }
       return;
     }
@@ -1626,9 +1624,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               children: [
                 Text(
                     _navOffRoute
-                        ? 'Fora da rota'
+                        ? tr('Fora da rota')
                         : dist == null
-                            ? 'Siga até o destino'
+                            ? tr('Siga até o destino')
                             : km(dist),
                     style: const TextStyle(
                         color: Colors.white,
@@ -1637,7 +1635,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                         height: 1.1)),
                 Text(
                     _navOffRoute
-                        ? 'Volte para a linha azul'
+                        ? tr('Volte para a linha azul')
                         : t == null
                             ? _route.destName
                             : t.phrase,
@@ -1646,14 +1644,13 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                     style: const TextStyle(
                         color: Colors.white, fontWeight: FontWeight.w600)),
                 Text(
-                    'Faltam ${km(left.toDouble())} · chegada '
-                    '${_two(eta.hour)}:${_two(eta.minute)}',
+                    tr('Faltam {0} · chegada {1}:{2}', [km(left.toDouble()), _two(eta.hour), _two(eta.minute)]),
                     style: const TextStyle(color: Colors.white70, fontSize: 12)),
               ],
             ),
           ),
           IconButton(
-            tooltip: 'Encerrar navegação',
+            tooltip: tr('Encerrar navegação'),
             icon: const Icon(Icons.close, color: Colors.white),
             onPressed: () => _stopTrackNav(),
           ),
@@ -1668,7 +1665,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   String _when(DateTime d) =>
       '${_two(d.day)}/${_two(d.month)}/${d.year} ${_two(d.hour)}:${_two(d.minute)}';
   String _dur(Duration d) =>
-      d.inHours > 0 ? '${d.inHours} h ${_two(d.inMinutes % 60)} min' : '${d.inMinutes} min';
+      d.inHours > 0 ? tr('{0} h {1} min', [d.inHours, _two(d.inMinutes % 60)]) : '${d.inMinutes} min';
 
   Future<String?> _askName(String title, String initial) async {
     final c = TextEditingController(text: initial);
@@ -1681,15 +1678,15 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           autofocus: true,
           maxLength: 60,
           textCapitalization: TextCapitalization.sentences,
-          decoration: const InputDecoration(labelText: 'Nome da rota'),
+          decoration: InputDecoration(labelText: tr('Nome da rota')),
         ),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancelar')),
+              child: Text(tr('Cancelar'))),
           FilledButton(
               onPressed: () => Navigator.pop(ctx, c.text.trim()),
-              child: const Text('Salvar')),
+              child: Text(tr('Salvar'))),
         ],
       ),
     );
@@ -1701,34 +1698,33 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     await _rec.start();
     if (!_running) await _start();
     if (mounted) setState(() {});
-    _snack('Gravando a rota. Para parar: botão Rotas → Parar gravação.');
+    _snack(tr('Gravando a rota. Para parar: botão Rotas → Parar gravação.'));
   }
 
   /// Continuar gravando uma rota já salva (1.29.41).
   Future<void> _resumeRecording(SavedTrack t) async {
     if (_rec.recording) {
-      _snack('Já está gravando. Pare a gravação atual antes.');
+      _snack(tr('Já está gravando. Pare a gravação atual antes.'));
       return;
     }
     await _rec.resume(t);
     if (!_running) await _start();
     if (mounted) setState(() {});
-    _snack('Continuando a gravação de "${t.name}" '
-        '(${t.km.toStringAsFixed(1)} km). O caminho novo entra no fim dela.');
+    _snack(tr('Continuando a gravação de "{0}" ({1} km). O caminho novo entra no fim dela.', [t.name, t.km.toStringAsFixed(1)]));
   }
 
   Future<void> _stopRecording() async {
     final cont = _rec.appendTo == null
         ? null
         : _rec.tracks.where((t) => t.id == _rec.appendTo).firstOrNull;
-    final def = cont?.name ?? 'Rota ${_when(DateTime.now())}';
-    final name = await _askName('Salvar rota gravada', def);
+    final def = cont?.name ?? tr('Rota {0}', [_when(DateTime.now())]);
+    final name = await _askName(tr('Salvar rota gravada'), def);
     if (name == null) return; // continua gravando
     final t = await _rec.stop(name.isEmpty ? def : name);
     if (mounted) setState(() {});
     _snack(t == null
-        ? 'Rota muito curta, não foi salva.'
-        : 'Rota "${t.name}" salva (${t.km.toStringAsFixed(1)} km).');
+        ? tr('Rota muito curta, não foi salva.')
+        : tr('Rota "{0}" salva ({1} km).', [t.name, t.km.toStringAsFixed(1)]));
   }
 
   Future<void> _showTrack(SavedTrack t) async {
@@ -1784,7 +1780,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       // 1.29.38: está no fim da rota (ex.: gravou até aqui) → o Google
       // abria só os últimos metros. Abre o caminho de volta.
       if (!reverse && best <= 3000 && from > pts.length * 0.8) {
-        _snack('Você está no fim desta rota: abrindo o caminho de volta.');
+        _snack(tr('Você está no fim desta rota: abrindo o caminho de volta.'));
         return _trackToGoogle(t, reverse: true);
       }
     }
@@ -1804,7 +1800,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 flags: const [Flag.FLAG_ACTIVITY_NEW_TASK])
             .launch();
       } catch (_) {
-        _snack('Não foi possível abrir o Google Maps.');
+        _snack(tr('Não foi possível abrir o Google Maps.'));
       }
     }
   }
@@ -1816,9 +1812,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     await f.copy(tmp.path);
     await SharePlus.instance.share(ShareParams(
       files: [XFile(tmp.path, mimeType: 'application/gpx+xml')],
-      text: 'Rota "${t.name}" (${t.km.toStringAsFixed(0)} km), gravada no '
-          'SpeedGuard. Abra no SpeedGuard (Rotas → Importar) ou em outro '
-          'app de GPS.',
+      text: tr('Rota "{0}" ({1} km), gravada no SpeedGuard. Abra no SpeedGuard (Rotas → Importar) ou em outro app de GPS.', [t.name, t.km.toStringAsFixed(0)]),
     ));
   }
 
@@ -1828,7 +1822,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       res = await FilePicker.platform
           .pickFiles(type: FileType.any, withData: true);
     } catch (_) {
-      _snack('Não consegui abrir os arquivos.');
+      _snack(tr('Não consegui abrir os arquivos.'));
       return;
     }
     if (res == null || res.files.isEmpty) return;
@@ -1840,8 +1834,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         f.name.replaceAll(RegExp(r'\.gpx$', caseSensitive: false), ''));
     if (mounted) setState(() {});
     _snack(t == null
-        ? 'Esse arquivo não tem uma rota (GPX).'
-        : 'Rota "${t.name}" importada (${t.km.toStringAsFixed(0)} km).');
+        ? tr('Esse arquivo não tem uma rota (GPX).')
+        : tr('Rota "{0}" importada ({1} km).', [t.name, t.km.toStringAsFixed(0)]));
   }
 
   void _trackActions(SavedTrack t) {
@@ -1873,7 +1867,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                         backgroundColor: const Color(0xFF0B8F5A),
                         foregroundColor: Colors.white),
                     icon: const Icon(Icons.play_arrow),
-                    label: Text('Continuar rota${l.$2 ? ' (volta)' : ''}'),
+                    label: Text(tr('Continuar rota{0}', [l.$2 ? tr(' (volta)') : ''])),
                     onPressed: () {
                       Navigator.pop(ctx);
                       _continueNav();
@@ -1895,7 +1889,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   backgroundColor: const Color(0xFF0B8F5A),
                   foregroundColor: Colors.white),
               icon: const Icon(Icons.navigation),
-              label: const Text('Navegar por esta rota (no app)'),
+              label: Text(tr('Navegar por esta rota (no app)')),
               onPressed: () {
                 Navigator.pop(ctx);
                 _startTrackNav(t);
@@ -1904,7 +1898,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             const SizedBox(height: 8),
             OutlinedButton.icon(
               icon: const Icon(Icons.swap_vert),
-              label: const Text('Navegar no sentido contrário (volta)'),
+              label: Text(tr('Navegar no sentido contrário (volta)')),
               onPressed: () {
                 Navigator.pop(ctx);
                 _startTrackNav(t, reverse: true);
@@ -1913,7 +1907,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             const SizedBox(height: 8),
             OutlinedButton.icon(
               icon: const Icon(Icons.fiber_manual_record, color: Colors.red),
-              label: const Text('Continuar gravando esta rota'),
+              label: Text(tr('Continuar gravando esta rota')),
               onPressed: () {
                 Navigator.pop(ctx);
                 _resumeRecording(t);
@@ -1922,7 +1916,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             const SizedBox(height: 8),
             FilledButton.tonalIcon(
               icon: const Icon(Icons.map),
-              label: const Text('Ver no mapa'),
+              label: Text(tr('Ver no mapa')),
               onPressed: () {
                 Navigator.pop(ctx);
                 _showTrack(t);
@@ -1931,7 +1925,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             const SizedBox(height: 8),
             FilledButton.tonalIcon(
               icon: const Icon(Icons.directions),
-              label: const Text('Seguir no Google Maps'),
+              label: Text(tr('Seguir no Google Maps')),
               onPressed: () {
                 Navigator.pop(ctx);
                 _trackToGoogle(t);
@@ -1940,7 +1934,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             const SizedBox(height: 8),
             OutlinedButton.icon(
               icon: const Icon(Icons.swap_vert),
-              label: const Text('Google Maps no sentido contrário (volta)'),
+              label: Text(tr('Google Maps no sentido contrário (volta)')),
               onPressed: () {
                 Navigator.pop(ctx);
                 _trackToGoogle(t, reverse: true);
@@ -1949,7 +1943,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             const SizedBox(height: 8),
             OutlinedButton.icon(
               icon: const Icon(Icons.share),
-              label: const Text('Compartilhar'),
+              label: Text(tr('Compartilhar')),
               onPressed: () {
                 Navigator.pop(ctx);
                 _shareTrack(t);
@@ -1960,10 +1954,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               Expanded(
                 child: OutlinedButton.icon(
                   icon: const Icon(Icons.edit),
-                  label: const Text('Renomear'),
+                  label: Text(tr('Renomear')),
                   onPressed: () async {
                     Navigator.pop(ctx);
-                    final n = await _askName('Renomear rota', t.name);
+                    final n = await _askName(tr('Renomear rota'), t.name);
                     if (n == null || n.isEmpty) return;
                     await _rec.rename(t, n);
                     if (mounted) setState(() {});
@@ -1975,21 +1969,21 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 child: OutlinedButton.icon(
                   style: OutlinedButton.styleFrom(foregroundColor: SG.red),
                   icon: const Icon(Icons.delete_outline),
-                  label: const Text('Excluir'),
+                  label: Text(tr('Excluir')),
                   onPressed: () async {
                     Navigator.pop(ctx);
                     final ok = await showDialog<bool>(
                       context: context,
                       builder: (d) => AlertDialog(
-                        title: const Text('Excluir rota?'),
-                        content: Text('"${t.name}" será apagada do celular.'),
+                        title: Text(tr('Excluir rota?')),
+                        content: Text(tr('"{0}" será apagada do celular.', [t.name])),
                         actions: [
                           TextButton(
                               onPressed: () => Navigator.pop(d, false),
-                              child: const Text('Cancelar')),
+                              child: Text(tr('Cancelar'))),
                           FilledButton(
                               onPressed: () => Navigator.pop(d, true),
-                              child: const Text('Excluir')),
+                              child: Text(tr('Excluir'))),
                         ],
                       ),
                     );
@@ -2021,9 +2015,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text('Rotas gravadas',
+              Text(tr('Rotas gravadas'),
                   style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-              Text('Ficam só no seu celular.',
+              Text(tr('Ficam só no seu celular.'),
                   style: TextStyle(color: SG.textSoft, fontSize: 12)),
               const SizedBox(height: 10),
               if (_rec.recording)
@@ -2031,8 +2025,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   style: FilledButton.styleFrom(
                       backgroundColor: SG.red, foregroundColor: Colors.white),
                   icon: const Icon(Icons.stop),
-                  label: Text('Parar gravação '
-                      '(${_rec.km.toStringAsFixed(1)} km)'),
+                  label: Text(tr('Parar gravação ({0} km)', [_rec.km.toStringAsFixed(1)])),
                   onPressed: () async {
                     Navigator.pop(ctx);
                     await _stopRecording();
@@ -2042,7 +2035,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 FilledButton.icon(
                   icon: const Icon(Icons.fiber_manual_record,
                       color: Colors.red),
-                  label: const Text('Gravar rota agora'),
+                  label: Text(tr('Gravar rota agora')),
                   onPressed: () async {
                     Navigator.pop(ctx);
                     await _startRecording();
@@ -2062,7 +2055,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                           foregroundColor: Colors.white),
                       icon: const Icon(Icons.play_arrow),
                       label: Text(
-                          'Continuar rota: ${l.$1.name}${l.$2 ? ' (volta)' : ''}',
+                          tr('Continuar rota: {0}{1}', [l.$1.name, l.$2 ? tr(' (volta)') : '']),
                           overflow: TextOverflow.ellipsis),
                       onPressed: () {
                         Navigator.pop(ctx);
@@ -2075,7 +2068,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               const SizedBox(height: 8),
               OutlinedButton.icon(
                 icon: const Icon(Icons.file_open),
-                label: const Text('Importar rota (arquivo GPX)'),
+                label: Text(tr('Importar rota (arquivo GPX)')),
                 onPressed: () async {
                   Navigator.pop(ctx);
                   await _importTrack();
@@ -2085,7 +2078,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               if (_rec.tracks.isEmpty)
                 Padding(
                   padding: const EdgeInsets.all(20),
-                  child: Text('Nenhuma rota gravada ainda.',
+                  child: Text(tr('Nenhuma rota gravada ainda.'),
                       textAlign: TextAlign.center,
                       style: TextStyle(color: SG.textSoft)),
                 )
@@ -2146,27 +2139,27 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Excluir park?'),
-        content: Text('"${park.name}" some para todos os motoristas.'),
+        title: Text(tr('Excluir park?')),
+        content: Text(tr('"{0}" some para todos os motoristas.', [park.name])),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancelar')),
+              child: Text(tr('Cancelar'))),
           FilledButton(
               style: FilledButton.styleFrom(backgroundColor: SG.red),
               onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Excluir')),
+              child: Text(tr('Excluir'))),
         ],
       ),
     );
     if (ok != true) return;
     if (park.id.startsWith('cm_') && !await _community.expirePark(park.id)) {
-      _snack('Sem internet: não consegui excluir. Tente de novo.');
+      _snack(tr('Sem internet: não consegui excluir. Tente de novo.'));
       return;
     }
     await _forgetMine(park.id);
     if (mounted) setState(() {});
-    _snack('Park excluído.');
+    _snack(tr('Park excluído.'));
   }
 
   void _startMove(Park park) {
@@ -2180,7 +2173,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       _follow = false;
     });
     _map.move(LatLng(park.lat, park.lon), 17);
-    _snack('Toque no mapa (ou arraste) até o lugar certo e confirme.');
+    _snack(tr('Toque no mapa (ou arraste) até o lugar certo e confirme.'));
   }
 
   Future<void> _confirmPlace(double lat, double lon) async {
@@ -2194,7 +2187,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       // Mudar de lugar: o antigo some e entra o novo (as regras do
       // Firebase não deixam mudar a posição de um documento).
       if (old.id.startsWith('cm_') && !await _community.expirePark(old.id)) {
-        _snack('Sem internet: não consegui mudar o park. Tente de novo.');
+        _snack(tr('Sem internet: não consegui mudar o park. Tente de novo.'));
         return;
       }
       await _forgetMine(old.id);
@@ -2210,29 +2203,23 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         icon: const Icon(Icons.warning_amber_rounded,
             color: Colors.amber, size: 40),
         title: Row(children: [
-          const Expanded(child: Text('Atenção, motorista!')),
+          Expanded(child: Text(tr('Atenção, motorista!'))),
           IconButton(
-            tooltip: 'Fechar',
+            tooltip: tr('Fechar'),
             icon: const Icon(Icons.close),
             onPressed: () => Navigator.pop(ctx, true),
           ),
         ]),
-        content: const Text(
-          'Só adicione um park onde você mesmo parou com o caminhão e '
-          'tem certeza de que o caminhão entra, manobra e sai.\n\n'
-          'Park adicionado aparece para todos os motoristas. Um park '
-          'errado ou inventado pode levar um colega a um lugar sem saída, '
-          'sem vaga ou proibido — de madrugada, cansado e sem tempo de '
-          'direção.\n\n'
-          'Na dúvida, não adicione.',
+        content: Text(
+          tr('Só adicione um park onde você mesmo parou com o caminhão e tem certeza de que o caminhão entra, manobra e sai.\n\nPark adicionado aparece para todos os motoristas. Um park errado ou inventado pode levar um colega a um lugar sem saída, sem vaga ou proibido — de madrugada, cansado e sem tempo de direção.\n\nNa dúvida, não adicione.'),
         ),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancelar')),
+              child: Text(tr('Cancelar'))),
           FilledButton(
               onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Entendi')),
+              child: Text(tr('Entendi'))),
         ],
       ),
     );
@@ -2243,7 +2230,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     // Só caminhão adiciona park (1.29.34): evita park falso de quem usa o
     // app no carro.
     if (!_isTruck) {
-      _snack('Adicionar park é só para quem escolheu Caminhão nas Configurações.');
+      _snack(tr('Adicionar park é só para quem escolheu Caminhão nas Configurações.'));
       return;
     }
     if (!await _parkWarning()) return;
@@ -2268,26 +2255,26 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 subtitle: Text(sub, style: const TextStyle(fontSize: 12)),
               );
           return AlertDialog(
-            title: const Text('Adicionar park aqui'),
+            title: Text(tr('Adicionar park aqui')),
             content: SingleChildScrollView(
               child: Column(mainAxisSize: MainAxisSize.min, children: [
-                opt('park_privado', Icons.local_parking, 'Park privado',
-                    'Pago'),
-                opt('park_free', Icons.money_off, 'Park free', 'Grátis'),
-                opt('park_zona', Icons.factory_outlined, 'Zona industrial',
-                    'Onde caminhão estaciona, entra e sai'),
+                opt('park_privado', Icons.local_parking, tr('Park privado'),
+                    tr('Pago')),
+                opt('park_free', Icons.money_off, tr('Park free'), tr('Grátis')),
+                opt('park_zona', Icons.factory_outlined, tr('Zona industrial'),
+                    tr('Onde caminhão estaciona, entra e sai')),
                 const SizedBox(height: 8),
                 // 1.29.32: onde fica o park.
                 SegmentedButton<bool>(
-                  segments: const [
+                  segments: [
                     ButtonSegment(
                         value: false,
                         icon: Icon(Icons.my_location),
-                        label: Text('Onde estou')),
+                        label: Text(tr('Onde estou'))),
                     ButtonSegment(
                         value: true,
                         icon: Icon(Icons.touch_app),
-                        label: Text('Marcar no mapa')),
+                        label: Text(tr('Marcar no mapa'))),
                   ],
                   selected: {onMap},
                   onSelectionChanged: pos == null
@@ -2299,20 +2286,20 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   controller: nameCtrl,
                   maxLength: 60,
                   textCapitalization: TextCapitalization.sentences,
-                  decoration: const InputDecoration(
-                      labelText: 'Nome (opcional)',
-                      hintText: 'Ex.: Park Los Pinos'),
+                  decoration: InputDecoration(
+                      labelText: tr('Nome (opcional)'),
+                      hintText: tr('Ex.: Park Los Pinos')),
                 ),
               ]),
             ),
             actions: [
               TextButton(
                   onPressed: () => Navigator.pop(ctx, false),
-                  child: const Text('Cancelar')),
+                  child: Text(tr('Cancelar'))),
               FilledButton(
                   onPressed:
                       type == null ? null : () => Navigator.pop(ctx, true),
-                  child: const Text('Adicionar')),
+                  child: Text(tr('Adicionar'))),
             ],
           );
         },
@@ -2328,7 +2315,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         _mapView = true;
         _follow = false;
       });
-      _snack('Toque no mapa (ou arraste) até o local exato e confirme.');
+      _snack(tr('Toque no mapa (ou arraste) até o local exato e confirme.'));
       return;
     }
     await _savePark(pos.latitude, pos.longitude, type!, name);
@@ -2359,8 +2346,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     _myParkIds.add(id);
     if (mounted) setState(() {});
     _snack(id.startsWith('local_')
-        ? 'Park salvo neste aparelho (sem internet para enviar).'
-        : 'Park adicionado! Ele aparece para todos os motoristas.');
+        ? tr('Park salvo neste aparelho (sem internet para enviar).')
+        : tr('Park adicionado! Ele aparece para todos os motoristas.'));
   }
 
   /// Botão "P+" verde ao lado do P (1.29.31): adicionar park aqui.
@@ -2413,7 +2400,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     final pos = _pos ?? await _currentPos();
     if (!mounted) return;
     if (pos == null) {
-      _snack('Aguardando o sinal do GPS…');
+      _snack(tr('Aguardando o sinal do GPS…'));
       return;
     }
     // Rota calculada mas a busca dos parks falhou: tenta de novo.
@@ -2438,22 +2425,22 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               final prog =
                   _route.progress(pos.latitude, pos.longitude) ?? 0;
               list = _parks.alongRoute(prog, max: ParkService.routeList);
-              title = 'Próximos parks até ${_route.destName}';
+              title = tr('Próximos parks até {0}', [_route.destName]);
               hint = _parks.routeLoading
-                  ? 'Buscando mais parks da rota…'
-                  : 'Distância pela estrada';
+                  ? tr('Buscando mais parks da rota…')
+                  : tr('Distância pela estrada');
             } else {
               list = _parks.ahead(pos.latitude, pos.longitude,
                   pos.speed > 2.5 ? pos.heading : -1,
                   country: _country);
               final noDir = !_parks.hasHeading;
               if (noDir) list = _parks.nearest(pos.latitude, pos.longitude);
-              title = noDir ? 'Parks mais perto' : 'Parks à frente';
+              title = noDir ? tr('Parks mais perto') : tr('Parks à frente');
               hint = routing && _parks.routeLoading
-                  ? 'Buscando os parks da rota… abra de novo em instantes.'
+                  ? tr('Buscando os parks da rota… abra de novo em instantes.')
                   : noDir
-                      ? 'Comece a andar para ver só os do seu sentido.'
-                      : 'Digite o destino em Navegar para ver todos os parks da rota.';
+                      ? tr('Comece a andar para ver só os do seu sentido.')
+                      : tr('Digite o destino em Navegar para ver todos os parks da rota.');
             }
             // Ainda buscando: atualiza a janela sozinha a cada 2 s.
             if (waiting || (routing && _parks.routeLoading)) {
@@ -2511,13 +2498,13 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                       overflow: TextOverflow.ellipsis),
                   subtitle: Text([
                     if (a.park.name.isNotEmpty) a.park.kindLabel,
-                    if (a.side != null) 'à ${a.side}',
+                    if (a.side != null) tr('à {0}', [tr(a.side!)]),
                     ...a.park.features,
                   ].join(' · ')),
                   // Compartilhar (separado) e rota.
                   trailing: Row(mainAxisSize: MainAxisSize.min, children: [
                     IconButton(
-                      tooltip: 'Compartilhar',
+                      tooltip: tr('Compartilhar'),
                       icon: const Icon(Icons.share),
                       onPressed: () => _sharePark(a.park),
                     ),
@@ -2550,7 +2537,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                       _addPark();
                     },
                     icon: const Icon(Icons.add_location_alt),
-                    label: const Text('Adicionar park aqui'),
+                    label: Text(tr('Adicionar park aqui')),
                   ),
                   const SizedBox(height: 8),
                   if (waiting && list.isEmpty)
@@ -2568,8 +2555,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                       padding: const EdgeInsets.all(20),
                       child: Text(
                           routing && _parks.hasRoute
-                              ? 'Nenhum park à frente nesta rota.'
-                              : 'Nenhum park encontrado à frente (até 60 km).',
+                              ? tr('Nenhum park à frente nesta rota.')
+                              : tr('Nenhum park encontrado à frente (até 60 km).'),
                           textAlign: TextAlign.center,
                           style: TextStyle(color: SG.textSoft)),
                     )
@@ -2589,7 +2576,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                         Navigator.pop(ctx);
                       },
                       icon: const Icon(Icons.close),
-                      label: const Text('Encerrar rota'),
+                      label: Text(tr('Encerrar rota')),
                     ),
                 ],
               ),
@@ -2619,7 +2606,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       final title = p.name.isNotEmpty ? p.name : p.kindLabel;
       final info = [
         if (p.name.isNotEmpty) p.kindLabel,
-        if (a.side != null) 'à ${a.side}',
+        if (a.side != null) tr('à {0}', [tr(a.side!)]),
         ...p.features,
       ].join(' · ');
       return Padding(
@@ -2664,12 +2651,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 ]),
           ),
           IconButton(
-            tooltip: 'Compartilhar',
+            tooltip: tr('Compartilhar'),
             icon: const Icon(Icons.share, size: 20),
             onPressed: () => _sharePark(p),
           ),
           IconButton(
-            tooltip: 'Ir até o park',
+            tooltip: tr('Ir até o park'),
             icon: const Icon(Icons.directions),
             onPressed: () => _navigateTo(p),
           ),
@@ -2736,7 +2723,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       if (speed > road + 2 && _roadWarned != road) {
         _roadWarned = road;
         if (say == null) {
-          say = 'Limite da via $road.';
+          say = tr('Limite da via {0}.', [road]);
           beep = 2;
         }
       } else if (speed <= road) {
@@ -2798,10 +2785,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           _tts.speak(!_discreet
               ? st.speak!
               : st.beeps == AlertEngine.overBeep
-                  ? 'Reduza.'
+                  ? tr('Reduza.')
                   : st.beeps > 0
                       ? '${AlertEngine.stages[st.beeps - 1]} metros.'
-                      : 'Radar.');
+                      : tr('Radar.'));
         }
       }
     }
@@ -2809,9 +2796,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     setState(() {
       _alert = st;
       if (_rule.mode == RadarMode.disabled) {
-        _status = 'Alertas desligados neste país';
+        _status = tr('Alertas desligados neste país');
       } else if (st.radar == null) {
-        _status = '${_allRadars.length} radares carregados na região';
+        _status = tr('{0} radares carregados na região', [_allRadars.length]);
       }
     });
     _sendBubble();
@@ -2828,7 +2815,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       if (d > 150) continue;
       _asked.add(r.id);
       HapticFeedback.heavyImpact();
-      _say('O radar móvel ainda está aí? Responda na tela.');
+      _say(tr('O radar móvel ainda está aí? Responda na tela.'));
       setState(() => _ask = r);
       _askTimer?.cancel();
       _askTimer = Timer(const Duration(seconds: 40), () {
@@ -2849,10 +2836,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     if (!mounted) return;
     setState(() {});
     _snack(!ok
-        ? 'Sem conexão: resposta não enviada.'
+        ? tr('Sem conexão: resposta não enviada.')
         : stillThere
-            ? 'Obrigado! Radar mantido por mais 48 horas.'
-            : 'Obrigado! Radar removido.');
+            ? tr('Obrigado! Radar mantido por mais 48 horas.')
+            : tr('Obrigado! Radar removido.'));
   }
 
   Future<void> _checkCountry(Position pos) async {
@@ -2874,7 +2861,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     }
     final notice = _rule.notice;
     if (notice != null && _noticeShown.add(code) && mounted) {
-      _say('Você entrou em ${_rule.name}.');
+      _say(tr('Você entrou em {0}.', [_rule.name]));
       showDialog(
         context: context,
         builder: (_) => AlertDialog(
@@ -2883,7 +2870,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           actions: [
             TextButton(
                 onPressed: () => Navigator.pop(context),
-                child: const Text('Entendi')),
+                child: Text(tr('Entendi'))),
           ],
         ),
       );
@@ -2904,7 +2891,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       if (mounted) setState(() => _showCount = false);
     });
     if (n == null) {
-      _snack('Sem conexão para baixar radares. Usando os já salvos.');
+      _snack(tr('Sem conexão para baixar radares. Usando os já salvos.'));
     }
   }
 
@@ -2945,15 +2932,15 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text('Navegar',
+            Text(tr('Navegar'),
                 style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
             TextField(
               controller: ctrl,
               autofocus: true,
               textInputAction: TextInputAction.go,
-              decoration: const InputDecoration(
-                hintText: 'Para onde? (endereço, cidade ou lugar)',
+              decoration: InputDecoration(
+                hintText: tr('Para onde? (endereço, cidade ou lugar)'),
                 prefixIcon: Icon(Icons.search),
                 border: OutlineInputBorder(),
               ),
@@ -2987,8 +2974,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             const SizedBox(height: 10),
             Text(
               _bubble
-                  ? 'O SpeedGuard continua avisando os radares no painel flutuante.'
-                  : 'Dica: ligue a Bolha flutuante em Configurações para ver os radares por cima do mapa.',
+                  ? tr('O SpeedGuard continua avisando os radares no painel flutuante.')
+                  : tr('Dica: ligue a Bolha flutuante em Configurações para ver os radares por cima do mapa.'),
               textAlign: TextAlign.center,
               style: TextStyle(color: SG.textSoft, fontSize: 12),
             ),
@@ -3026,8 +3013,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       await intent.launch();
     } catch (_) {
       _snack(app == 'waze'
-          ? 'Não foi possível abrir o Waze. Ele está instalado?'
-          : 'Não foi possível abrir o Google Maps. Ele está instalado?');
+          ? tr('Não foi possível abrir o Waze. Ele está instalado?')
+          : tr('Não foi possível abrir o Google Maps. Ele está instalado?'));
     }
   }
 
@@ -3054,7 +3041,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           title: Text(l.label,
               style: const TextStyle(fontWeight: FontWeight.w600)),
           subtitle: Text(l.isEvent
-              ? '${l.subtitle} · some após 6 h'
+              ? tr('{0} · some após 6 h', [l.subtitle])
               : l.subtitle),
           value: _layers.contains(l),
           onChanged: (v) {
@@ -3075,9 +3062,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Padding(
+                Padding(
                   padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
-                  child: Text('Opções do mapa',
+                  child: Text(tr('Opções do mapa'),
                       style:
                           TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                 ),
@@ -3087,15 +3074,15 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 for (final l in Layer.events) item(l, setSheet),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-                  child: Text('MAIS',
+                  child: Text(tr('MAIS'),
                       style: TextStyle(
                           color: SG.textSoft, fontWeight: FontWeight.w600)),
                 ),
                 SwitchListTile(
                   secondary: Icon(Icons.my_location, color: SG.accent),
-                  title: const Text('O mapa segue você',
+                  title: Text(tr('O mapa segue você'),
                       style: TextStyle(fontWeight: FontWeight.w600)),
-                  subtitle: const Text('Desloca o mapa com a sua posição'),
+                  subtitle: Text(tr('Desloca o mapa com a sua posição')),
                   value: _follow,
                   onChanged: (v) {
                     setSheet(() {});
@@ -3106,11 +3093,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 ),
                 SwitchListTile(
                   secondary: Icon(Icons.explore, color: SG.accent),
-                  title: const Text('Mapa gira com o veículo',
+                  title: Text(tr('Mapa gira com o veículo'),
                       style: TextStyle(fontWeight: FontWeight.w600)),
-                  subtitle: const Text(
-                      'Ligado: a seta fica sempre para cima e o mapa vira '
-                      'conforme você anda. Desligado: norte sempre em cima.'),
+                  subtitle: Text(
+                      tr('Ligado: a seta fica sempre para cima e o mapa vira conforme você anda. Desligado: norte sempre em cima.')),
                   value: _headingUp,
                   onChanged: (v) async {
                     setSheet(() {});
@@ -3149,12 +3135,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     final pos = _pos;
     if (pos == null) {
       tell(fromBubble
-          ? 'Sem sinal de GPS. Aviso não salvo.'
-          : 'Aguarde o sinal do GPS para reportar.');
+          ? tr('Sem sinal de GPS. Aviso não salvo.')
+          : tr('Aguarde o sinal do GPS para reportar.'));
       return;
     }
     if (!communityEnabled) {
-      tell('Avisos precisam do Firebase configurado.');
+      tell(tr('Avisos precisam do Firebase configurado.'));
       return;
     }
     final dir = pos.speed > 2.5 ? pos.heading : null;
@@ -3166,8 +3152,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       if (!mounted) return;
       setState(() {});
       tell(fromBubble
-          ? '${l.label} já reportado. Confirmado, obrigado!'
-          : '${l.label}: já reportado aqui. Confirmado por mais 6 h.');
+          ? tr('{0} já reportado. Confirmado, obrigado!', [l.label])
+          : tr('{0}: já reportado aqui. Confirmado por mais 6 h.', [l.label]));
       return;
     }
     final ok = await _community.report(
@@ -3181,14 +3167,14 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     setState(() {});
     tell(ok
         ? (fromBubble
-            ? '${l.label} reportado. Obrigado!'
-            : '${l.label} reportado para todos. Some em 6 h.')
-        : 'Sem conexão: não foi possível reportar.');
+            ? tr('{0} reportado. Obrigado!', [l.label])
+            : tr('{0} reportado para todos. Some em 6 h.', [l.label]))
+        : tr('Sem conexão: não foi possível reportar.'));
   }
 
   Future<void> _report() async {
     if (_pos == null) {
-      _snack('Aguarde o sinal do GPS para reportar.');
+      _snack(tr('Aguarde o sinal do GPS para reportar.'));
       return;
     }
     final choice = await showDialog<Object>(
@@ -3210,8 +3196,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               const SizedBox(height: 8),
               Text(
                 communityEnabled
-                    ? 'Todos verão este radar. Radares móveis são confirmados a cada 48 h por quem passar.'
-                    : 'O radar fica salvo só neste aparelho.',
+                    ? tr('Todos verão este radar. Radares móveis são confirmados a cada 48 h por quem passar.')
+                    : tr('O radar fica salvo só neste aparelho.'),
                 textAlign: TextAlign.center,
                 style: TextStyle(color: SG.textSoft, fontSize: 12),
               ),
@@ -3236,9 +3222,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     final pos = _pos;
     if (pos == null) {
       if (fromBubble) {
-        _say('Sem sinal de GPS. Radar não salvo.');
+        _say(tr('Sem sinal de GPS. Radar não salvo.'));
       } else {
-        _snack('Aguarde o sinal do GPS para reportar.');
+        _snack(tr('Aguarde o sinal do GPS para reportar.'));
       }
       return;
     }
@@ -3253,9 +3239,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         if (!mounted) return;
         setState(() {});
         if (fromBubble) {
-          _say('Radar já reportado. Confirmado, obrigado!');
+          _say(tr('Radar já reportado. Confirmado, obrigado!'));
         } else {
-          _snack('Esse radar já estava reportado. Confirmado, obrigado!');
+          _snack(tr('Esse radar já estava reportado. Confirmado, obrigado!'));
         }
         return;
       }
@@ -3275,15 +3261,15 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     if (!mounted) return;
     setState(() {});
     if (fromBubble) {
-      _say('Radar reportado. Obrigado!');
+      _say(tr('Radar reportado. Obrigado!'));
       return;
     }
     if (shared) {
-      _snack('Radar compartilhado com todos. Obrigado!');
+      _snack(tr('Radar compartilhado com todos. Obrigado!'));
     } else if (communityEnabled) {
-      _snack('Sem conexão: radar salvo só neste aparelho.');
+      _snack(tr('Sem conexão: radar salvo só neste aparelho.'));
     } else {
-      _snack('Radar salvo neste aparelho.');
+      _snack(tr('Radar salvo neste aparelho.'));
     }
   }
 
@@ -3298,7 +3284,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       await _community.reportRemoved(r);
     }
     _removed.shared = _community.removed;
-    _snack('Radar escondido. Obrigado pelo aviso!');
+    _snack(tr('Radar escondido. Obrigado pelo aviso!'));
   }
 
   void _showRadar(Radar r) {
@@ -3314,13 +3300,13 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 8),
             Text(r.maxSpeed != null
-                ? 'Limite: ${r.maxSpeed} km/h'
-                : 'Limite não informado'),
+                ? tr('Limite: {0} km/h', [r.maxSpeed])
+                : tr('Limite não informado')),
             if (r.type == 'usuario') ...[
               const SizedBox(height: 16),
               OutlinedButton.icon(
                 icon: const Icon(Icons.delete_outline),
-                label: const Text('Excluir este radar'),
+                label: Text(tr('Excluir este radar')),
                 onPressed: () async {
                   await _service.removeUserRadar(r.id);
                   if (!mounted) return;
@@ -3333,39 +3319,36 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               const SizedBox(height: 16),
               FilledButton.icon(
                 icon: const Icon(Icons.swap_horiz),
-                label: const Text('Este radar é da outra pista'),
+                label: Text(tr('Este radar é da outra pista')),
                 onPressed: _goodHeading < 0
                     ? null
                     : () async {
                         Navigator.pop(context);
                         await _removed.markWrongSide(r, _goodHeading);
                         if (mounted) setState(() {});
-                        _snack('Pronto: neste sentido ele não avisa mais. '
-                            'Na pista dele continua avisando.');
+                        _snack(tr('Pronto: neste sentido ele não avisa mais. Na pista dele continua avisando.'));
                       },
               ),
               const SizedBox(height: 4),
               Text(
                   _goodHeading < 0
-                      ? 'Para usar, ande um pouco (o app precisa saber o seu sentido).'
-                      : 'Use quando o app avisar um radar da pista contrária: '
-                          'ele para de avisar no seu sentido.',
+                      ? tr('Para usar, ande um pouco (o app precisa saber o seu sentido).')
+                      : tr('Use quando o app avisar um radar da pista contrária: ele para de avisar no seu sentido.'),
                   style: const TextStyle(fontSize: 12, color: Colors.white60)),
             ],
             if (r.type != 'usuario' && !r.isEvent) ...[
               const SizedBox(height: 16),
               OutlinedButton.icon(
                 icon: const Icon(Icons.not_interested),
-                label: const Text('Este radar não existe mais'),
+                label: Text(tr('Este radar não existe mais')),
                 onPressed: () async {
                   Navigator.pop(context);
                   await _radarGone(r);
                 },
               ),
               const SizedBox(height: 4),
-              const Text(
-                  'Some na hora para você. Para os outros motoristas, some '
-                  'quando 2 pessoas avisarem.',
+              Text(
+                  tr('Some na hora para você. Para os outros motoristas, some quando 2 pessoas avisarem.'),
                   style: TextStyle(fontSize: 12, color: Colors.white60)),
             ],
           ],
@@ -3385,10 +3368,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             mainAxisSize: MainAxisSize.min,
             children: [
               SwitchListTile(
-                title: const Text('Parks à frente'),
-                subtitle: const Text(
-                    'Áreas de descanso, de serviço e estacionamentos de caminhão '
-                    'no seu sentido, com aviso a 2 km'),
+                title: Text(tr('Parks à frente')),
+                subtitle: Text(
+                    tr('Áreas de descanso, de serviço e estacionamentos de caminhão no seu sentido, com aviso a 2 km')),
                 value: _showParks,
                 onChanged: (v) async {
                   final p = await SharedPreferences.getInstance();
@@ -3399,10 +3381,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               ),
               if (_showParks)
                 SwitchListTile(
-                  title: const Text('Só parks de caminhão'),
-                  subtitle: const Text(
-                      'Estacionamentos e paradas de caminhão. Desligado: também '
-                      'as áreas de descanso e de serviço sem vaga de caminhão marcada'),
+                  title: Text(tr('Só parks de caminhão')),
+                  subtitle: Text(
+                      tr('Estacionamentos e paradas de caminhão. Desligado: também as áreas de descanso e de serviço sem vaga de caminhão marcada')),
                   value: _parks.truckOnly,
                   onChanged: (v) async {
                     final p = await SharedPreferences.getInstance();
@@ -3412,9 +3393,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   },
                 ),
               SwitchListTile(
-                title: const Text('Aviso de pedágio'),
-                subtitle: const Text(
-                    'Avisa uma vez, a 1000 m, com voz e na tela'),
+                title: Text(tr('Aviso de pedágio')),
+                subtitle: Text(
+                    tr('Avisa uma vez, a 1000 m, com voz e na tela')),
                 value: _tolls.enabled,
                 onChanged: (v) async {
                   final p = await SharedPreferences.getInstance();
@@ -3423,10 +3404,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 },
               ),
               SwitchListTile(
-                title: const Text('Só radares da minha via'),
-                subtitle: const Text(
-                    'Avisa só os radares da rodovia/rua onde você está. Radares '
-                    'de ruas ao lado ou que cruzam são ignorados'),
+                title: Text(tr('Só radares da minha via')),
+                subtitle: Text(
+                    tr('Avisa só os radares da rodovia/rua onde você está. Radares de ruas ao lado ou que cruzam são ignorados')),
                 value: _sameRoad,
                 onChanged: (v) async {
                   final p = await SharedPreferences.getInstance();
@@ -3439,18 +3419,17 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 // 1.29.9: mesmo formato das outras opções (texto em largura
                 // total, botão embaixo); antes o botão ao lado espremia o texto.
                 ListTile(
-                  title: const Text('Radares escondidos'),
+                  title: Text(tr('Radares escondidos')),
                   subtitle: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(_removed.mineCount == 1
-                          ? '1 radar marcado por você como "não existe mais"'
-                          : '${_removed.mineCount} radares marcados por você '
-                              'como "não existe mais"'),
+                          ? tr('1 radar marcado por você como "não existe mais"')
+                          : tr('{0} radares marcados por você como "não existe mais"', [_removed.mineCount])),
                       const SizedBox(height: 8),
                       OutlinedButton.icon(
                         icon: const Icon(Icons.visibility_outlined, size: 18),
-                        label: const Text('Mostrar de novo'),
+                        label: Text(tr('Mostrar de novo')),
                         onPressed: () async {
                           await _removed.clearMine();
                           setSheet(() {});
@@ -3461,13 +3440,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   ),
                 ),
               SwitchListTile(
-                title: const Text('Aviso de velocidade excedida'),
+                title: Text(tr('Aviso de velocidade excedida')),
                 subtitle: Text(_isTruck
-                    ? 'Caminhão: passou de $_truckMax, o velocímetro fica vermelho '
-                        'com a contagem; aos 20 s "Atenção" e aos 30 s "Velocidade '
-                        'excedida. Tempo excedido". Mostra o limite da via'
-                    : 'Passou do limite da via: velocímetro vermelho com a contagem; '
-                        'aos 20 s "Atenção" e aos 30 s "Velocidade excedida"'),
+                    ? tr('Caminhão: passou de {0}, o velocímetro fica vermelho com a contagem; aos 20 s "Atenção" e aos 30 s "Velocidade excedida. Tempo excedido". Mostra o limite da via', [_truckMax])
+                    : tr('Passou do limite da via: velocímetro vermelho com a contagem; aos 20 s "Atenção" e aos 30 s "Velocidade excedida"')),
                 value: _speedWarn,
                 onChanged: (v) async {
                   final p = await SharedPreferences.getInstance();
@@ -3483,23 +3459,23 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                    const Text('Som do aviso de velocidade (Mudo: só o aviso na tela)'),
+                    Text(tr('Som do aviso de velocidade (Mudo: só o aviso na tela)')),
                     const SizedBox(height: 6),
                     SegmentedButton<String>(
                       showSelectedIcon: false,
-                      segments: const [
+                      segments: [
                         ButtonSegment(
                             value: 'voice',
                             icon: Icon(Icons.record_voice_over),
-                            label: Text('Voz')),
+                            label: Text(tr('Voz'))),
                         ButtonSegment(
                             value: 'beep',
                             icon: Icon(Icons.notifications_active),
-                            label: Text('Bipe')),
+                            label: Text(tr('Bipe'))),
                         ButtonSegment(
                             value: 'mute',
                             icon: Icon(Icons.volume_off),
-                            label: Text('Mudo')),
+                            label: Text(tr('Mudo'))),
                       ],
                       selected: {_speedSound},
                       onSelectionChanged: (v) async {
@@ -3510,7 +3486,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                         if (v.first == 'beep') {
                           _beep(3);
                         } else if (v.first == 'voice') {
-                          _tts.speak('Atenção.');
+                          _tts.speak(tr('Atenção.'));
                         }
                       },
                     ),
@@ -3520,9 +3496,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
                   child: Row(children: [
-                    const Expanded(
-                        child: Text('Limitador do caminhão\n'
-                            'Começa a contar os 30 s acima de',
+                    Expanded(
+                        child: Text(tr('Limitador do caminhão\nComeça a contar os 30 s acima de'),
                             style: TextStyle(height: 1.3))),
                     DropdownButton<int>(
                       value: _truckMax,
@@ -3543,8 +3518,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   ]),
                 ),
               SwitchListTile(
-                title: const Text('Alertas sonoros'),
-                subtitle: const Text('Avisos a 1000, 800, 500, 400, 300 e 100 m do radar'),
+                title: Text(tr('Alertas sonoros')),
+                subtitle: Text(tr('Avisos a 1000, 800, 500, 400, 300 e 100 m do radar')),
                 value: _voice,
                 onChanged: (v) async {
                   final p = await SharedPreferences.getInstance();
@@ -3558,15 +3533,15 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
                   child: SegmentedButton<String>(
                     showSelectedIcon: false,
-                    segments: const [
+                    segments: [
                       ButtonSegment(
                           value: 'voice',
                           icon: Icon(Icons.record_voice_over),
-                          label: Text('Voz')),
+                          label: Text(tr('Voz'))),
                       ButtonSegment(
                           value: 'beep',
                           icon: Icon(Icons.notifications_active),
-                          label: Text('Bipe')),
+                          label: Text(tr('Bipe'))),
                     ],
                     selected: {_sound},
                     onSelectionChanged: (v) async {
@@ -3577,7 +3552,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                       if (v.first == 'beep') {
                         _beep(1);
                       } else {
-                        _tts.speak('Radar fixo a 1000 metros. Limite 80.');
+                        _tts.speak(tr('Radar fixo a 1000 metros. Limite 80.'));
                       }
                     },
                   ),
@@ -3603,7 +3578,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                         if (_sound == 'beep') {
                           _beep(3);
                         } else {
-                          _tts.speak('Volume ${(v * 100).round()} por cento.');
+                          _tts.speak(tr('Volume {0} por cento.', [(v * 100).round()]));
                         }
                       },
                     ),
@@ -3615,15 +3590,15 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                           textAlign: TextAlign.right)),
                 ]),
               ),
-              const Padding(
+              Padding(
                 padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
                 child: Text(
-                    'Volume dos avisos (voz e bipes). 100% = volume do celular',
+                    tr('Volume dos avisos (voz e bipes). 100% = volume do celular'),
                     style: TextStyle(fontSize: 12)),
               ),
               SwitchListTile(
-                title: const Text('Modo discreto'),
-                subtitle: const Text('Na voz, fala só a distância ("500 metros")'),
+                title: Text(tr('Modo discreto')),
+                subtitle: Text(tr('Na voz, fala só a distância ("500 metros")')),
                 value: _discreet,
                 onChanged: (v) async {
                   final p = await SharedPreferences.getInstance();
@@ -3632,9 +3607,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 },
               ),
               SwitchListTile(
-                title: const Text('Bolha flutuante'),
-                subtitle: const Text(
-                    'Mostra velocidade e radar por cima do Maps/Waze'),
+                title: Text(tr('Bolha flutuante')),
+                subtitle: Text(
+                    tr('Mostra velocidade e radar por cima do Maps/Waze')),
                 value: _bubble,
                 onChanged: (v) async {
                   if (v && !await FlutterOverlayWindow.isPermissionGranted()) {
@@ -3649,11 +3624,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               if (!_bubble)
                 ListTile(
                   leading: Icon(Icons.timer_outlined, color: SG.red),
-                  title: const Text('Testar pop-up da contagem'),
-                  subtitle: const Text(
-                      'Conta 35 s de mentira: toque, minimize o app e abra '
-                      'outro (ex.: YouTube) — o círculo vermelho tem de '
-                      'aparecer por cima'),
+                  title: Text(tr('Testar pop-up da contagem')),
+                  subtitle: Text(
+                      tr('Conta 35 s de mentira: toque, minimize o app e abra outro (ex.: YouTube) — o círculo vermelho tem de aparecer por cima')),
                   onTap: () async {
                     if (!await FlutterOverlayWindow.isPermissionGranted()) {
                       final ok = await FlutterOverlayWindow.requestPermission();
@@ -3665,11 +3638,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   },
                 ),
               if (_bubble) ...[
-                const Padding(
+                Padding(
                   padding: EdgeInsets.fromLTRB(16, 4, 16, 6),
                   child: Align(
                     alignment: Alignment.centerLeft,
-                    child: Text('Tamanho do painel'),
+                    child: Text(tr('Tamanho do painel')),
                   ),
                 ),
                 Padding(
@@ -3678,7 +3651,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                     showSelectedIcon: false,
                     segments: [
                       for (final e in kPanelScales.entries)
-                        ButtonSegment(value: e.value, label: Text(e.key)),
+                        ButtonSegment(value: e.value, label: Text(tr(e.key))),
                     ],
                     selected: {_bubbleScale},
                     onSelectionChanged: (v) async {
@@ -3688,26 +3661,26 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                     },
                   ),
                 ),
-                const Padding(
+                Padding(
                   padding: EdgeInsets.fromLTRB(16, 12, 16, 6),
                   child: Align(
                     alignment: Alignment.centerLeft,
-                    child: Text('Formato do painel'),
+                    child: Text(tr('Formato do painel')),
                   ),
                 ),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: SegmentedButton<bool>(
                     showSelectedIcon: false,
-                    segments: const [
+                    segments: [
                       ButtonSegment(
                           value: false,
                           icon: Icon(Icons.crop_portrait),
-                          label: Text('Vertical')),
+                          label: Text(tr('Vertical'))),
                       ButtonSegment(
                           value: true,
                           icon: Icon(Icons.crop_landscape),
-                          label: Text('Horizontal')),
+                          label: Text(tr('Horizontal'))),
                     ],
                     selected: {_bubbleLand},
                     onSelectionChanged: (v) async {
@@ -3724,11 +3697,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 ),
                 const SizedBox(height: 8),
               ],
-              const Padding(
+              Padding(
                 padding: EdgeInsets.fromLTRB(16, 12, 16, 6),
                 child: Align(
                   alignment: Alignment.centerLeft,
-                  child: Text('Ícone no mapa'),
+                  child: Text(tr('Ícone no mapa')),
                 ),
               ),
               Padding(
@@ -3753,11 +3726,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   ],
                 ),
               ),
-              const Padding(
+              Padding(
                 padding: EdgeInsets.fromLTRB(16, 12, 16, 6),
                 child: Align(
                   alignment: Alignment.centerLeft,
-                  child: Text('Cores do app'),
+                  child: Text(tr('Cores do app')),
                 ),
               ),
               Padding(
@@ -3803,18 +3776,41 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                                   : null,
                             ),
                             const SizedBox(height: 4),
-                            Text(pal.name, style: const TextStyle(fontSize: 12)),
+                            Text(tr(pal.name), style: const TextStyle(fontSize: 12)),
                           ]),
                         ),
                     ],
                   ),
                 ),
               ),
-              const Padding(
+              // 1.30.0: idioma do app e dos avisos falados.
+              ListTile(
+                leading: const Icon(Icons.language),
+                title: Text(tr('Idioma')),
+                subtitle: Text(tr('Textos do app e avisos de voz')),
+                trailing: DropdownButton<String>(
+                  value: langChoice,
+                  underline: const SizedBox(),
+                  items: [
+                    DropdownMenuItem(value: '', child: Text(tr('Auto'))),
+                    for (final e in kLangs.entries)
+                      DropdownMenuItem(value: e.key, child: Text(e.value)),
+                  ],
+                  onChanged: (v) async {
+                    if (v == null) return;
+                    await setLang(v);
+                    await _tts.setLanguage(ttsLang);
+                    _sendBubble();
+                    if (mounted) setState(() {});
+                    setSheet(() {});
+                  },
+                ),
+              ),
+              Padding(
                 padding: EdgeInsets.fromLTRB(16, 12, 16, 6),
                 child: Align(
                   alignment: Alignment.centerLeft,
-                  child: Text('Aparência'),
+                  child: Text(tr('Aparência')),
                 ),
               ),
               Padding(
@@ -3823,19 +3819,19 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   valueListenable: SG.mode,
                   builder: (_, mode, __) => SegmentedButton<ThemeMode>(
                     showSelectedIcon: false,
-                    segments: const [
+                    segments: [
                       ButtonSegment(
                           value: ThemeMode.system,
                           icon: Icon(Icons.brightness_auto),
-                          label: Text('Auto')),
+                          label: Text(tr('Auto'))),
                       ButtonSegment(
                           value: ThemeMode.light,
                           icon: Icon(Icons.light_mode),
-                          label: Text('Claro')),
+                          label: Text(tr('Claro'))),
                       ButtonSegment(
                           value: ThemeMode.dark,
                           icon: Icon(Icons.dark_mode),
-                          label: Text('Escuro')),
+                          label: Text(tr('Escuro'))),
                     ],
                     selected: {mode},
                     onSelectionChanged: (v) async {
@@ -3849,8 +3845,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               const SizedBox(height: 8),
               ListTile(
                 leading: const Icon(Icons.play_circle_outline),
-                title: const Text('Tutorial'),
-                subtitle: const Text('Vídeo de como configurar e usar o app'),
+                title: Text(tr('Tutorial')),
+                subtitle: Text(tr('Vídeo de como configurar e usar o app')),
                 onTap: () {
                   Navigator.pop(ctx);
                   Navigator.push(
@@ -3861,8 +3857,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               ),
               ListTile(
                 leading: const Icon(Icons.help_outline),
-                title: const Text('Ajuda'),
-                subtitle: const Text('Perguntas e respostas (funciona sem internet)'),
+                title: Text(tr('Ajuda')),
+                subtitle: Text(tr('Perguntas e respostas (funciona sem internet)')),
                 onTap: () {
                   Navigator.pop(ctx);
                   Navigator.push(
@@ -3872,7 +3868,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               ),
               ListTile(
                 leading: const Icon(Icons.refresh),
-                title: const Text('Atualizar radares agora'),
+                title: Text(tr('Atualizar radares agora')),
                 onTap: () {
                   Navigator.pop(ctx);
                   if (_pos != null) {
@@ -3885,12 +3881,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               if (_isTruck)
               ListTile(
                 leading: const Icon(Icons.groups),
-                title: const Text('Localização em grupo'),
+                title: Text(tr('Localização em grupo')),
                 subtitle: Text(_live.sharing
-                    ? 'Compartilhando · ${_live.members.length} no mapa'
+                    ? tr('Compartilhando · {0} no mapa', [_live.members.length])
                     : _live.hasGroup
-                        ? 'Vendo o grupo · ${_live.members.length} no mapa'
-                        : 'Ver e mostrar colegas no mapa'),
+                        ? tr('Vendo o grupo · {0} no mapa', [_live.members.length])
+                        : tr('Ver e mostrar colegas no mapa')),
                 onTap: () {
                   Navigator.pop(context);
                   _groupSheet();
@@ -3898,7 +3894,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               ),
               ListTile(
                 leading: const Icon(Icons.bug_report_outlined),
-                title: const Text('Diagnóstico (último erro)'),
+                title: Text(tr('Diagnóstico (último erro)')),
                 onTap: () async {
                   final p = await SharedPreferences.getInstance();
                   final err = _lastError ?? p.getString('last_error');
@@ -3914,12 +3910,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   showDialog(
                     context: ctx,
                     builder: (d) => AlertDialog(
-                      title: const Text('Último erro'),
+                      title: Text(tr('Último erro')),
                       content: SingleChildScrollView(
                           child: SelectableText(
-                              '${err ?? 'Nenhum erro registrado.'}\n\n'
-                              'Pop-up da contagem:\n'
-                              '${log.isEmpty ? '(vazio)' : log.reversed.take(25).join('\n')}',
+                              tr('{0}\n\nPop-up da contagem:\n{1}', [err ?? tr('Nenhum erro registrado.'), log.isEmpty ? tr('(vazio)') : log.reversed.take(25).join('\n')]),
                               style: const TextStyle(fontSize: 12))),
                       actions: [
                         if (err != null)
@@ -3929,10 +3923,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                                 _lastError = null;
                                 if (d.mounted) Navigator.pop(d);
                               },
-                              child: const Text('Apagar')),
+                              child: Text(tr('Apagar'))),
                         TextButton(
                             onPressed: () => Navigator.pop(d),
-                            child: const Text('Fechar')),
+                            child: Text(tr('Fechar'))),
                       ],
                     ),
                   );
@@ -3940,12 +3934,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               ),
               ListTile(
                 leading: const Icon(Icons.system_update),
-                title: const Text('Procurar atualização do app'),
+                title: Text(tr('Procurar atualização do app')),
                 // 1.28.9: mostra a versão instalada (muda a cada atualização).
                 subtitle: FutureBuilder<String>(
                   future: UpdateService.installed(),
                   builder: (_, s) =>
-                      Text('Versão instalada: ${s.data ?? '…'}'),
+                      Text(tr('Versão instalada: {0}', [s.data ?? '…'])),
                 ),
                 onTap: () {
                   Navigator.pop(ctx);
@@ -3954,7 +3948,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               ),
               ListTile(
                 leading: const Icon(Icons.public),
-                title: Text('País: ${_rule.name}'),
+                title: Text(tr('País: {0}', [_rule.name])),
                 subtitle: Text(_modeLabel(_rule.mode)),
               ),
               ListTile(
@@ -3962,10 +3956,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 // Versão real do app instalado (antes fixa em "1.19.0").
                 title: FutureBuilder<String>(
                   future: UpdateService.installed(),
-                  builder: (_, s) => Text('SpeedGuard ${s.data ?? ''}'.trim()),
+                  builder: (_, s) => Text(tr('SpeedGuard {0}', [s.data ?? '']).trim()),
                 ),
-                subtitle: const Text('Dados de radares: © colaboradores do '
-                    'OpenStreetMap. Respeite sempre os limites de velocidade.'),
+                subtitle: Text(tr('Dados de radares: © colaboradores do OpenStreetMap. Respeite sempre os limites de velocidade.')),
               ),
             ],
           ),
@@ -3977,11 +3970,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   String _modeLabel(RadarMode m) {
     switch (m) {
       case RadarMode.full:
-        return 'Radares visíveis com distância exata';
+        return tr('Radares visíveis com distância exata');
       case RadarMode.dangerZone:
-        return 'Somente aviso de zona de perigo';
+        return tr('Somente aviso de zona de perigo');
       case RadarMode.disabled:
-        return 'Alertas desligados por lei';
+        return tr('Alertas desligados por lei');
     }
   }
 
@@ -4283,7 +4276,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                                     : const Color(0xFF00BCD4),
                                 borderRadius: BorderRadius.circular(10)),
                             child: Text(
-                                'Média ${_section.average ?? '--'}',
+                                tr('Média {0}', [_section.average ?? '--']),
                                 style: const TextStyle(
                                     color: Colors.white,
                                     fontSize: 13,
@@ -4303,7 +4296,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                                     Border.all(color: Colors.white, width: 2)),
                             child: Text(
                                 overSecs >= 30
-                                    ? 'VELOCIDADE\nEXCEDIDA'
+                                    ? tr('VELOCIDADE\nEXCEDIDA')
                                     : '${30 - overSecs} s',
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
@@ -4368,8 +4361,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   padding: const EdgeInsets.all(12),
                   child: Column(mainAxisSize: MainAxisSize.min, children: [
                     Text(
-                        '${_moving != null ? 'Novo lugar: t' : 'T'}oque no mapa ou arraste até o local exato do '
-                        '${_placing!.$2.isNotEmpty ? _placing!.$2 : Park.userTypeLabel(_placing!.$1).$1}',
+                        tr(_moving != null ? 'Novo lugar: toque no mapa ou arraste até o local exato do {0}' : 'Toque no mapa ou arraste até o local exato do {0}', [_placing!.$2.isNotEmpty ? _placing!.$2 : Park.userTypeLabel(_placing!.$1).$1]),
                         textAlign: TextAlign.center,
                         style: const TextStyle(fontWeight: FontWeight.w600)),
                     const SizedBox(height: 10),
@@ -4380,7 +4372,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                             _placing = null;
                             _moving = null;
                           }),
-                          child: const Text('Cancelar'),
+                          child: Text(tr('Cancelar')),
                         ),
                       ),
                       const SizedBox(width: 10),
@@ -4390,7 +4382,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                               backgroundColor: const Color(0xFF2E7D32),
                               foregroundColor: Colors.white),
                           icon: const Icon(Icons.check),
-                          label: const Text('Confirmar'),
+                          label: Text(tr('Confirmar')),
                           onPressed: () {
                             final c = _map.camera.center;
                             _confirmPlace(c.latitude, c.longitude);
@@ -4430,7 +4422,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                     isLabelVisible: _live.members.isNotEmpty,
                     child: FloatingActionButton.small(
                       heroTag: 'grupo',
-                      tooltip: 'Grupo',
+                      tooltip: tr('Grupo'),
                       backgroundColor: const Color(0xFF7E57C2),
                       foregroundColor: Colors.white,
                       onPressed: _groupList,
@@ -4446,7 +4438,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                     decoration: BoxDecoration(
                         color: SG.red,
                         borderRadius: BorderRadius.circular(20)),
-                    child: Text('● REC ${_rec.km.toStringAsFixed(1)} km',
+                    child: Text(tr('● REC {0} km', [_rec.km.toStringAsFixed(1)]),
                         style: const TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.w800)),
@@ -4457,7 +4449,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                     avatar: const Icon(Icons.route, size: 18),
                     label: ConstrainedBox(
                       constraints: const BoxConstraints(maxWidth: 160),
-                      child: Text(_shownTrackName ?? 'Rota',
+                      child: Text(_shownTrackName ?? tr('Rota'),
                           overflow: TextOverflow.ellipsis),
                     ),
                     onDeleted: _hideTrack,
@@ -4514,9 +4506,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             left: 12,
             bottom: 12,
             child: Row(children: [
-              _pill(Icons.tune, 'Opções', _mapOptions),
+              _pill(Icons.tune, tr('Opções'), _mapOptions),
               const SizedBox(width: 6),
-              _pill(Icons.navigation, 'Navegar', _navigate),
+              _pill(Icons.navigation, tr('Navegar'), _navigate),
               const SizedBox(width: 6),
               _parkButton(),
               // Adicionar park: só com caminhão escolhido (1.29.34).
@@ -4534,7 +4526,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 alignment: Alignment.center,
                 padding: const EdgeInsets.all(32),
                 child: Text(
-                  'Alertas desligados em ${_rule.name}\n(proibido por lei)',
+                  tr('Alertas desligados em {0}\n(proibido por lei)', [_rule.name]),
                   textAlign: TextAlign.center,
                   style: const TextStyle(fontSize: 20),
                 ),
@@ -4562,20 +4554,20 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             child: Row(
               children: [
                 _RoundAction(
-                  tooltip: 'Configurações',
+                  tooltip: tr('Configurações'),
                   icon: Icons.settings,
                   onTap: _settings,
                 ),
                 const SizedBox(width: 10),
                 _RoundAction(
-                  tooltip: _mapView ? 'Tela de alerta' : 'Mapa',
+                  tooltip: _mapView ? tr('Tela de alerta') : tr('Mapa'),
                   icon: _mapView ? Icons.keyboard_double_arrow_up : Icons.map,
                   onTap: _toggleView,
                 ),
                 const SizedBox(width: 10),
                 // 1.29.35: rotas gravadas (vermelho enquanto grava).
                 _RoundAction(
-                  tooltip: 'Rotas gravadas',
+                  tooltip: tr('Rotas gravadas'),
                   icon: _rec.recording ? Icons.fiber_manual_record : Icons.route,
                   onTap: _tracksSheet,
                 ),
@@ -4588,7 +4580,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 ),
                 const SizedBox(width: 10),
                 _RoundAction(
-                  tooltip: 'Reportar radar aqui',
+                  tooltip: tr('Reportar radar aqui'),
                   icon: Icons.add_location_alt,
                   onTap: _report,
                 ),
@@ -4619,17 +4611,16 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           _OnlineChip(
             icon: '🌍',
             count: p.world!,
-            label: 'no mundo',
-            tooltip: 'Pessoas com o SpeedGuard conectado no mundo',
+            label: tr('no mundo'),
+            tooltip: tr('Pessoas com o SpeedGuard conectado no mundo'),
           ),
           if (code != null && p.country != null) ...[
             const SizedBox(width: 8),
             _OnlineChip(
               icon: PresenceService.flag(code),
               count: p.country!,
-              label: 'no país',
-              tooltip: 'Pessoas com o SpeedGuard conectado em '
-                  '${ruleFor(code).name}',
+              label: tr('no país'),
+              tooltip: tr('Pessoas com o SpeedGuard conectado em {0}', [ruleFor(code).name]),
             ),
           ],
         ],
@@ -4645,7 +4636,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         padding: const EdgeInsets.all(12),
         child: Column(
           children: [
-            const Text('O radar móvel ainda está aqui?',
+            Text(tr('O radar móvel ainda está aqui?'),
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 10),
             Row(
@@ -4657,7 +4648,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                         minimumSize: const Size.fromHeight(48)),
                     onPressed: () => _answer(true),
                     icon: const Icon(Icons.check),
-                    label: const Text('SIM'),
+                    label: Text(tr('SIM')),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -4668,7 +4659,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                         minimumSize: const Size.fromHeight(48)),
                     onPressed: () => _answer(false),
                     icon: const Icon(Icons.close),
-                    label: const Text('NÃO'),
+                    label: Text(tr('NÃO')),
                   ),
                 ),
               ],
@@ -4735,8 +4726,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       title = _rule.name;
       subtitle = _status;
     } else if (_rule.mode == RadarMode.dangerZone) {
-      title = 'ZONA DE PERIGO';
-      subtitle = 'Respeite o limite de velocidade';
+      title = tr('ZONA DE PERIGO');
+      subtitle = tr('Respeite o limite de velocidade');
     } else {
       final d = a.distance!;
       title = d >= 1000
@@ -4809,7 +4800,7 @@ class _UpdatingBadgeState extends State<_UpdatingBadge>
   @override
   Widget build(BuildContext context) {
     return Tooltip(
-      message: 'Atualizando radares',
+      message: tr('Atualizando radares'),
       child: Container(
         width: 52,
         height: 52,
@@ -4989,7 +4980,7 @@ class _MainButton extends StatelessWidget {
               Flexible(
                 child: FittedBox(
                   fit: BoxFit.scaleDown,
-                  child: Text(running ? 'PARAR' : 'INICIAR',
+                  child: Text(running ? tr('PARAR') : tr('INICIAR'),
                       style: TextStyle(
                           color: running ? SG.text : Colors.white,
                           fontSize: 19,

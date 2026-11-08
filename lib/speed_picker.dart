@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'layers.dart';
 import 'theme.dart';
+import 'i18n.dart';
 
 /// Limites prontos para reportar um radar (km/h).
 const List<int> kPresetSpeeds = [30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130];
@@ -86,8 +87,8 @@ class _SpeedPickerState extends State<SpeedPicker> {
         children: [
           Row(
             children: [
-              const Expanded(
-                child: Text('Reportar radar',
+              Expanded(
+                child: Text(tr('Reportar radar'),
                     style: TextStyle(
                         color: Colors.white,
                         fontSize: 18,
@@ -100,11 +101,11 @@ class _SpeedPickerState extends State<SpeedPicker> {
             ],
           ),
           Row(children: [
-            _typeButton(true, Icons.camera_alt, 'Móvel'),
-            _typeButton(false, Icons.speed, 'Fixo'),
+            _typeButton(true, Icons.camera_alt, tr('Móvel')),
+            _typeButton(false, Icons.speed, tr('Fixo')),
           ]),
           const SizedBox(height: 10),
-          const Text('Toque no limite de velocidade',
+          Text(tr('Toque no limite de velocidade'),
               style: TextStyle(color: Colors.white70, fontSize: 13)),
           const SizedBox(height: 10),
           Wrap(

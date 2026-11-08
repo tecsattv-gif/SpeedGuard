@@ -1,3 +1,5 @@
+import 'i18n.dart';
+
 /// Como o app se comporta em cada país, conforme a lei local.
 enum RadarMode {
   /// Mostra radares no mapa e avisa a distância exata.
@@ -11,10 +13,12 @@ enum RadarMode {
 }
 
 class CountryRule {
-  final String name;
+  final String _name;
   final RadarMode mode;
-  final String? notice;
-  const CountryRule(this.name, this.mode, [this.notice]);
+  final String? _notice;
+  String get name => tr(_name);
+  String? get notice => _notice == null ? null : tr(_notice);
+  const CountryRule(this._name, this.mode, [this._notice]);
 }
 
 /// Regras especiais. Países fora desta lista usam o modo completo.

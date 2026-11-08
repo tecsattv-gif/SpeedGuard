@@ -1,6 +1,7 @@
 import 'package:geolocator/geolocator.dart';
 
 import 'models.dart';
+import 'i18n.dart';
 
 /// Controle de velocidade média (1.29.1).
 ///
@@ -51,8 +52,8 @@ class SectionWatch {
         final avg = average;
         reset();
         return avg == null
-            ? 'Fim do controle de velocidade média.'
-            : 'Fim do controle de velocidade média. Média $avg.';
+            ? tr('Fim do controle de velocidade média.')
+            : tr('Fim do controle de velocidade média. Média {0}.', [avg]);
       }
       if (r.section != 'end' && (_start == null || _start!.id != r.id) &&
           pos.speed > 3) {
@@ -61,8 +62,8 @@ class SectionWatch {
         _dist = 0;
         final l = r.maxSpeed;
         return l == null
-            ? 'Controle de velocidade média iniciado.'
-            : 'Controle de velocidade média iniciado. Limite $l.';
+            ? tr('Controle de velocidade média iniciado.')
+            : tr('Controle de velocidade média iniciado. Limite {0}.', [l]);
       }
     }
 
@@ -78,7 +79,7 @@ class SectionWatch {
         final w = _lastWarn;
         if (w == null || DateTime.now().difference(w).inSeconds >= 60) {
           _lastWarn = DateTime.now();
-          return 'Média $avg. Acima do limite. Reduza.';
+          return tr('Média {0}. Acima do limite. Reduza.', [avg]);
         }
       }
     }

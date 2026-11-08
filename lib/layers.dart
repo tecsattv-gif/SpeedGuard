@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'i18n.dart';
 import 'models.dart';
 
 /// Camadas do painel "Opções do mapa": cada uma liga/desliga o que aparece
@@ -22,11 +23,13 @@ enum Layer {
       Color(0xFFFF7A2F), Icons.warning_amber_rounded),
   policia('Polícia', 'Polícia na via', Color(0xFF3D7BFF), Icons.local_police);
 
-  final String label;
-  final String subtitle;
+  final String _label;
+  final String _subtitle;
+  String get label => tr(_label);
+  String get subtitle => tr(_subtitle);
   final Color color;
   final IconData icon;
-  const Layer(this.label, this.subtitle, this.color, this.icon);
+  const Layer(this._label, this._subtitle, this.color, this.icon);
 
   /// Avisos reportados pelos motoristas que somem sozinhos depois de 6 h.
   static const events = [fila, acidente, obra, perigo, policia];

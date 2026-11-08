@@ -1,3 +1,4 @@
+import 'i18n.dart';
 /// Uma via perto de um radar/park, gravada na base própria (1.29.0,
 /// tools/road_match.py): tipo, número, nome, mão única e rumo do trecho.
 class RoadRef {
@@ -93,29 +94,29 @@ class Radar {
   String get typeLabel {
     switch (type) {
       case 'semaforo':
-        return 'Radar de semáforo';
+        return tr('Radar de semáforo');
       case 'movel':
-        return 'Radar móvel';
+        return tr('Radar móvel');
       case 'media':
         return section == 'end'
-            ? 'Fim da velocidade média'
-            : 'Radar de velocidade média';
+            ? tr('Fim da velocidade média')
+            : tr('Radar de velocidade média');
       case 'usuario':
-        return 'Reportado por você';
+        return tr('Reportado por você');
       case 'comunidade':
-        return 'Radar reportado';
+        return tr('Radar reportado');
       case 'fila':
-        return 'Fila';
+        return tr('Fila');
       case 'acidente':
-        return 'Acidente';
+        return tr('Acidente');
       case 'obra':
-        return 'Obras';
+        return tr('Obras');
       case 'perigo':
-        return 'Perigo';
+        return tr('Perigo');
       case 'policia':
-        return 'Polícia';
+        return tr('Polícia');
       default:
-        return 'Radar fixo';
+        return tr('Radar fixo');
     }
   }
 

@@ -8,6 +8,7 @@ import 'models.dart';
 import 'overpass_gate.dart';
 import 'route_service.dart';
 import 'tile_store.dart';
+import 'i18n.dart';
 
 /// Park (área de descanso, área de serviço ou estacionamento de caminhão).
 class Park {
@@ -38,9 +39,9 @@ class Park {
   }
 
   static (String, String) userTypeLabel(String type) => switch (type) {
-        'park_privado' => ('Park privado (pago)', 'yes'),
-        'park_free' => ('Park free (grátis)', 'no'),
-        _ => ('Zona industrial', ''),
+        'park_privado' => (tr('Park privado (pago)'), 'yes'),
+        'park_free' => (tr('Park free (grátis)'), 'no'),
+        _ => (tr('Zona industrial'), ''),
       };
 
   bool get isTruck {
@@ -78,12 +79,12 @@ class Park {
   }
 
   String get kindLabel => switch (kind) {
-        'services' => 'Área de serviço',
-        'rest_area' => 'Área de descanso',
+        'services' => tr('Área de serviço'),
+        'rest_area' => tr('Área de descanso'),
         'user' => tags['ptype'] == 'park_zona'
-            ? 'Zona industrial · PARK ADICIONADO por motorista'
-            : 'PARK ADICIONADO por motorista',
-        _ => 'Estacionamento de caminhão',
+            ? tr('Zona industrial · PARK ADICIONADO por motorista')
+            : tr('PARK ADICIONADO por motorista'),
+        _ => tr('Estacionamento de caminhão'),
       };
 
   bool _yes(String k) {
@@ -94,12 +95,12 @@ class Park {
   /// O que o park oferece (só o que está marcado no mapa).
   List<String> get features => [
         if (_yes('toilets') || tags['toilets:wheelchair'] != null) 'WC',
-        if (_yes('shower')) 'Chuveiro',
-        if (kind == 'services' || _yes('fuel')) 'Combustível',
-        if (_yes('restaurant') || _yes('food')) 'Restaurante',
-        if (tags['capacity:hgv'] != null) '${tags['capacity:hgv']} vagas',
-        if (tags['fee'] == 'yes') 'Pago',
-        if (tags['fee'] == 'no') 'Grátis',
+        if (_yes('shower')) tr('Chuveiro'),
+        if (kind == 'services' || _yes('fuel')) tr('Combustível'),
+        if (_yes('restaurant') || _yes('food')) tr('Restaurante'),
+        if (tags['capacity:hgv'] != null) tr('{0} vagas', [tags['capacity:hgv']]),
+        if (tags['fee'] == 'yes') tr('Pago'),
+        if (tags['fee'] == 'no') tr('Grátis'),
       ];
 }
 
@@ -530,8 +531,8 @@ class ParkService {
     final p = list.first;
     if (p.distance > 2100 || _announced.contains(p.park.id)) return null;
     _announced.add(p.park.id);
-    final side = p.side != null ? ', à ${p.side}' : '';
-    final what = p.park.kind == 'parking' ? 'Estacionamento de caminhão' : 'Park';
-    return '$what a 2 quilômetros$side.';
+    final side = p.side != null ? tr(', à {0}', [tr(p.side!)]) : '';
+    final what = p.park.kind == 'parking' ? tr('Estacionamento de caminhão') : tr('Park');
+    return tr('{0} a 2 quilômetros{1}.', [what, side]);
   }
 }

@@ -4,6 +4,7 @@ import 'alert_engine.dart';
 import 'country_rules.dart';
 import 'layers.dart';
 import 'theme.dart';
+import 'i18n.dart';
 
 /// Tela de alerta (sem mapa), no estilo do CamSam: setas verdes grandes com
 /// o caminho livre; com radar à frente mostra a placa, a distância e o tipo.
@@ -61,10 +62,10 @@ class AlertView extends StatelessWidget {
     if (mode == RadarMode.dangerZone) {
       return Column(mainAxisSize: MainAxisSize.min, children: [
         Icon(Icons.warning_amber_rounded, color: color, size: 160),
-        const Text('ZONA DE PERIGO',
+        Text(tr('ZONA DE PERIGO'),
             style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold)),
         const SizedBox(height: 8),
-        const Text('Respeite o limite de velocidade',
+        Text(tr('Respeite o limite de velocidade'),
             style: TextStyle(fontSize: 18)),
       ]);
     }
@@ -121,7 +122,7 @@ class AlertView extends StatelessWidget {
               borderRadius: BorderRadius.circular(12),
               boxShadow: SG.glow(SG.red, 16),
             ),
-            child: const Text('REDUZA A VELOCIDADE',
+            child: Text(tr('REDUZA A VELOCIDADE'),
                 style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
           ),
         ],

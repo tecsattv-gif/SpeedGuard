@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'i18n.dart';
 import 'theme.dart';
 
 /// Ícone da sua posição no mapa, escolhido em Configurações.
@@ -9,9 +10,10 @@ enum VehicleIcon {
   truck('Caminhão', Icons.local_shipping),
   moto('Moto', Icons.two_wheeler);
 
-  final String label;
+  final String _label;
   final IconData icon;
-  const VehicleIcon(this.label, this.icon);
+  String get label => tr(_label);
+  const VehicleIcon(this._label, this.icon);
 
   static VehicleIcon fromName(String? n) =>
       values.firstWhere((v) => v.name == n, orElse: () => arrow);
