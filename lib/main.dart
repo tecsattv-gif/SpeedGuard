@@ -2491,86 +2491,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         : tr('Navegação iniciada pela rota {0}. {1} quilômetros.', [name, (_route.total / 1000).round()]));
   }
 
-  /// 1.39.0: navegação no próprio SpeedGuard, de [origin] (vazio = minha
-  /// localização) até [dest]: rota do OSRM na linha azul, avisos por voz e
-  /// parks da rota. Com origem longe de você (mais de 2 km), só mostra a
-  /// rota no mapa; a voz começa quando você estiver no início dela.
-  Future<void> _navigateInApp(String origin, String dest) async {
-    final pos = _pos ?? await _currentPos();
-    if (origin.isEmpty && pos == null) {
-      _snack(tr('Sem GPS: digite também o local de origem.'));
-      return;
-    }
-    _snack(tr('Calculando a rota…'));
-    _nav = null;
-    _route.clear();
-    _parks.clearRoute();
-    _parks.onRouteUpdate = () {
-      if (mounted) setState(() {});
-    };
-    final err = await _route.plan(
-        pos?.latitude ?? 0, pos?.longitude ?? 0, dest,
-        origin: origin);
-    if (!mounted) return;
-    if (err != null) {
-      _snack(err);
-      return;
-    }
-    final pts = List<(double, double)>.of(_route.pts);
-    final from = _route.originName.isNotEmpty
-        ? _route.originName
-        : tr('Minha localização');
-    final name = '$from → ${_route.destName}';
-    final ll = [for (final p in pts) LatLng(p.$1, p.$2)];
-    final atStart = pos != null &&
-        Geolocator.distanceBetween(
-                pos.latitude, pos.longitude, pts.first.$1, pts.first.$2) <
-            2000;
-    _route.setTrack(name, pts);
-    final km = (_route.total / 1000).round();
-    final mins = (_route.durationS / 60).round();
-    final time = mins >= 60
-        ? '${mins ~/ 60} h ${_two(mins % 60)}'
-        : '$mins min';
-    setState(() {
-      _shownTrack = ll;
-      _shownTrackName = name;
-      _mapView = true;
-      _follow = atStart;
-    });
-    if (atStart) {
-      _nav = TrackNav(_route.pts, _route.cum);
-      _navOff = 0;
-      _navOffRoute = false;
-      _navProg = 0;
-      _camTo(pos!, 16);
-      if (!_running) await _start();
-      _navSay(tr('Navegação iniciada até {0}. {1} quilômetros.',
-          [_route.destName, km]));
-    } else {
-      try {
-        _map.fitCamera(CameraFit.bounds(
-            bounds: LatLngBounds.fromPoints(ll),
-            padding: const EdgeInsets.all(48)));
-      } catch (_) {}
-      _snack(tr('Rota {0}: {1} km, cerca de {2}. Os avisos por voz começam quando você estiver no início da rota.',
-          [name, km, time]));
-    }
-    var n = await _parks.loadRoute(_route, country: _country);
-    for (var i = 0; i < 20 && n != null && mounted; i++) {
-      final prog = pos == null
-          ? 0.0
-          : _route.progress(pos.latitude, pos.longitude) ?? 0.0;
-      if (!_parks.needMore(_route, prog)) break;
-      final more = await _parks.loadRoute(_route,
-          country: _country, from: _parks.loadedUntil);
-      if (more == null) break;
-      n = more;
-      if (mounted) setState(() {});
-    }
-    if (mounted) setState(() {});
-  }
-
   void _stopTrackNav({bool arrived = false}) {
     _nav = null;
     _navOffRoute = false;
@@ -3979,18 +3899,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               onSubmitted: (_) => Navigator.pop(ctx, 'google'),
             ),
             const SizedBox(height: 14),
-            // 1.39.0: navegação dentro do próprio SpeedGuard (linha azul no
-            // mapa e avisos por voz), de origem até o destino.
-            FilledButton.icon(
-              style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0xFF2E7D32),
-                  foregroundColor: Colors.white,
-                  minimumSize: const Size.fromHeight(52)),
-              onPressed: () => Navigator.pop(ctx, 'speedguard'),
-              icon: const Icon(Icons.alt_route),
-              label: Text(tr('Navegar no SpeedGuard')),
-            ),
-            const SizedBox(height: 10),
             Row(children: [
               Expanded(
                 child: FilledButton.icon(
@@ -4032,14 +3940,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     ctrl.dispose();
     fromCtrl.dispose();
     if (app == null) return;
-    if (app == 'speedguard') {
-      if (dest.isEmpty) {
-        _snack(tr('Digite o destino.'));
-        return;
-      }
-      await _navigateInApp(from, dest);
-      return;
-    }
     // Liga o monitoramento antes de sair, para avisar os radares no caminho.
     if (!_running) await _start();
     // Calcula a mesma rota aqui, para listar os parks do caminho.
