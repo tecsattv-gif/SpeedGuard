@@ -1,7 +1,7 @@
 name: speedguard
 description: SpeedGuard - alerta de radares para o mundo todo.
 publish_to: 'none'
-version: 1.36.0+124
+version: 1.36.1+125
 
 environment:
   sdk: '>=3.4.0 <4.0.0'
@@ -39,7 +39,7 @@ flutter:
   assets:
     - assets/splash.png
     - assets/icon.png
-    - assets/portacarros.png
+    - assets/caminhao_azul.png
     - assets/carro.png
     - assets/moto.png
     - assets/sounds/

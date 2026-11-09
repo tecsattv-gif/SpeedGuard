@@ -5073,7 +5073,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                               // 1.29.37: foto do veículo escolhido (seta: só
                               // a placa).
                               plateImage: switch (_vehicle) {
-                                VehicleIcon.truck => 'assets/portacarros.png',
+                                VehicleIcon.truck => 'assets/caminhao_azul.png',
                                 VehicleIcon.car => 'assets/carro.png',
                                 VehicleIcon.moto => 'assets/moto.png',
                                 _ => null,
