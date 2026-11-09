@@ -22,6 +22,8 @@ class RouteService {
   double get total => cum.isEmpty ? 0 : cum.last;
 
   void clear() {
+    originName = '';
+    durationS = 0;
     pts = [];
     cum = [];
     destName = '';
@@ -31,8 +33,36 @@ class RouteService {
 
   /// Procura o destino e calcula a rota. Devolve null se deu certo, ou a
   /// mensagem de erro.
-  Future<String?> plan(double lat, double lon, String dest) async {
+  /// 1.39.0: [origin] opcional (endereço de partida); vazio = posição atual.
+  String originName = '';
+  double durationS = 0; // tempo estimado pelo OSRM (s)
+
+  Future<(double, double, String)?> _geocode(String q) async {
+    final g = await http.get(
+        Uri.parse('https://nominatim.openstreetmap.org/search'
+            '?format=json&limit=1&q=${Uri.encodeComponent(q)}'),
+        headers: {'User-Agent': _ua}).timeout(const Duration(seconds: 15));
+    if (g.statusCode != 200) return null;
+    final found = jsonDecode(utf8.decode(g.bodyBytes)) as List;
+    if (found.isEmpty) return null;
+    return (
+      double.parse(found.first['lat'].toString()),
+      double.parse(found.first['lon'].toString()),
+      found.first['display_name']?.toString().split(',').first ?? q,
+    );
+  }
+
+  Future<String?> plan(double lat, double lon, String dest,
+      {String origin = ''}) async {
     try {
+      originName = '';
+      if (origin.trim().isNotEmpty) {
+        final o = await _geocode(origin.trim());
+        if (o == null) return tr('Não achei "{0}" no mapa.', [origin.trim()]);
+        lat = o.$1;
+        lon = o.$2;
+        originName = o.$3;
+      }
       final g = await http.get(
           Uri.parse('https://nominatim.openstreetmap.org/search'
               '?format=json&limit=1&q=${Uri.encodeComponent(dest)}'),
@@ -50,6 +80,7 @@ class RouteService {
       final data = jsonDecode(utf8.decode(r.bodyBytes)) as Map;
       final routes = data['routes'] as List?;
       if (routes == null || routes.isEmpty) return tr('Sem rota até o destino.');
+      durationS = (routes.first['duration'] as num?)?.toDouble() ?? 0;
       final coords = routes.first['geometry']['coordinates'] as List;
       final p = <(double, double)>[
         for (final c in coords)

@@ -168,6 +168,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   double _mapRot = 0;
   /// Tela cheia: true = mapa, false = tela de alerta (setas grandes).
   bool _mapView = true;
+  // 1.39.0: mapa em modo satélite (botão no lado direito do mapa).
+  bool _satellite = false;
   /// Ícone da sua posição no mapa (seta, carro, caminhão ou moto).
   VehicleIcon _vehicle = VehicleIcon.arrow;
   /// Camadas ligadas no painel "Opções do mapa".
@@ -401,6 +403,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     _bubbleScale = p.getDouble('bubbleScale') ?? 1.0;
     _bubbleLand = p.getBool('bubbleLand') ?? false;
     _mapView = p.getBool('mapView') ?? true;
+    _satellite = p.getBool('mapSatellite') ?? false;
     _headingUp = p.getBool('map_heading_up') ?? true;
     _vehicle = VehicleIcon.fromName(p.getString('vehicle'));
     final saved = p.getStringList('layers');
@@ -488,6 +491,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       if (!_bubble && (_running || _testSecs != null)) {
         _showRing();
       }
+    } else if (state == AppLifecycleState.detached) {
+      // 1.39.0: app fechado (tirado dos recentes): fecha a janela flutuante
+      // na hora, para ela não ficar por cima da tela dos outros apps.
+      _closeBubble();
+      FlutterOverlayWindow.closeOverlay().catchError((_) => null);
     } else if (state == AppLifecycleState.resumed) {
       _inFront = true;
       _closeBubble();
@@ -499,6 +507,16 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         FlutterOverlayWindow.requestPermission();
       }
     }
+  }
+
+  /// 1.39.0: alterna entre o mapa padrão e o satélite (fica salvo).
+  Future<void> _toggleSatellite() async {
+    HapticFeedback.selectionClick();
+    setState(() => _satellite = !_satellite);
+    try {
+      final p = await SharedPreferences.getInstance();
+      await p.setBool('mapSatellite', _satellite);
+    } catch (_) {}
   }
 
   Future<void> _showBubble() async {
@@ -988,7 +1006,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   }
 
   /// Calcula a rota até o destino digitado e busca os parks nela.
-  Future<void> _planRoute(String dest) async {
+  Future<void> _planRoute(String dest, {String origin = ''}) async {
     _nav = null; // rota nova do Navegar encerra a navegação gravada
     _parks.onRouteUpdate = () {
       if (mounted) setState(() {});
@@ -997,7 +1015,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     if (pos == null) return;
     _route.clear();
     _parks.clearRoute();
-    final err = await _route.plan(pos.latitude, pos.longitude, dest);
+    final err = await _route.plan(pos.latitude, pos.longitude, dest,
+        origin: origin);
     if (err != null) {
       _snack(tr('{0} Os parks seguem pelo seu sentido.', [err]));
       return;
@@ -2472,6 +2491,86 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         : tr('Navegação iniciada pela rota {0}. {1} quilômetros.', [name, (_route.total / 1000).round()]));
   }
 
+  /// 1.39.0: navegação no próprio SpeedGuard, de [origin] (vazio = minha
+  /// localização) até [dest]: rota do OSRM na linha azul, avisos por voz e
+  /// parks da rota. Com origem longe de você (mais de 2 km), só mostra a
+  /// rota no mapa; a voz começa quando você estiver no início dela.
+  Future<void> _navigateInApp(String origin, String dest) async {
+    final pos = _pos ?? await _currentPos();
+    if (origin.isEmpty && pos == null) {
+      _snack(tr('Sem GPS: digite também o local de origem.'));
+      return;
+    }
+    _snack(tr('Calculando a rota…'));
+    _nav = null;
+    _route.clear();
+    _parks.clearRoute();
+    _parks.onRouteUpdate = () {
+      if (mounted) setState(() {});
+    };
+    final err = await _route.plan(
+        pos?.latitude ?? 0, pos?.longitude ?? 0, dest,
+        origin: origin);
+    if (!mounted) return;
+    if (err != null) {
+      _snack(err);
+      return;
+    }
+    final pts = List<(double, double)>.of(_route.pts);
+    final from = _route.originName.isNotEmpty
+        ? _route.originName
+        : tr('Minha localização');
+    final name = '$from → ${_route.destName}';
+    final ll = [for (final p in pts) LatLng(p.$1, p.$2)];
+    final atStart = pos != null &&
+        Geolocator.distanceBetween(
+                pos.latitude, pos.longitude, pts.first.$1, pts.first.$2) <
+            2000;
+    _route.setTrack(name, pts);
+    final km = (_route.total / 1000).round();
+    final mins = (_route.durationS / 60).round();
+    final time = mins >= 60
+        ? '${mins ~/ 60} h ${_two(mins % 60)}'
+        : '$mins min';
+    setState(() {
+      _shownTrack = ll;
+      _shownTrackName = name;
+      _mapView = true;
+      _follow = atStart;
+    });
+    if (atStart) {
+      _nav = TrackNav(_route.pts, _route.cum);
+      _navOff = 0;
+      _navOffRoute = false;
+      _navProg = 0;
+      _camTo(pos!, 16);
+      if (!_running) await _start();
+      _navSay(tr('Navegação iniciada até {0}. {1} quilômetros.',
+          [_route.destName, km]));
+    } else {
+      try {
+        _map.fitCamera(CameraFit.bounds(
+            bounds: LatLngBounds.fromPoints(ll),
+            padding: const EdgeInsets.all(48)));
+      } catch (_) {}
+      _snack(tr('Rota {0}: {1} km, cerca de {2}. Os avisos por voz começam quando você estiver no início da rota.',
+          [name, km, time]));
+    }
+    var n = await _parks.loadRoute(_route, country: _country);
+    for (var i = 0; i < 20 && n != null && mounted; i++) {
+      final prog = pos == null
+          ? 0.0
+          : _route.progress(pos.latitude, pos.longitude) ?? 0.0;
+      if (!_parks.needMore(_route, prog)) break;
+      final more = await _parks.loadRoute(_route,
+          country: _country, from: _parks.loadedUntil);
+      if (more == null) break;
+      n = more;
+      if (mounted) setState(() {});
+    }
+    if (mounted) setState(() {});
+  }
+
   void _stopTrackNav({bool arrived = false}) {
     _nav = null;
     _navOffRoute = false;
@@ -3843,6 +3942,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   /// monitorando e o painel flutuante avisa os radares por cima.
   Future<void> _navigate() async {
     final ctrl = TextEditingController();
+    // 1.39.0: local de origem (vazio = minha localização).
+    final fromCtrl = TextEditingController();
     final app = await showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
@@ -3857,6 +3958,16 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
             TextField(
+              controller: fromCtrl,
+              textInputAction: TextInputAction.next,
+              decoration: InputDecoration(
+                hintText: tr('De onde? (vazio = minha localização)'),
+                prefixIcon: Icon(Icons.trip_origin),
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 8),
+            TextField(
               controller: ctrl,
               autofocus: true,
               textInputAction: TextInputAction.go,
@@ -3868,6 +3979,18 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               onSubmitted: (_) => Navigator.pop(ctx, 'google'),
             ),
             const SizedBox(height: 14),
+            // 1.39.0: navegação dentro do próprio SpeedGuard (linha azul no
+            // mapa e avisos por voz), de origem até o destino.
+            FilledButton.icon(
+              style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFF2E7D32),
+                  foregroundColor: Colors.white,
+                  minimumSize: const Size.fromHeight(52)),
+              onPressed: () => Navigator.pop(ctx, 'speedguard'),
+              icon: const Icon(Icons.alt_route),
+              label: Text(tr('Navegar no SpeedGuard')),
+            ),
+            const SizedBox(height: 10),
             Row(children: [
               Expanded(
                 child: FilledButton.icon(
@@ -3905,12 +4028,22 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       ),
     );
     final dest = ctrl.text.trim();
+    final from = fromCtrl.text.trim();
     ctrl.dispose();
+    fromCtrl.dispose();
     if (app == null) return;
+    if (app == 'speedguard') {
+      if (dest.isEmpty) {
+        _snack(tr('Digite o destino.'));
+        return;
+      }
+      await _navigateInApp(from, dest);
+      return;
+    }
     // Liga o monitoramento antes de sair, para avisar os radares no caminho.
     if (!_running) await _start();
     // Calcula a mesma rota aqui, para listar os parks do caminho.
-    if (dest.isNotEmpty) _planRoute(dest);
+    if (dest.isNotEmpty) _planRoute(dest, origin: from);
     final q = Uri.encodeComponent(dest);
     final AndroidIntent intent;
     if (app == 'waze') {
@@ -3920,6 +4053,16 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             ? 'https://waze.com/ul'
             : 'https://waze.com/ul?q=$q&navigate=yes',
         package: 'com.waze',
+        flags: const [Flag.FLAG_ACTIVITY_NEW_TASK],
+      );
+    } else if (from.isNotEmpty && dest.isNotEmpty) {
+      // Com origem: abre a rota "de → para" no Google Maps.
+      intent = AndroidIntent(
+        action: 'action_view',
+        data: 'https://www.google.com/maps/dir/?api=1'
+            '&origin=${Uri.encodeComponent(from)}&destination=$q'
+            '&travelmode=driving',
+        package: 'com.google.android.apps.maps',
         flags: const [Flag.FLAG_ACTIVITY_NEW_TASK],
       );
     } else {
@@ -4996,12 +5139,39 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               },
             ),
             children: [
-              TileLayer(
-                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                userAgentPackageName: 'com.tecsattv.speedguard',
-                // Modo escuro: mapa escurecido para não ofuscar à noite.
-                tileBuilder: SG.dark ? darkModeTileBuilder : null,
-              ),
+              if (!_satellite)
+                TileLayer(
+                  key: const ValueKey('osm'),
+                  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                  userAgentPackageName: 'com.tecsattv.speedguard',
+                  // Modo escuro: mapa escurecido para não ofuscar à noite.
+                  tileBuilder: SG.dark ? darkModeTileBuilder : null,
+                )
+              else ...[
+                // 1.39.0: modo satélite (Esri World Imagery) com as estradas
+                // e os nomes por cima, para continuar vendo a rodovia.
+                TileLayer(
+                  key: const ValueKey('sat'),
+                  urlTemplate: 'https://server.arcgisonline.com/ArcGIS/rest/'
+                      'services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+                  userAgentPackageName: 'com.tecsattv.speedguard',
+                  maxNativeZoom: 19,
+                ),
+                TileLayer(
+                  key: const ValueKey('sat_roads'),
+                  urlTemplate: 'https://server.arcgisonline.com/ArcGIS/rest/'
+                      'services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}',
+                  userAgentPackageName: 'com.tecsattv.speedguard',
+                  maxNativeZoom: 19,
+                ),
+                TileLayer(
+                  key: const ValueKey('sat_names'),
+                  urlTemplate: 'https://server.arcgisonline.com/ArcGIS/rest/'
+                      'services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
+                  userAgentPackageName: 'com.tecsattv.speedguard',
+                  maxNativeZoom: 19,
+                ),
+              ],
               // Rota gravada aberta e a gravação em andamento (1.29.35).
               if (_shownTrack != null || (_rec.recording && _rec.points > 1))
                 PolylineLayer(polylines: [
@@ -5142,8 +5312,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                               label: true)),
                     ),
                 ]),
-              const SimpleAttributionWidget(
-                source: Text('OpenStreetMap'),
+              SimpleAttributionWidget(
+                source: Text(_satellite
+                    ? 'Esri, Maxar, Earthstar Geographics'
+                    : 'OpenStreetMap'),
               ),
             ],
           ),
@@ -5445,6 +5617,22 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   ? 166
                   : 72,
               child: _locateCard(_live.members[_trackId]!),
+            ),
+
+          // 1.39.0: botão Satélite / Mapa padrão, no meio do lado direito.
+          if (_mapView)
+            Positioned(
+              right: 12,
+              top: MediaQuery.sizeOf(context).height * 0.42,
+              child: FloatingActionButton.small(
+                heroTag: 'satelite',
+                tooltip: tr(_satellite ? 'Mapa padrão' : 'Satélite'),
+                backgroundColor:
+                    _satellite ? SG.card : const Color(0xFF1B5E20),
+                foregroundColor: _satellite ? SG.text : Colors.white,
+                onPressed: _toggleSatellite,
+                child: Icon(_satellite ? Icons.map : Icons.satellite_alt),
+              ),
             ),
 
           // Botões "Opções" (camadas do mapa) e "Navegar" (Google/Waze).

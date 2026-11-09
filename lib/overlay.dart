@@ -124,6 +124,8 @@ class _OverlayBubbleState extends State<OverlayBubble> {
         if (_stale) {
           _stale = false;
           _olog('janela: app voltou a mandar dados');
+          FlutterOverlayWindow.setOverlayVisible(visible: true)
+              .catchError((_) => null);
           // Bolha: volta a aceitar toque (arrastar, botões).
           if (m['ringOnly'] != true && _clickThrough) {
             _clickThrough = false;
@@ -220,26 +222,33 @@ class _OverlayBubbleState extends State<OverlayBubble> {
     } catch (_) {}
   }
 
-  /// Sem notícia do app há 6 s: deixa os toques passarem e esconde tudo.
-  /// Há 60 s: o app foi fechado — a janela se fecha sozinha.
+  /// Sem notícia do app há 4 s: deixa os toques passarem e esconde a janela.
+  /// Há 15 s: o app foi fechado — a janela se fecha sozinha.
+  /// 1.39.0: antes eram 6 s / 60 s e só o toque era liberado; com o app
+  /// fechado a tela dos outros apps chegava a ficar sem responder. Agora a
+  /// janela também é escondida (tamanho zero, sem toque) e o fechamento é
+  /// repetido a cada 2 s até dar certo.
+  bool _closing = false;
   void _checkAlive() {
     final idle = DateTime.now().difference(_lastAny);
-    if (idle > const Duration(seconds: 60)) {
-      _olog('janela: app sem resposta há 60 s, fechando');
-      _watchdog?.cancel();
+    if (idle > const Duration(seconds: 15)) {
+      if (!_closing) _olog('janela: app sem resposta há 15 s, fechando');
+      _closing = true;
+      FlutterOverlayWindow.setOverlayVisible(visible: false)
+          .catchError((_) => null);
       FlutterOverlayWindow.closeOverlay().catchError((_) => null);
-      return;
+      return; // o watchdog continua: tenta fechar de novo em 2 s
     }
     // Janela que nunca recebeu dado nenhum: libera os toques já em 2 s.
-    final limit = Duration(seconds: _gotConfig ? 6 : 2);
+    final limit = Duration(seconds: _gotConfig ? 4 : 2);
     if (idle > limit && !_stale) {
       _stale = true;
-      _olog('janela: app sem resposta, toques passam');
-      if (!_clickThrough) {
-        _clickThrough = true;
-        FlutterOverlayWindow.updateFlag(OverlayFlag.clickThrough)
-            .catchError((_) => null);
-      }
+      _olog('janela: app sem resposta, toques passam e janela escondida');
+      _clickThrough = true;
+      FlutterOverlayWindow.updateFlag(OverlayFlag.clickThrough)
+          .catchError((_) => null);
+      FlutterOverlayWindow.setOverlayVisible(visible: false)
+          .catchError((_) => null);
       if (mounted) setState(() {});
     }
   }
