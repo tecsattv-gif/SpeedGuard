@@ -910,6 +910,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   // ---------- Aviso de pedágio (1.29.48) ----------
   final _tolls = TollService();
   String? _tollBanner;
+  bool _tollGantry = false; // aviso é de pórtico eletrônico (1.36.0)
   Timer? _tollTimer;
 
   void _checkToll(Position pos) {
@@ -917,18 +918,37 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     _tolls.update(pos.latitude, pos.longitude);
     // 1.35.0: só o pedágio da via onde você está (não o da saída ao lado).
     final mine = _roads.myRoad();
-    final d = _tolls.check(
+    final hit = _tolls.check(
         pos.latitude, pos.longitude, pos.heading, pos.speed * 3.6,
         sameRoad: _sameRoad, myType: mine?.$1, myIds: mine?.$2 ?? const {});
-    if (d == null) return;
-    final m = (d / 100).round() * 100;
-    final km = m >= 900;
-    if (_voice) {
-      _tts.speak(km ? tr('Pedágio em 1 quilômetro.') : tr('Pedágio em {0} metros.', [m]));
+    if (hit == null) return;
+    String say, banner;
+    if (hit.passing) {
+      // 1.36.0: passando por baixo do pórtico de pedágio eletrônico.
+      say = tr('Passando pelo pedágio eletrônico.');
+      banner = tr('Pedágio eletrônico agora');
+    } else {
+      final m = (hit.d / 100).round() * 100;
+      final km = m >= 900;
+      if (hit.gantry) {
+        say = km
+            ? tr('Pedágio eletrônico em 1 quilômetro.')
+            : tr('Pedágio eletrônico em {0} metros.', [m]);
+        banner = km
+            ? tr('Pedágio eletrônico a 1 km')
+            : tr('Pedágio eletrônico a {0} m', [m]);
+      } else {
+        say = km ? tr('Pedágio em 1 quilômetro.') : tr('Pedágio em {0} metros.', [m]);
+        banner = km ? tr('Pedágio a 1 km') : tr('Pedágio a {0} m', [m]);
+      }
     }
+    if (_voice) _tts.speak(say);
     _tollTimer?.cancel();
-    setState(() => _tollBanner = km ? tr('Pedágio a 1 km') : tr('Pedágio a {0} m', [m]));
-    _tollTimer = Timer(const Duration(seconds: 15), () {
+    setState(() {
+      _tollBanner = banner;
+      _tollGantry = hit.gantry;
+    });
+    _tollTimer = Timer(Duration(seconds: hit.passing ? 8 : 15), () {
       if (mounted) setState(() => _tollBanner = null);
     });
   }
@@ -5279,7 +5299,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   child: Row(children: [
-                    const Icon(Icons.toll, color: Colors.black, size: 38),
+                    Icon(_tollGantry ? Icons.contactless : Icons.toll,
+                        color: Colors.black, size: 38),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(_tollBanner!,

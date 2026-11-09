@@ -59,7 +59,7 @@ const _groups = <_Group>[
     _Faq('O app avisa radar de semáforo?',
         'Sim, os semáforos com câmera que estão no mapa. Confira em Opções (canto de baixo à esquerda) se a camada "Radares de semáforo" está ligada. Se faltar algum, reporte com o botão de reportar.'),
     _Faq('O app avisa pedágio?',
-        'Sim. A 1000 m de um pedágio à frente ele fala "Pedágio em 1 quilômetro" e mostra um aviso amarelo por 15 segundos, uma vez por praça. Liga e desliga em Configurações → Aviso de pedágio. Pedágio eletrônico sem cabine pode não ser avisado.'),
+        'Sim. A 1000 m de um pedágio à frente ele fala "Pedágio em 1 quilômetro" e mostra um aviso amarelo por 15 segundos, uma vez por praça. Liga e desliga em Configurações → Aviso de pedágio. Pedágio eletrônico sem cabine (pórtico por cima da estrada, como em Portugal) também é avisado: a 1000 m ele fala "Pedágio eletrônico em 1 quilômetro" e, na hora em que você passa por baixo, "Passando pelo pedágio eletrônico".'),
     _Faq('Por que não tenho avisos na Suíça?',
         'Na Suíça avisar radares é proibido por lei, então o app desliga os alertas lá. Na Alemanha funciona, com o aviso de que só passageiros podem usar.'),
   ]),

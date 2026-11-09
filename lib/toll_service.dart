@@ -19,7 +19,17 @@ class TollRoad {
 class Toll {
   final double lat, lon;
   final List<TollRoad> roads; // vazio = não se sabe a via
-  const Toll(this.lat, this.lon, this.roads);
+  /// Pórtico de pedágio eletrônico, sem cabine (highway=toll_gantry), 1.36.0.
+  final bool gantry;
+  const Toll(this.lat, this.lon, this.roads, {this.gantry = false});
+}
+
+/// Aviso a dar agora: [d] = distância; [passing] = passando por baixo do
+/// pórtico (só pedágio eletrônico).
+class TollHit {
+  final double d;
+  final bool gantry, passing;
+  const TollHit(this.d, this.gantry, this.passing);
 }
 
 /// Aviso de pedágio (1.29.48): busca as cabines de pedágio
@@ -30,13 +40,17 @@ class Toll {
 /// Só avisa o pedágio da via e do sentido em que você está: o pedágio
 /// dentro da saída (alça _link) não é avisado enquanto você segue na
 /// rodovia — só se você entrar na saída.
+///
+/// 1.36.0: também os pórticos de pedágio eletrônico sem cabine
+/// (highway=toll_gantry, ex.: antigas SCUT de Portugal, Via Verde). Avisa a
+/// 1000 m e de novo na hora em que você passa por baixo.
 class TollService {
   static const _urls = [
     'https://overpass-api.de/api/interpreter',
     'https://overpass.private.coffee/api/interpreter',
     'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
   ];
-  static const _ua = 'SpeedGuard/1.35 (Android; tecsattv-gif/SpeedGuard)';
+  static const _ua = 'SpeedGuard/1.36 (Android; tecsattv-gif/SpeedGuard)';
   static const warnAt = 1000.0;
 
   bool enabled = true;
@@ -46,6 +60,9 @@ class TollService {
   bool _busy = false;
   // Praças já avisadas (várias cabines juntas contam como uma).
   final List<(double, double)> _done = [];
+  // Pórticos eletrônicos já avisados "passando agora".
+  final List<(double, double)> _passed = [];
+  static const passAt = 120.0;
 
   static Set<String> _ids(Map tags) {
     String norm(String v) => v.toUpperCase().replaceAll(RegExp(r'[\s-]'), '');
@@ -91,10 +108,13 @@ class TollService {
     // Cabines (pontos), as vias em que cada uma está e as cabines
     // desenhadas como linha/área (essas sem via conhecida).
     final q = '[out:json][timeout:20];'
-        'node["barrier"="toll_booth"]($box)->.t;'
-        '.t out skel;'
-        'way(bn.t)["highway"];out body geom;'
-        'way["barrier"="toll_booth"]($box);out center;';
+        'node["barrier"="toll_booth"]($box)->.a;'
+        'node["highway"="toll_gantry"]($box)->.g;'
+        '(.a;.g;)->.t;'
+        '.t out;'
+        'way(bn.t)["highway"]["highway"!="toll_gantry"];out body geom;'
+        'way["barrier"="toll_booth"]($box);out center;'
+        'way["highway"="toll_gantry"]($box);out center;';
     try {
       final list = await OverpassGate.run(() async {
         for (final u in _urls) {
@@ -125,6 +145,7 @@ class TollService {
 
   static List<Toll> _parse(List els) {
     final booths = <int, (double, double)>{};
+    final gantries = <int>{};
     final roadsOf = <int, List<TollRoad>>{};
     final out = <Toll>[];
     for (final e in els) {
@@ -134,7 +155,13 @@ class TollService {
         final la = (e['lat'] as num?)?.toDouble();
         final lo = (e['lon'] as num?)?.toDouble();
         final id = (e['id'] as num?)?.toInt();
-        if (la != null && lo != null && id != null) booths[id] = (la, lo);
+        if (la != null && lo != null && id != null) {
+          booths[id] = (la, lo);
+          final nt = (e['tags'] as Map?) ?? const {};
+          if (nt['highway'] == 'toll_gantry' && nt['barrier'] != 'toll_booth') {
+            gantries.add(id);
+          }
+        }
         continue;
       }
       if (type != 'way') continue;
@@ -144,6 +171,17 @@ class TollService {
         final la = (c['lat'] as num?)?.toDouble();
         final lo = (c['lon'] as num?)?.toDouble();
         if (la != null && lo != null) out.add(Toll(la, lo, const []));
+        continue;
+      }
+      if (tags['highway'] == 'toll_gantry') {
+        final c = e['center'];
+        if (c is Map) {
+          final la = (c['lat'] as num?)?.toDouble();
+          final lo = (c['lon'] as num?)?.toDouble();
+          if (la != null && lo != null) {
+            out.add(Toll(la, lo, const [], gantry: true));
+          }
+        }
         continue;
       }
       final hw = tags['highway']?.toString();
@@ -173,7 +211,8 @@ class TollService {
       }
     }
     for (final en in booths.entries) {
-      out.add(Toll(en.value.$1, en.value.$2, roadsOf[en.key] ?? const []));
+      out.add(Toll(en.value.$1, en.value.$2, roadsOf[en.key] ?? const [],
+          gantry: gantries.contains(en.key)));
     }
     return out;
   }
@@ -207,23 +246,39 @@ class TollService {
     return t.roads.any(ok);
   }
 
-  /// Distância do pedágio à frente que deve ser avisado agora (uma vez).
+  /// Aviso de pedágio à frente que deve ser dado agora (uma vez por praça;
+  /// pórtico eletrônico: uma vez a 1000 m e outra ao passar por baixo).
   /// [sameRoad]: só pedágios da via onde você está ([myType]/[myIds] = via
   /// atual, null quando não se sabe).
-  double? check(double lat, double lon, double heading, double kmh,
+  TollHit? check(double lat, double lon, double heading, double kmh,
       {bool sameRoad = true, String? myType, Set<String> myIds = const {}}) {
     if (!enabled || heading < 0 || kmh < 15 || _tolls.isEmpty) return null;
+    bool near(List<(double, double)> l, Toll t, double r) =>
+        l.any((x) => Geolocator.distanceBetween(x.$1, x.$2, t.lat, t.lon) < r);
+    // 1º: passando agora por baixo de um pórtico eletrônico.
+    for (final t in _tolls) {
+      if (!t.gantry) continue;
+      final d = Geolocator.distanceBetween(lat, lon, t.lat, t.lon);
+      if (d > passAt) continue;
+      final b = Geolocator.bearingBetween(lat, lon, t.lat, t.lon);
+      // Perto, o rumo até o ponto varia mais: aceita até 45°.
+      if (d > 25 && _diff((b + 360) % 360, heading) > 45) continue;
+      if (near(_passed, t, 300)) continue;
+      if (sameRoad && !_onMyRoad(t, heading, kmh, myType, myIds)) continue;
+      _passed.add((t.lat, t.lon));
+      _done.add((t.lat, t.lon)); // não avisa mais "a 1 km" depois de passar
+      if (_passed.length > 200) _passed.removeAt(0);
+      return TollHit(d, true, true);
+    }
+    // 2º: pedágio (cabine ou pórtico) a até 1000 m à frente.
     double? best;
     Toll? at;
     for (final t in _tolls) {
       final d = Geolocator.distanceBetween(lat, lon, t.lat, t.lon);
-      if (d > warnAt || d < 80) continue;
+      if (d > warnAt || d < (t.gantry ? passAt : 80)) continue;
       final b = Geolocator.bearingBetween(lat, lon, t.lat, t.lon);
       if (_diff((b + 360) % 360, heading) > 25) continue;
-      if (_done.any((x) =>
-          Geolocator.distanceBetween(x.$1, x.$2, t.lat, t.lon) < 600)) {
-        continue;
-      }
+      if (near(_done, t, t.gantry ? 300 : 600)) continue;
       if (sameRoad && !_onMyRoad(t, heading, kmh, myType, myIds)) continue;
       if (best == null || d < best) {
         best = d;
@@ -233,6 +288,6 @@ class TollService {
     if (at == null) return null;
     _done.add((at.lat, at.lon));
     if (_done.length > 200) _done.removeAt(0);
-    return best;
+    return TollHit(best!, at.gantry, false);
   }
 }
