@@ -3862,8 +3862,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   /// monitorando e o painel flutuante avisa os radares por cima.
   Future<void> _navigate() async {
     final ctrl = TextEditingController();
-    // 1.39.0: local de origem (vazio = minha localização).
-    final fromCtrl = TextEditingController();
     final app = await showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
@@ -3877,16 +3875,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             Text(tr('Navegar'),
                 style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
-            TextField(
-              controller: fromCtrl,
-              textInputAction: TextInputAction.next,
-              decoration: InputDecoration(
-                hintText: tr('De onde? (vazio = minha localização)'),
-                prefixIcon: Icon(Icons.trip_origin),
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 8),
             TextField(
               controller: ctrl,
               autofocus: true,
@@ -3936,14 +3924,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       ),
     );
     final dest = ctrl.text.trim();
-    final from = fromCtrl.text.trim();
     ctrl.dispose();
-    fromCtrl.dispose();
     if (app == null) return;
     // Liga o monitoramento antes de sair, para avisar os radares no caminho.
     if (!_running) await _start();
     // Calcula a mesma rota aqui, para listar os parks do caminho.
-    if (dest.isNotEmpty) _planRoute(dest, origin: from);
+    if (dest.isNotEmpty) _planRoute(dest);
     final q = Uri.encodeComponent(dest);
     final AndroidIntent intent;
     if (app == 'waze') {
@@ -3953,16 +3939,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             ? 'https://waze.com/ul'
             : 'https://waze.com/ul?q=$q&navigate=yes',
         package: 'com.waze',
-        flags: const [Flag.FLAG_ACTIVITY_NEW_TASK],
-      );
-    } else if (from.isNotEmpty && dest.isNotEmpty) {
-      // Com origem: abre a rota "de → para" no Google Maps.
-      intent = AndroidIntent(
-        action: 'action_view',
-        data: 'https://www.google.com/maps/dir/?api=1'
-            '&origin=${Uri.encodeComponent(from)}&destination=$q'
-            '&travelmode=driving',
-        package: 'com.google.android.apps.maps',
         flags: const [Flag.FLAG_ACTIVITY_NEW_TASK],
       );
     } else {

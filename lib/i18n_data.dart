@@ -3,7 +3,6 @@
 
 const Map<String, Map<String, String>> kTr = {
   'en': {
-    'De onde? (vazio = minha localização)': 'From where? (empty = my location)',
     'Satélite': 'Satellite',
     'Mapa padrão': 'Standard map',
     'O aviso do radar aparece com o app minimizado?': 'Does the camera alert appear with the app minimised?',
@@ -616,7 +615,6 @@ const Map<String, Map<String, String>> kTr = {
     'Mensagens dos colegas do grupo': 'Messages from group members',
   },
   'es': {
-    'De onde? (vazio = minha localização)': '¿Desde dónde? (vacío = mi ubicación)',
     'Satélite': 'Satélite',
     'Mapa padrão': 'Mapa estándar',
     'O aviso do radar aparece com o app minimizado?': '¿El aviso del radar aparece con la app minimizada?',
@@ -1229,7 +1227,6 @@ const Map<String, Map<String, String>> kTr = {
     'Mensagens dos colegas do grupo': 'Mensajes de los compañeros del grupo',
   },
   'fr': {
-    'De onde? (vazio = minha localização)': "D'où ? (vide = ma position)",
     'Satélite': 'Satellite',
     'Mapa padrão': 'Carte standard',
     'O aviso do radar aparece com o app minimizado?': 'L’alerte radar s’affiche-t-elle avec l’appli réduite ?',
