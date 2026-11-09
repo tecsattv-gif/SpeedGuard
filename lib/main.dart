@@ -1386,6 +1386,53 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     'Fila à frente 🚧', 'Me liga quando puder 📞', 'Boa viagem! 🚛',
   ];
 
+  /// Tiques embaixo das minhas mensagens (1.37.0): ✓ enviada,
+  /// ✓✓ verde-claro entregue no celular do colega.
+  Widget _withTicks(_ChatItem it, Widget child) {
+    if (!it.mine || it.docId == null) return child;
+    return Column(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          child,
+          Icon(it.delivered ? Icons.done_all : Icons.done,
+              size: 16,
+              color: it.delivered
+                  ? const Color(0xFFB9F6CA)
+                  : Colors.white70),
+        ]);
+  }
+
+  /// Confere quais mensagens minhas já foram entregues (1.37.0).
+  Future<void> _checkDelivered() async {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    var changed = false;
+    for (final list in _chat.values) {
+      for (final it in list) {
+        if (!it.mine || it.delivered || it.docId == null) continue;
+        // Com mais de 24 h quem recebe apaga sem mostrar: para de conferir.
+        if (now - it.at > 25 * 3600 * 1000) continue;
+        if (await _live.delivered(it.docId!) == true) {
+          it.delivered = true;
+          changed = true;
+        }
+      }
+    }
+    if (changed) {
+      _chatRefresh?.call(() {});
+      if (mounted) setState(() {});
+    }
+  }
+
+  /// Bipe de mensagem nova (1.37.0), antes da voz ler a mensagem.
+  Future<void> _msgBeep() async {
+    try {
+      await _player.stop();
+      await _player.play(AssetSource('sounds/msg.wav'), volume: _volume);
+      await Future.delayed(const Duration(milliseconds: 600));
+    } catch (_) {}
+  }
+
   void _onInbox(LiveMsg msg) {
     final nick = msg.nick.isEmpty ? tr('Um colega') : msg.nick;
     (_chat[msg.from] ??= []).add(_ChatItem(false, msg.text, msg.at,
@@ -1403,11 +1450,16 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     } else if (!open && mounted) {
       _msgPopup(msg.from, msg.nick, shown, msg.isVoice);
     }
+    // 1.37.0: bipe de mensagem nova com o app aberto (minimizado, a
+    // notificação já toca o som dela).
+    final beep = (_voice && !bg) ? _msgBeep() : Future<void>.value();
     if (msg.isVoice) {
       // Com a voz ligada e o app aberto, anuncia e toca sozinha (mãos no
       // volante); senão fica na conversa com o botão ▶.
       if (_voice && !bg) {
-        _tts.speak(tr('Mensagem de voz de {0}', [nick])).then((_) async {
+        beep
+            .then((_) => _tts.speak(tr('Mensagem de voz de {0}', [nick])))
+            .then((_) async {
           await Future.delayed(const Duration(milliseconds: 2500));
           if (_playing == null) _playVoice(msg.audioPath!);
         });
@@ -1418,9 +1470,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       final clean = msg.text
           .replaceAll(RegExp(r'[^\p{L}\p{N} .,!?]', unicode: true), '')
           .trim();
-      _tts.speak(clean.isEmpty
+      beep.then((_) => _tts.speak(clean.isEmpty
           ? tr('Mensagem de {0}', [nick])
-          : '${tr('Mensagem de {0}', [nick])}. $clean');
+          : '${tr('Mensagem de {0}', [nick])}. $clean'));
     }
   }
 
@@ -1583,11 +1635,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         Future<void> send(String t) async {
           if (t.trim().isEmpty || sending) return;
           setS(() => sending = true);
-          final ok = await _live.sendMsg(id, t);
+          final docId = await _live.sendMsg(id, t);
           sending = false;
-          if (ok) {
+          if (docId != null) {
             (_chat[id] ??= []).add(_ChatItem(
-                true, t.trim(), DateTime.now().millisecondsSinceEpoch));
+                true, t.trim(), DateTime.now().millisecondsSinceEpoch,
+                docId: docId));
             textC.clear();
           } else {
             _snack(_live.msgRulesMissing
@@ -1620,13 +1673,13 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             return;
           }
           if (ctx.mounted) setS(() => sending = true);
-          final ok = await _live.sendMsg(id, tr('🎤 Mensagem de voz'),
+          final docId = await _live.sendMsg(id, tr('🎤 Mensagem de voz'),
               audio: bytes, durMs: dur);
           sending = false;
-          if (ok) {
+          if (docId != null) {
             (_chat[id] ??= []).add(_ChatItem(true, tr('🎤 Mensagem de voz'),
                 DateTime.now().millisecondsSinceEpoch,
-                audio: path, durMs: dur));
+                audio: path, durMs: dur, docId: docId));
           } else {
             _snack(_live.msgRulesMissing
                 ? tr('Falta publicar a regra msgs no Firebase (veja o README).')
@@ -1712,7 +1765,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                                   : SG.line,
                               borderRadius: BorderRadius.circular(12),
                             ),
-                            child: it.audio == null
+                            child: _withTicks(it, it.audio == null
                                 ? Text(it.text,
                                     style: TextStyle(
                                         color: it.mine ? Colors.white : null))
@@ -1742,7 +1795,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                                                       ? Colors.white
                                                       : null)),
                                         ]),
-                                  ),
+                                  )),
                           ),
                         ),
                     ],
@@ -1903,6 +1956,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       ]) {
         if (mounted) _onInbox(msg);
       }
+      await _checkDelivered();
       if (await _live.refresh()) {
         // Colega atravessou fronteira (1.29.47): notificação + voz.
         for (final (nick, cc) in await _live.borderEvents()) {
@@ -5875,5 +5929,10 @@ class _ChatItem {
   final int at;
   final String? audio; // arquivo .m4a
   final int durMs;
-  _ChatItem(this.mine, this.text, this.at, {this.audio, this.durMs = 0});
+  /// Minhas mensagens (1.37.0): id no Firebase e se já foi entregue
+  /// (✓ enviada, ✓✓ entregue, como no WhatsApp).
+  final String? docId;
+  bool delivered = false;
+  _ChatItem(this.mine, this.text, this.at,
+      {this.audio, this.durMs = 0, this.docId});
 }

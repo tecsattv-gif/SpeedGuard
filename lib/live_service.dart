@@ -415,12 +415,14 @@ class LiveService {
   /// Manda [text] (com emojis) para o colega [toId] (id do aparelho dele).
   /// Com [audio] (1.33.0) vai também a gravação (AAC/m4a) e a duração; o
   /// texto serve de aviso para quem ainda tem versão sem voz.
-  Future<bool> sendMsg(String toId, String text,
+  /// Devolve o id do documento no Firebase (para os tiques de entregue,
+  /// 1.37.0) ou null se não enviou.
+  Future<String?> sendMsg(String toId, String text,
       {Uint8List? audio, int durMs = 0}) async {
-    if (!communityEnabled || !hasGroup) return false;
+    if (!communityEnabled || !hasGroup) return null;
     final t = text.trim();
-    if (t.isEmpty) return false;
-    if (audio != null && audio.length > voiceMaxBytes) return false;
+    if (t.isEmpty) return null;
+    if (audio != null && audio.length > voiceMaxBytes) return null;
     final id = await _deviceId();
     final fields = {
       'to': {'stringValue': toId},
@@ -441,9 +443,28 @@ class LiveService {
               body: jsonEncode({'fields': fields}))
           .timeout(Duration(seconds: audio == null ? 20 : 45));
       msgRulesMissing = r.statusCode == 403;
-      return r.statusCode == 200;
+      if (r.statusCode != 200) return null;
+      final name = (jsonDecode(utf8.decode(r.bodyBytes)) as Map)['name'];
+      return name.toString().split('/').last;
     } catch (_) {
-      return false;
+      return null;
+    }
+  }
+
+  /// Tiques de entregue (1.37.0): quem recebe apaga a mensagem do Firebase
+  /// assim que ela chega no aparelho dele. Então, se o documento sumiu
+  /// (404), a mensagem foi entregue. true = entregue, false = ainda não,
+  /// null = sem internet (tenta de novo depois).
+  Future<bool?> delivered(String docId) async {
+    try {
+      final r = await http
+          .get(Uri.parse('$_base/msgs/$docId?key=$firebaseApiKey'))
+          .timeout(const Duration(seconds: 15));
+      if (r.statusCode == 404) return true;
+      if (r.statusCode == 200) return false;
+      return null;
+    } catch (_) {
+      return null;
     }
   }
 
