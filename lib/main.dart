@@ -1341,8 +1341,56 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   }
 
   // ---------- Mensagens diretas (1.32.0) ----------
-  /// Conversa de cada colega nesta sessão.
+  /// Conversa de cada colega. Desde a 1.38.0 fica guardada no celular por
+  /// 7 dias (não usa o Firebase: lá a mensagem continua sendo apagada
+  /// assim que é entregue).
   final Map<String, List<_ChatItem>> _chat = {};
+  bool _chatLoaded = false;
+  static const _chatKeepDays = 7;
+
+  /// Lê as conversas guardadas no celular e descarta as com mais de 7 dias.
+  Future<void> _loadChat() async {
+    if (_chatLoaded) return;
+    _chatLoaded = true;
+    try {
+      final p = await SharedPreferences.getInstance();
+      final raw = p.getString('chat_history');
+      if (raw == null) return;
+      final old = DateTime.now()
+          .subtract(const Duration(days: _chatKeepDays))
+          .millisecondsSinceEpoch;
+      final saved = <String, List<_ChatItem>>{};
+      (jsonDecode(raw) as Map).forEach((k, v) {
+        final list = <_ChatItem>[
+          for (final m in v as List)
+            if ((m['at'] as int? ?? 0) >= old) _ChatItem.fromJson(m as Map)
+        ];
+        if (list.isNotEmpty) saved[k.toString()] = list;
+      });
+      // O que chegou antes de ler (raro) vai depois do histórico.
+      _chat.forEach((k, v) => (saved[k] ??= []).addAll(v));
+      _chat
+        ..clear()
+        ..addAll(saved);
+      _chatRefresh?.call(() {});
+    } catch (_) {}
+  }
+
+  /// Guarda as conversas no celular (só as dos últimos 7 dias).
+  Future<void> _saveChat() async {
+    try {
+      final old = DateTime.now()
+          .subtract(const Duration(days: _chatKeepDays))
+          .millisecondsSinceEpoch;
+      final out = <String, List<Map<String, dynamic>>>{};
+      _chat.forEach((k, v) {
+        v.removeWhere((it) => it.at < old);
+        if (v.isNotEmpty) out[k] = [for (final it in v) it.toJson()];
+      });
+      final p = await SharedPreferences.getInstance();
+      await p.setString('chat_history', jsonEncode(out));
+    } catch (_) {}
+  }
 
   // Mensagens de voz (1.33.0).
   final _voiceRec = AudioRecorder();
@@ -1419,6 +1467,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       }
     }
     if (changed) {
+      _saveChat();
       _chatRefresh?.call(() {});
       if (mounted) setState(() {});
     }
@@ -1437,6 +1486,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     final nick = msg.nick.isEmpty ? tr('Um colega') : msg.nick;
     (_chat[msg.from] ??= []).add(_ChatItem(false, msg.text, msg.at,
         audio: msg.audioPath, durMs: msg.durMs));
+    _saveChat();
     final shown = msg.isVoice ? tr('🎤 Mensagem de voz') : msg.text;
     final open = _chatOpen == msg.from;
     if (open) {
@@ -1617,6 +1667,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   Future<void> _chatWith(String id, String nick) async {
     _openingChat = false;
+    await _loadChat();
     LiveBorder.clearChat(id);
     final name = nick.isEmpty ? tr('Motorista') : nick;
     final textC = TextEditingController();
@@ -1641,6 +1692,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             (_chat[id] ??= []).add(_ChatItem(
                 true, t.trim(), DateTime.now().millisecondsSinceEpoch,
                 docId: docId));
+            _saveChat();
             textC.clear();
           } else {
             _snack(_live.msgRulesMissing
@@ -1680,6 +1732,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             (_chat[id] ??= []).add(_ChatItem(true, tr('🎤 Mensagem de voz'),
                 DateTime.now().millisecondsSinceEpoch,
                 audio: path, durMs: dur, docId: docId));
+            _saveChat();
           } else {
             _snack(_live.msgRulesMissing
                 ? tr('Falta publicar a regra msgs no Firebase (veja o README).')
@@ -1950,6 +2003,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         _voiceClean = true;
         LiveService.cleanVoice();
       }
+      await _loadChat();
       for (final msg in [
         ...await LiveService.takePending(),
         ...await _live.inbox()
@@ -5935,4 +5989,21 @@ class _ChatItem {
   bool delivered = false;
   _ChatItem(this.mine, this.text, this.at,
       {this.audio, this.durMs = 0, this.docId});
+
+  /// Guardado no celular por 7 dias (1.38.0).
+  Map<String, dynamic> toJson() => {
+        'mine': mine, 'text': text, 'at': at,
+        if (audio != null) 'audio': audio, 'dur': durMs,
+        if (docId != null) 'doc': docId, 'ok': delivered,
+      };
+
+  static _ChatItem fromJson(Map m) {
+    var audio = m['audio'] as String?;
+    // Áudio já apagado do celular (mais de 7 dias): fica só o texto.
+    if (audio != null && !File(audio).existsSync()) audio = null;
+    return _ChatItem(m['mine'] == true, m['text']?.toString() ?? '',
+        m['at'] as int? ?? 0,
+        audio: audio, durMs: m['dur'] as int? ?? 0, docId: m['doc'] as String?)
+      ..delivered = m['ok'] == true;
+  }
 }
