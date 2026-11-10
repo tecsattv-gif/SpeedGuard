@@ -5011,7 +5011,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     // Reconstrói a tela quando o tema (claro/escuro) muda.
     Theme.of(context);
     final pos = _pos;
-    final speed = pos == null ? 0 : (pos.speed.clamp(0, 400) * 3.6).round();
+    // 1.41.2: parado o monitoramento, o GPS não é mais lido — o velocímetro
+    // mostra 0 (antes ficava congelado na última velocidade, parecendo ativo).
+    final speed = pos == null || !_running
+        ? 0
+        : (pos.speed.clamp(0, 400) * 3.6).round();
     final overSecs = _running ? _watch.seconds : null;
     final roadSign = _running && _speedWarn ? _shownLimit : null;
     final showRadars = _rule.mode == RadarMode.full;
