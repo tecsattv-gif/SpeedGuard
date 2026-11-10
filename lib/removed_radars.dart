@@ -26,6 +26,9 @@ class RemovedRadars {
 
   int get mineCount => _mine.length + _wrong.length;
 
+  /// Muda quando a lista baixada do Firebase é trocada (cache 1.41.1).
+  int get sharedStamp => identityHashCode(_shared);
+
   Future<void> load() async {
     final p = await SharedPreferences.getInstance();
     _mine

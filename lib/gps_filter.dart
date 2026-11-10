@@ -67,10 +67,17 @@ class GpsFilter {
     );
   }
 
+  /// Desaceleração máxima plausível (m/s²). Um caminhão freando forte fica
+  /// em ~5 m/s²; de 90 a 0 km/h leva 4 s ou mais.
+  static const maxDecel = 7.0;
+
   /// Devolve a leitura (igual à do GPS), ou null se ela deve ser ignorada.
   Position? accept(Position p) {
     final prev = _last, at = _lastAt;
-    if (prev != null && at != null && _rejected < 3) {
+    // 1.41.1: leitura velha (o provedor "fused" às vezes repete uma posição
+    // guardada de segundos atrás) — jogava o veículo para trás e com 0 km/h.
+    if (prev != null && !p.timestamp.isAfter(prev.timestamp)) return null;
+    if (prev != null && at != null && _rejected < 5) {
       final age = DateTime.now().difference(at).inMilliseconds / 1000;
       if (age < 10) {
         // Leitura ruim no meio de leituras boas.
@@ -83,6 +90,26 @@ class GpsFilter {
         if (dist > 150 && dist / math.max(age, 0.5) > maxJumpSpeed) {
           _rejected++;
           return null;
+        }
+        if (prev.speed > 8) {
+          // 1.41.1: de 90 para 0 km/h em 1 s não existe — é leitura sem
+          // velocidade (antena/Wi-Fi ou repetida). Ignora.
+          final drop = prev.speed - p.speed;
+          if (drop > maxDecel * math.max(age, 1.0) + 2) {
+            _rejected++;
+            return null;
+          }
+          // 1.41.1: andando rápido, ponto atrás do veículo = posição velha.
+          if (prev.heading >= 0 && dist > 15) {
+            final b = Geolocator.bearingBetween(
+                prev.latitude, prev.longitude, p.latitude, p.longitude);
+            var d = (b - prev.heading).abs() % 360;
+            if (d > 180) d = 360 - d;
+            if (d > 120) {
+              _rejected++;
+              return null;
+            }
+          }
         }
       }
     }

@@ -268,10 +268,36 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     return _allRadarsRaw;
   }
 
-  List<Radar> get _allRadarsRaw => [
-        for (final r in [..._service.all, ..._community.radars])
-          if (_layers.contains(Layer.of(r)) && !_removed.hidden(r)) r
-      ];
+  /// 1.41.1: a lista era refeita várias vezes por segundo (a cada leitura
+  /// do GPS, a cada aviso e a cada redesenho), conferindo cada radar contra
+  /// os "não existe mais" — com o raio de 60 km isso travava a tela. Agora
+  /// só refaz quando algo muda (ou a cada 3 s, para os avisos que vencem).
+  List<Radar> _radarCache = const [];
+  int _radarKey = 0;
+  DateTime _radarAt = DateTime(2000);
+
+  List<Radar> get _allRadarsRaw {
+    final s = _service.all, c = _community.radars;
+    final key = Object.hash(
+        s.length,
+        s.isEmpty ? null : s.first.id,
+        s.isEmpty ? null : s.last.id,
+        c.length,
+        c.isEmpty ? null : c.last.id,
+        Object.hashAllUnordered(_layers),
+        _removed.mineCount,
+        _removed.sharedStamp);
+    final now = DateTime.now();
+    if (key == _radarKey && now.difference(_radarAt).inSeconds < 3) {
+      return _radarCache;
+    }
+    _radarKey = key;
+    _radarAt = now;
+    return _radarCache = List.unmodifiable([
+      for (final r in [...s, ...c])
+        if (_layers.contains(Layer.of(r)) && !_removed.hidden(r)) r
+    ]);
+  }
 
   /// Radares a desenhar no mapa: só os da área da tela (com margem) e no
   /// máximo [_maxMarkers], os mais perto do centro (1.28.3). Com o raio de
