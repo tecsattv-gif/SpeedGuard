@@ -35,6 +35,24 @@ class UpdateService {
   static bool _asking = false;
 
   /// Versão instalada (ex.: "1.27.0").
+  /// 1.41.1: cada atualização deixava o APK baixado (~60 MB) no cache e
+  /// nunca apagava — o cache chegou a 1,3 GB. Apaga os APKs já instalados
+  /// (todos, menos o que está sendo baixado agora).
+  static Future<void> cleanOldApks({String? keep}) async {
+    try {
+      final dir = await getTemporaryDirectory();
+      await for (final f in dir.list()) {
+        final name = f.uri.pathSegments.last;
+        if (f is File &&
+            name.startsWith('SpeedGuard-') &&
+            name.endsWith('.apk') &&
+            f.path != keep) {
+          await f.delete();
+        }
+      }
+    } catch (_) {}
+  }
+
   static Future<String> installed() async =>
       (await PackageInfo.fromPlatform()).version;
 
@@ -182,6 +200,7 @@ class UpdateService {
     try {
       final dir = await getTemporaryDirectory();
       final file = File('${dir.path}/SpeedGuard-${info.version}.apk');
+      await cleanOldApks(keep: file.path);
       final res = await client.send(http.Request('GET', Uri.parse(info.apkUrl)));
       if (res.statusCode != 200) throw Exception('HTTP ${res.statusCode}');
       final total = res.contentLength ?? info.size;

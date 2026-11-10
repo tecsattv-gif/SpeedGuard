@@ -337,6 +337,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    // 1.41.1: apaga os APKs de atualizações antigas que enchiam o cache.
+    UpdateService.cleanOldApks();
     // Mensagem de voz terminou de tocar (1.33.0).
     _voicePlayer.onPlayerComplete.listen((_) {
       _playing = null;
