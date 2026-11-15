@@ -139,7 +139,8 @@ jobs:
           ${BT}apksigner verify --print-certs SpeedGuard-antigo.apk | grep -q "CN=SpeedGuard" || { echo "::error::APK assinado com chave errada"; exit 1; }
           # Precisa instalar no Android 6 (API 23): assinatura v1 e minSdk 23.
           ${BT}apksigner verify --min-sdk-version 23 SpeedGuard-antigo.apk || { echo "::error::APK não verifica no Android 6"; exit 1; }
-          MIN=$(${BT}aapt2 dump badging SpeedGuard-antigo.apk | grep -o "sdkVersion:'[0-9]*'" | grep -o "[0-9]*")
+          MIN=$(${BT}aapt2 dump badging SpeedGuard-antigo.apk | grep -oE "^(sdkVersion|minSdkVersion):'[0-9]+'" | head -n1 | grep -oE "[0-9]+" || true)
+          [ -n "$MIN" ] || { echo "::error::Não consegui ler o minSdk do APK"; exit 1; }
           echo "minSdk do APK: $MIN"
           [ "$MIN" -le 23 ] || { echo "::error::APK saiu com minSdk $MIN (precisa ser 23)"; exit 1; }
           echo "::notice title=APK Android 6::minSdk $MIN, $(du -h SpeedGuard-antigo.apk | cut -f1)"
