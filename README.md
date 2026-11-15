@@ -215,6 +215,7 @@ O workflow roda `flutter create` para gerar os arquivos Android que não estão 
 O APK normal só instala em **Android 7 ou mais novo** (em Android 6 aparece "Erro de análise – ocorreu um problema ao analisar o pacote"). Para aparelhos com **Android 6**, como o GPS **Garmin dēzlCam 785**, existe um segundo build: o workflow **Build APK (Android 6)** (`.github/workflows/build-antigo.yml`) roda a cada push na `main`, compila o mesmo código com o **Flutter 3.32.8** (o último que ainda gera app para Android 6) e `minSdk 23`, e assina com a **mesma chave**.
 
 - **Baixar (link fixo, sem conta no GitHub):** `https://github.com/tecsattv-gif/SpeedGuard/releases/download/antigo/SpeedGuard-antigo.apk`
+- **Endereço curto para digitar no navegador do Garmin:** `tecsattv-gif.github.io/SpeedGuard/g` (página `docs/g/index.html`, que só redireciona para o link acima e tem um botão **BAIXAR**).
 - O APK fica numa Release separada, de tag fixa **`antigo`**, marcada como pré-lançamento. Assim ela nunca vira a "latest" e o app normal nunca baixa este APK por engano.
 - O app compilado por este build (`--dart-define=SG_LEGACY=true`) procura atualização na Release `antigo` (a versão vem do título, ex.: "SpeedGuard 1.42.0 (Android 6)") e se atualiza sozinho como o normal.
 - Só neste build alguns pacotes ficam em versões mais antigas (o `pubspec.yaml` do repositório não muda): `flutter_tts` 4.0.2 (as novas exigem Android 7) e `workmanager` 0.9.2 (as novas exigem Flutter 3.38).
