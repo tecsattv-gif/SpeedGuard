@@ -44,6 +44,9 @@ class MainActivity : FlutterActivity() {
                     "sinceBoot" -> result.success(SystemClock.elapsedRealtime() / 1000)
                     // 1.42.3: versão do Android (API).
                     "sdk" -> result.success(Build.VERSION.SDK_INT)
+                    // 1.42.4: fabricante/marca/modelo (para reconhecer o Garmin).
+                    "maker" -> result.success(
+                        "${Build.MANUFACTURER} ${Build.BRAND} ${Build.MODEL}")
                     // 1.42.3: bipe do próprio Android (reserva do tocador).
                     "tone" -> {
                         try {

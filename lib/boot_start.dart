@@ -22,6 +22,16 @@ class BootStart {
   /// Android 7 ou mais antigo (ex.: GPS Garmin, Android 6).
   static bool get oldAndroid => sdk > 0 && sdk < 26;
 
+  /// 1.42.4: fabricante, marca e modelo do aparelho (minúsculas).
+  static String maker = '';
+
+  /// 1.42.4: GPS Garmin (dēzlCam): pelo fabricante/modelo ou, se o
+  /// aparelho não informar, pelo build para Android 6 (feito para ele).
+  static bool get garmin =>
+      maker.contains('garmin') ||
+      maker.contains('dezl') ||
+      const bool.fromEnvironment('SG_LEGACY');
+
   /// Bipe do próprio Android, para quando o tocador de som falha.
   static Future<void> tone() async {
     try {
@@ -46,6 +56,11 @@ class BootStart {
       sdk = await _ch.invokeMethod<int>('sdk') ?? 0;
     } catch (_) {
       sdk = 0;
+    }
+    try {
+      maker = (await _ch.invokeMethod<String>('maker') ?? '').toLowerCase();
+    } catch (_) {
+      maker = '';
     }
     _ch.setMethodCallHandler((call) async {
       if (call.method == 'boot') onBoot?.call();

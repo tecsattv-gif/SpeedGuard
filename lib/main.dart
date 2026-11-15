@@ -688,7 +688,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     final counting = !_inFront && !_bubble && _countSecs != null;
     if (counting && !_ringBeeped) {
       _ringBeeped = true;
-      if (_voice && _speedSound != 'mute') {
+      // 1.42.4: no Garmin o bipe do início da contagem já toca em
+      // _checkSpeedLimit (com o app na tela ou minimizado).
+      if (_voice && _speedSound != 'mute' && !BootStart.garmin) {
         // 1.29.26: o bipe de "acima do limite" do próprio app.
         _beep(AlertEngine.overBeep);
       }
@@ -3811,7 +3813,14 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       if (ev?.step == 3) setState(() {}); // card "VELOCIDADE EXCEDIDA"
       // Mudo: sem som, mas o aviso visual (velocímetro vermelho, contagem
       // dos 30 s e "VELOCIDADE EXCEDIDA") continua igual.
-      if (_voice && say != null && _speedSound != 'mute') {
+      if (BootStart.garmin && ev != null) {
+        // 1.42.4 (só no Garmin): a contagem avisa sempre por bipe — no
+        // início da contagem, faltando 10 s e no fim ("velocidade
+        // excedida") —, sem depender da voz do aparelho. Mudo continua mudo.
+        if (_voice && _speedSound != 'mute') {
+          _beep(ev.step == 1 ? 1 : (ev.step == 2 ? 3 : AlertEngine.overBeep));
+        }
+      } else if (_voice && say != null && _speedSound != 'mute') {
         if (_speedSound == 'beep' || !_tts.ok) {
           if (beep > 0) _beep(beep);
         } else {
