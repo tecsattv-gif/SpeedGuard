@@ -25,8 +25,13 @@ class UpdateInfo {
 }
 
 class UpdateService {
-  static const _api =
-      'https://api.github.com/repos/tecsattv-gif/SpeedGuard/releases/latest';
+  /// Build para Android 6 (`--dart-define=SG_LEGACY=true`, workflow
+  /// build-antigo.yml): o APK fica numa Release separada, de tag fixa
+  /// "antigo", e a versão vem no título ("SpeedGuard 1.42.0 (Android 6)").
+  static const legacy = bool.fromEnvironment('SG_LEGACY');
+  static const _api = legacy
+      ? 'https://api.github.com/repos/tecsattv-gif/SpeedGuard/releases/tags/antigo'
+      : 'https://api.github.com/repos/tecsattv-gif/SpeedGuard/releases/latest';
 
   /// Ao voltar para o app (já aberto), procura de novo no máximo a cada
   /// 30 min — para não perguntar a cada troca com o Google Maps/Waze.
@@ -88,7 +93,13 @@ class UpdateService {
       if ((a as Map)['name'].toString().endsWith('.apk')) apk = a;
     }
     if (apk == null) return null;
-    final version = tag.replaceAll(RegExp(r'^[vV]'), '');
+    final version = legacy
+        ? (RegExp(r'\d+\.\d+\.\d+')
+                .firstMatch(m['name']?.toString() ?? '')
+                ?.group(0) ??
+            '')
+        : tag.replaceAll(RegExp(r'^[vV]'), '');
+    if (version.isEmpty) return null;
     if (!newer(version, await installed())) return null;
     return UpdateInfo(version, apk['browser_download_url'].toString(),
         (apk['size'] as num?)?.toInt() ?? 0);
