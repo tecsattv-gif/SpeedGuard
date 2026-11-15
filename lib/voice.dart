@@ -28,6 +28,19 @@ class Voice {
   /// começa em 3 s, toca o bipe e passa a usar só bipes.
   bool verify = false;
   bool _silent = false; // conferido: a voz não sai neste aparelho
+
+  /// 1.42.5 (Garmin): nunca tenta falar; todo aviso sai em bipe. No Garmin
+  /// o aparelho às vezes respondia que tinha voz (ao voltar para o app, a
+  /// conferência refeita religava a fala) e o aviso de radar ficava mudo.
+  bool _beepOnly = false;
+  bool get beepOnly => _beepOnly;
+  set beepOnly(bool v) {
+    _beepOnly = v;
+    if (v) {
+      ok = false;
+      reason = 'engine';
+    }
+  }
   int _startedSeq = 0, _seq = 0;
 
   Voice() {
@@ -48,7 +61,7 @@ class Voice {
   Future<void> setLanguage(String lang) async {
     final base = lang.split('-').first;
     final tries = <String>{lang, ...?_alt[base]};
-    if (_silent) return;
+    if (_silent || _beepOnly) return;
     try {
       final engines = await _tts.getEngines.timeout(_wait);
       if (engines is List && engines.isEmpty) {
@@ -89,7 +102,7 @@ class Voice {
 
   /// Fala o aviso; sem voz no aparelho toca o bipe [beep] (0 = nada).
   Future<void> speak(String text, {int beep = 1}) async {
-    if (!ok) {
+    if (!ok || _beepOnly) {
       if (beep > 0) onNoVoice?.call(beep);
       return;
     }

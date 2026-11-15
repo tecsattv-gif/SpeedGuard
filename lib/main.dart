@@ -474,6 +474,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     _tts.onNoVoice = _beep;
     // 1.42.3: em Android antigo confere se a voz fala mesmo (ver Voice).
     _tts.verify = BootStart.oldAndroid;
+    // 1.42.5: no Garmin todo aviso sai em bipe, sem depender da voz.
+    _tts.beepOnly = BootStart.garmin;
     _tts.setSpeechRate(0.5);
     _tts.setVolume(_volume);
     _tts.awaitSpeakCompletion(false);
@@ -576,6 +578,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     _predictTimer?.cancel();
     _tts.stop();
     _player.dispose();
+    _oldPlayer?.dispose();
     _voicePlayer.dispose();
     _voiceRec.dispose();
     _countTimer?.cancel();
@@ -937,6 +940,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   /// 6 = acima do limite.
   Future<void> _beep(int n) async {
     final file = n >= AlertEngine.overBeep ? 'beep_fast' : 'step$n';
+    if (BootStart.oldAndroid || BootStart.garmin) return _beepOld(file);
     try {
       await _player.stop();
     } catch (_) {}
@@ -950,6 +954,54 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       _logError('bipe', e, st);
       BootStart.tone();
     }
+  }
+
+  /// 1.42.5 — bipe em Android antigo (ex.: Garmin, Android 6). Lá o bipe
+  /// tocava na primeira vez e depois ficava mudo: o tocador reaproveitado
+  /// parava de soar sem dar erro. Agora cada bipe usa um tocador novo (o
+  /// anterior é descartado) e o app confere se o som chegou ao fim; se não
+  /// chegou, toca o bipe do próprio Android. Cada bipe fica anotado em
+  /// Configurações → Diagnóstico.
+  AudioPlayer? _oldPlayer;
+  int _beepSeq = 0;
+  Future<void> _beepOld(String file) async {
+    final seq = ++_beepSeq;
+    final prev = _oldPlayer;
+    _oldPlayer = null;
+    if (prev != null) {
+      // Descarta o tocador anterior sem segurar o bipe novo.
+      prev.dispose().timeout(const Duration(seconds: 2)).catchError((_) {});
+    }
+    var done = false;
+    try {
+      final p = AudioPlayer();
+      _oldPlayer = p;
+      p.onPlayerComplete.listen((_) => done = true);
+      await p
+          .setAudioContext(AudioContext(
+            android: const AudioContextAndroid(
+              contentType: AndroidContentType.music,
+              usageType: AndroidUsageType.media,
+              audioFocus: AndroidAudioFocus.none,
+            ),
+          ))
+          .timeout(const Duration(seconds: 2));
+      await p
+          .play(AssetSource('sounds/$file.wav'), volume: _volume)
+          .timeout(const Duration(seconds: 3));
+      _plog('bipe $file');
+    } catch (e, st) {
+      _plog('bipe $file: falhou, bipe do Android');
+      _logError('bipe', e, st);
+      BootStart.tone();
+      return;
+    }
+    // O som mais longo tem menos de 1 s: se em 2,5 s não terminou, não tocou.
+    Timer(const Duration(milliseconds: 2500), () {
+      if (done || seq != _beepSeq) return;
+      _plog('bipe $file: não tocou, bipe do Android');
+      BootStart.tone();
+    });
   }
 
   Future<void> _stop() async {
