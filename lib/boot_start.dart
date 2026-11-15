@@ -16,6 +16,19 @@ class BootStart {
   /// 1.42.1: o aviso de "aparelho ligou" chegou com o app já aberto.
   static void Function()? onBoot;
 
+  /// 1.42.3: versão do Android (API). 0 = não deu para saber.
+  static int sdk = 0;
+
+  /// Android 7 ou mais antigo (ex.: GPS Garmin, Android 6).
+  static bool get oldAndroid => sdk > 0 && sdk < 26;
+
+  /// Bipe do próprio Android, para quando o tocador de som falha.
+  static Future<void> tone() async {
+    try {
+      await _ch.invokeMethod('tone');
+    } catch (_) {}
+  }
+
   /// Chamar uma vez no main(), antes do runApp.
   static Future<void> init() async {
     try {
@@ -28,6 +41,11 @@ class BootStart {
       nearBoot = secs != null && secs < 180;
     } catch (_) {
       nearBoot = false;
+    }
+    try {
+      sdk = await _ch.invokeMethod<int>('sdk') ?? 0;
+    } catch (_) {
+      sdk = 0;
     }
     _ch.setMethodCallHandler((call) async {
       if (call.method == 'boot') onBoot?.call();

@@ -1,6 +1,11 @@
 package com.tecsattv.speedguard
 
 import android.content.Intent
+import android.media.AudioManager
+import android.media.ToneGenerator
+import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.os.SystemClock
 import flutter.overlay.window.flutter_overlay_window.OverlayService
 import io.flutter.embedding.android.FlutterActivity
@@ -37,6 +42,24 @@ class MainActivity : FlutterActivity() {
                     }
                     // 1.42.1: segundos desde que o aparelho ligou.
                     "sinceBoot" -> result.success(SystemClock.elapsedRealtime() / 1000)
+                    // 1.42.3: versão do Android (API).
+                    "sdk" -> result.success(Build.VERSION.SDK_INT)
+                    // 1.42.3: bipe do próprio Android (reserva do tocador).
+                    "tone" -> {
+                        try {
+                            val tg = ToneGenerator(AudioManager.STREAM_MUSIC, 100)
+                            tg.startTone(ToneGenerator.TONE_PROP_BEEP2, 300)
+                            Handler(Looper.getMainLooper()).postDelayed({
+                                try {
+                                    tg.release()
+                                } catch (e: Throwable) {
+                                }
+                            }, 700)
+                            result.success(true)
+                        } catch (e: Throwable) {
+                            result.success(false)
+                        }
+                    }
                     // Minimiza o app (como apertar o botão Início).
                     "moveToBack" -> result.success(moveTaskToBack(true))
                     else -> result.notImplemented()

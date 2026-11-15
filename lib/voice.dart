@@ -23,6 +23,19 @@ class Voice {
 
   static const _wait = Duration(seconds: 4);
 
+  /// 1.42.3: confere se cada fala começa mesmo. Em Android antigo (ex.:
+  /// Garmin) o aparelho pode dizer que tem voz e ficar mudo: se a fala não
+  /// começa em 3 s, toca o bipe e passa a usar só bipes.
+  bool verify = false;
+  bool _silent = false; // conferido: a voz não sai neste aparelho
+  int _startedSeq = 0, _seq = 0;
+
+  Voice() {
+    try {
+      _tts.setStartHandler(() => _startedSeq = _seq);
+    } catch (_) {}
+  }
+
   /// Mesma língua em outros países, para quando a voz exata não existe.
   static const _alt = {
     'pt': ['pt-BR', 'pt-PT'],
@@ -35,6 +48,7 @@ class Voice {
   Future<void> setLanguage(String lang) async {
     final base = lang.split('-').first;
     final tries = <String>{lang, ...?_alt[base]};
+    if (_silent) return;
     try {
       final engines = await _tts.getEngines.timeout(_wait);
       if (engines is List && engines.isEmpty) {
@@ -79,7 +93,17 @@ class Voice {
       if (beep > 0) onNoVoice?.call(beep);
       return;
     }
+    final seq = ++_seq;
     await _safe(() => _tts.speak(text));
+    if (!verify) return;
+    Timer(const Duration(seconds: 3), () {
+      // Outra fala veio depois, ou esta começou: tudo certo.
+      if (seq != _seq || _startedSeq == seq) return;
+      _silent = true;
+      ok = false;
+      reason = 'engine';
+      if (beep > 0) onNoVoice?.call(beep);
+    });
   }
 
   Future<void> _safe(Future<dynamic> Function() f) async {

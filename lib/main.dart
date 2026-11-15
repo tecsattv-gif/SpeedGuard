@@ -342,6 +342,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    // 1.42.3: aberto ao ligar o aparelho, o app pode já estar atrás de outro
+    // (ex.: a navegação do Garmin) antes de esta tela existir; aí o aviso de
+    // "foi para segundo plano" nunca chega e o pop-up não abria.
+    final st0 = WidgetsBinding.instance.lifecycleState;
+    if (st0 != null && st0 != AppLifecycleState.resumed) _inFront = false;
     // 1.41.1: apaga os APKs de atualizações antigas que enchiam o cache.
     UpdateService.cleanOldApks();
     // Mensagem de voz terminou de tocar (1.33.0).
@@ -423,14 +428,25 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     _volume = p.getDouble('volume') ?? 1.0;
     try {
       // Bipes abaixam a música/navegação por um instante, sem pausar.
+      // 1.42.3: em Android antigo (ex.: Garmin, Android 6) o bipe ficava
+      // mudo; lá toca como som de mídia comum, sem pedir o foco do áudio
+      // (se o aparelho nega o foco, o som nem começa).
       await _player.setAudioContext(AudioContext(
-        android: const AudioContextAndroid(
-          contentType: AndroidContentType.sonification,
-          usageType: AndroidUsageType.assistanceNavigationGuidance,
-          audioFocus: AndroidAudioFocus.gainTransientMayDuck,
-        ),
+        android: BootStart.oldAndroid
+            ? const AudioContextAndroid(
+                contentType: AndroidContentType.music,
+                usageType: AndroidUsageType.media,
+                audioFocus: AndroidAudioFocus.none,
+              )
+            : const AudioContextAndroid(
+                contentType: AndroidContentType.sonification,
+                usageType: AndroidUsageType.assistanceNavigationGuidance,
+                audioFocus: AndroidAudioFocus.gainTransientMayDuck,
+              ),
       ));
-    } catch (_) {}
+    } catch (e, st) {
+      _logError('som (preparar)', e, st);
+    }
     _discreet = p.getBool('discreet') ?? false;
     _bubble = p.getBool('bubble') ?? false;
     _bootMin = p.getBool('boot_min') ?? false;
@@ -456,6 +472,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     // A voz é preparada sem segurar a abertura do app: num aparelho sem
     // motor de voz ela pode demorar ou nunca responder.
     _tts.onNoVoice = _beep;
+    // 1.42.3: em Android antigo confere se a voz fala mesmo (ver Voice).
+    _tts.verify = BootStart.oldAndroid;
     _tts.setSpeechRate(0.5);
     _tts.setVolume(_volume);
     _tts.awaitSpeakCompletion(false);
@@ -504,10 +522,33 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         await Future.delayed(const Duration(milliseconds: 600));
         await BootStart.minimize();
       }
+      // 1.42.3: se o app já estava atrás de outro quando o monitoramento
+      // ligou, o Android não avisa de novo que ele foi minimizado e a bolha
+      // (ou o pop-up dos avisos) não abria: confere e abre aqui.
+      await Future.delayed(const Duration(milliseconds: 1200));
+      _openOverlayIfHidden(assumeHidden: minimize);
     } catch (e) {
       _plog('boot: erro $e');
     } finally {
       _bootStarting = false;
+    }
+  }
+
+  /// App em segundo plano com o monitoramento ligado e sem a janela
+  /// flutuante: abre a bolha (ou o pop-up dos avisos). [assumeHidden]: o app
+  /// acabou de ser minimizado; sem estado conhecido, conta como escondido.
+  void _openOverlayIfHidden({bool assumeHidden = false}) {
+    final st = WidgetsBinding.instance.lifecycleState;
+    if (st == AppLifecycleState.resumed) return;
+    if (st == null && !assumeHidden) return;
+    _inFront = false;
+    _plog('boot: app em segundo plano (${st?.name ?? '?'}), janela '
+        '${_overlayShown ? 'aberta' : 'fechada'}');
+    if (!_running || _overlayShown || _opening) return;
+    if (_bubble) {
+      _showBubble();
+    } else {
+      _showRing();
     }
   }
 
@@ -896,8 +937,17 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     final file = n >= AlertEngine.overBeep ? 'beep_fast' : 'step$n';
     try {
       await _player.stop();
-      await _player.play(AssetSource('sounds/$file.wav'), volume: _volume);
     } catch (_) {}
+    try {
+      await _player
+          .play(AssetSource('sounds/$file.wav'), volume: _volume)
+          .timeout(const Duration(seconds: 3));
+    } catch (e, st) {
+      // 1.42.3: o tocador falhou (visto em Android antigo): fica registrado
+      // no Diagnóstico e toca o bipe do próprio Android.
+      _logError('bipe', e, st);
+      BootStart.tone();
+    }
   }
 
   Future<void> _stop() async {
