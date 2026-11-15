@@ -12,7 +12,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_overlay_window/flutter_overlay_window.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:flutter_tts/flutter_tts.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:path_provider/path_provider.dart';
@@ -51,6 +50,7 @@ import 'track_nav.dart';
 import 'track_recorder.dart';
 import 'i18n.dart';
 import 'boot_start.dart';
+import 'voice.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -136,7 +136,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   final _map = MapController();
   final _service = RadarService();
   final _engine = AlertEngine();
-  final _tts = FlutterTts();
+  final _tts = Voice();
   final _community = CommunityService();
   final _removed = RemovedRadars();
   /// Quantas pessoas estão conectadas (mundo e país).
@@ -452,6 +452,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     }
     _country = p.getString('country');
     await _service.load();
+    // 1.42.1: sem voz no aparelho (ex.: Garmin), o aviso falado vira bipe.
+    _tts.onNoVoice = _beep;
     await _tts.setLanguage(ttsLang);
     await _tts.setSpeechRate(0.5);
     await _tts.setVolume(_volume);
@@ -545,6 +547,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       _inFront = true;
       _closeBubble();
       _presenceTick();
+      // Voltou ao app (talvez depois de instalar uma voz): confere de novo.
+      _tts.setLanguage(ttsLang).then((_) {
+        if (mounted) setState(() {});
+      });
       if (mounted) UpdateService.autoCheck(context, resumed: true);
       if (_bubbleNoPermission) {
         _bubbleNoPermission = false;
@@ -961,7 +967,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         if (_sound == 'beep') {
           _beep(3);
         } else {
-          _tts.speak(say);
+          _tts.speak(say, beep: 3);
         }
       }
     });
@@ -1572,7 +1578,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       // volante); senão fica na conversa com o botão ▶.
       if (_voice && !bg) {
         beep
-            .then((_) => _tts.speak(tr('Mensagem de voz de {0}', [nick])))
+            .then((_) => _tts.speak(tr('Mensagem de voz de {0}', [nick]), beep: 0))
             .then((_) async {
           await Future.delayed(const Duration(milliseconds: 2500));
           if (_playing == null) _playVoice(msg.audioPath!);
@@ -1586,7 +1592,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           .trim();
       beep.then((_) => _tts.speak(clean.isEmpty
           ? tr('Mensagem de {0}', [nick])
-          : '${tr('Mensagem de {0}', [nick])}. $clean'));
+          : '${tr('Mensagem de {0}', [nick])}. $clean', beep: 0));
     }
   }
 
@@ -3720,7 +3726,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       // Mudo: sem som, mas o aviso visual (velocímetro vermelho, contagem
       // dos 30 s e "VELOCIDADE EXCEDIDA") continua igual.
       if (_voice && say != null && _speedSound != 'mute') {
-        if (_speedSound == 'beep') {
+        if (_speedSound == 'beep' || !_tts.ok) {
           if (beep > 0) _beep(beep);
         } else {
           _tts.speak(say);
@@ -3763,7 +3769,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     if (st.speak != null || st.beeps > 0) {
       HapticFeedback.heavyImpact();
       if (_voice) {
-        if (_sound == 'beep' && st.beeps > 0) {
+        if ((_sound == 'beep' || !_tts.ok) && st.beeps > 0) {
           _beep(st.beeps);
         } else if (st.speak != null) {
           _tts.speak(!_discreet
@@ -4540,6 +4546,28 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                         _tts.speak(tr('Radar fixo a 1000 metros. Limite 80.'));
                       }
                     },
+                  ),
+                ),
+              // 1.42.1: aparelho sem voz (ex.: Garmin): avisa e mostra onde instalar.
+              if (_voice && !_tts.ok)
+                ListTile(
+                  leading: const Icon(Icons.warning_amber, color: Colors.orange),
+                  title: Text(_tts.reason == 'lang'
+                      ? tr('Este aparelho não tem voz neste idioma')
+                      : tr('Este aparelho não tem voz instalada')),
+                  subtitle: Text(tr('Os avisos falados tocam como bipes. Para ouvir a voz, instale um motor de voz (texto para fala) com este idioma.')),
+                  trailing: TextButton(
+                    onPressed: () async {
+                      try {
+                        await AndroidIntent(
+                          action: 'com.android.settings.TTS_SETTINGS',
+                          flags: const [Flag.FLAG_ACTIVITY_NEW_TASK],
+                        ).launch();
+                      } catch (_) {
+                        _snack(tr('Não foi possível abrir as configurações de voz do aparelho.'));
+                      }
+                    },
+                    child: Text(tr('Abrir')),
                   ),
                 ),
               // Volume dos avisos (voz e bipes de radar e de velocidade).
