@@ -8,7 +8,7 @@ name: Build APK (Android 6)
 
 on:
   push:
-    branches: [main, claude/android6]
+    branches: [main]
     paths-ignore:
       - 'docs/**'
   workflow_dispatch:

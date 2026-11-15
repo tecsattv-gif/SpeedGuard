@@ -208,6 +208,17 @@ O GitHub Actions compila sozinho a cada push na `main` (ou manualmente em **Acti
 
 O workflow roda `flutter create` para gerar os arquivos Android que não estão no repositório, sem sobrescrever o manifesto.
 
+### Versão para Android 6 (SpeedGuard-antigo.apk)
+
+O APK normal só instala em **Android 7 ou mais novo** (em Android 6 aparece "Erro de análise – ocorreu um problema ao analisar o pacote"). Para aparelhos com **Android 6**, como o GPS **Garmin dēzlCam 785**, existe um segundo build: o workflow **Build APK (Android 6)** (`.github/workflows/build-antigo.yml`) roda a cada push na `main`, compila o mesmo código com o **Flutter 3.32.8** (o último que ainda gera app para Android 6) e `minSdk 23`, e assina com a **mesma chave**.
+
+- **Baixar (link fixo, sem conta no GitHub):** `https://github.com/tecsattv-gif/SpeedGuard/releases/download/antigo/SpeedGuard-antigo.apk`
+- O APK fica numa Release separada, de tag fixa **`antigo`**, marcada como pré-lançamento. Assim ela nunca vira a "latest" e o app normal nunca baixa este APK por engano.
+- O app compilado por este build (`--dart-define=SG_LEGACY=true`) procura atualização na Release `antigo` (a versão vem do título, ex.: "SpeedGuard 1.42.0 (Android 6)") e se atualiza sozinho como o normal.
+- Só neste build alguns pacotes ficam em versões mais antigas (o `pubspec.yaml` do repositório não muda): `flutter_tts` 4.0.2 (as novas exigem Android 7) e `workmanager` 0.9.2 (as novas exigem Flutter 3.38).
+- Se uma versão futura usar algo que o Flutter 3.32 não tem, **só este build falha**; o APK normal continua saindo. O erro aparece nas anotações da execução em Actions.
+- Android 5 ou mais antigo não é suportado (a gravação de voz exige Android 6).
+
 ## Radares compartilhados (Firebase)
 
 **Já ativado** desde a versão 1.6.3. Os radares reportados ficam no Cloud Firestore do projeto Firebase **SpeedGuard001** (ID `speedguard001`, plano Spark gratuito), na coleção `radars`; as pessoas conectadas ficam na coleção `presence`. O app acessa pela API REST, com o ID do projeto e a chave de API da Web em `lib/firebase_config.dart`. A chave não é secreta (vai dentro do app); quem protege os dados são as regras abaixo, publicadas no console (na versão 1.19.0 entrou `'acidente'` na lista da regra de apagar; na **1.32.0** entrou o bloco `msgs` das mensagens do grupo; na **1.33.0** o bloco `msgs` passou a aceitar `audio` e `dur` (mensagens de voz); republique em **Firestore → Regras → Publicar**):
