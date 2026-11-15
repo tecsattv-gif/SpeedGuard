@@ -34,6 +34,10 @@ class AlertEngine {
   final Map<String, int> _stage = {};
   final Set<String> _announced = {};
   final Set<String> _warnedSpeed = {};
+
+  /// Radares pelos quais o veículo já passou: o aviso some na hora, em vez
+  /// de continuar marcando o radar para trás (1.41.3).
+  final Set<String> _passed = {};
   DateTime _lastZoneAlert = DateTime.fromMillisecondsSinceEpoch(0);
 
   static double _angleDiff(double a, double b) {
@@ -70,16 +74,31 @@ class AlertEngine {
         _stage.remove(r.id);
         _announced.remove(r.id);
         _warnedSpeed.remove(r.id);
+        _passed.remove(r.id);
         continue;
       }
       if (d > alertDist) continue;
 
+      // Já passou por ele: fica fora até se afastar 300 m (aí o filtro de
+      // "à frente" abaixo já cuida, e uma volta pelo mesmo ponto avisa).
+      if (_passed.contains(r.id)) {
+        if (d > 300) _passed.remove(r.id);
+        continue;
+      }
+
       if (headingOk) {
         final bearing = Geolocator.bearingBetween(
             pos.latitude, pos.longitude, r.lat, r.lon);
+        final off = _angleDiff(pos.heading, (bearing + 360) % 360);
+        // Perto (até 80 m) o radar ficou para trás: acabou de passar.
+        // Antes o aviso seguia marcando o radar até 80 m depois dele.
+        if (d <= 80 && off > 100) {
+          _passed.add(r.id);
+          continue;
+        }
         // Precisa estar à frente (exceto bem perto, onde o GPS oscila).
         // 60° de folga para curvas e alças de trevo.
-        if (d > 80 && _angleDiff(pos.heading, (bearing + 360) % 360) > 60) {
+        if (d > 80 && off > 60) {
           continue;
         }
         // Sentido do radar: no OpenStreetMap uns marcam o sentido do trânsito
