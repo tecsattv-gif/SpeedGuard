@@ -1,7 +1,9 @@
 package com.tecsattv.speedguard
 
 import android.content.Intent
+import android.media.AudioFormat
 import android.media.AudioManager
+import android.media.AudioTrack
 import android.media.ToneGenerator
 import android.os.Build
 import android.os.Handler
@@ -47,6 +49,13 @@ class MainActivity : FlutterActivity() {
                     // 1.42.4: fabricante/marca/modelo (para reconhecer o Garmin).
                     "maker" -> result.success(
                         "${Build.MANUFACTURER} ${Build.BRAND} ${Build.MODEL}")
+                    // 1.42.6 (Garmin): toca o bipe do app (o mesmo som do
+                    // Android 7+) direto pelo Android, mais alto.
+                    "beep" -> {
+                        val wav = call.argument<ByteArray>("wav")
+                        val vol = call.argument<Double>("volume") ?: 1.0
+                        result.success(wav != null && playWav(wav, vol))
+                    }
                     // 1.42.3: bipe do próprio Android (reserva do tocador).
                     "tone" -> {
                         try {
@@ -68,6 +77,100 @@ class MainActivity : FlutterActivity() {
                     else -> result.notImplemented()
                 }
             }
+    }
+
+    /**
+     * 1.42.6 (Garmin): toca um bipe do app (WAV de 16 bits) direto pelo
+     * AudioTrack, sem o tocador do Flutter. O som é levado ao volume máximo
+     * e reforçado (limite suave, sem estalo), porque no alto-falante do
+     * Garmin o bipe saía baixo. Devolve false se não deu para tocar.
+     */
+    private var beepTrack: AudioTrack? = null
+
+    private fun playWav(wav: ByteArray, volume: Double): Boolean {
+        try {
+            fun u16(i: Int): Int =
+                (wav[i].toInt() and 0xff) or ((wav[i + 1].toInt() and 0xff) shl 8)
+            fun u32(i: Int): Int = u16(i) or (u16(i + 2) shl 16)
+
+            var rate = 22050
+            var channels = 1
+            var bits = 16
+            var dataOff = -1
+            var dataLen = 0
+            var pos = 12
+            while (pos + 8 <= wav.size) {
+                val id = String(wav, pos, 4, Charsets.US_ASCII)
+                val len = u32(pos + 4)
+                if (id == "fmt " && pos + 24 <= wav.size) {
+                    channels = u16(pos + 10)
+                    rate = u32(pos + 12)
+                    bits = u16(pos + 22)
+                } else if (id == "data") {
+                    dataOff = pos + 8
+                    dataLen = minOf(len, wav.size - dataOff)
+                    break
+                }
+                if (len < 0) break
+                pos += 8 + len + (len and 1)
+            }
+            if (dataOff < 0 || bits != 16 || dataLen < 4) return false
+
+            val n = dataLen / 2
+            val pcm = ShortArray(n)
+            var peak = 1
+            for (i in 0 until n) {
+                val v = u16(dataOff + 2 * i).toShort()
+                pcm[i] = v
+                val a = Math.abs(v.toInt())
+                if (a > peak) peak = a
+            }
+            // Volume máximo + reforço de 1,8x com limite suave (tanh).
+            val drive = 1.8
+            val top = Math.tanh(drive)
+            val vol = Math.max(0.1, Math.min(1.0, volume))
+            for (i in 0 until n) {
+                val x = pcm[i].toDouble() / peak * drive
+                pcm[i] = (Math.tanh(x) / top * 32767.0 * vol).toInt().toShort()
+            }
+
+            try {
+                beepTrack?.release()
+            } catch (e: Throwable) {
+            }
+            beepTrack = null
+
+            val track = AudioTrack(
+                AudioManager.STREAM_MUSIC,
+                rate,
+                if (channels == 2) AudioFormat.CHANNEL_OUT_STEREO
+                else AudioFormat.CHANNEL_OUT_MONO,
+                AudioFormat.ENCODING_PCM_16BIT,
+                n * 2,
+                AudioTrack.MODE_STATIC
+            )
+            if (track.state != AudioTrack.STATE_INITIALIZED) {
+                track.release()
+                return false
+            }
+            if (track.write(pcm, 0, n) <= 0) {
+                track.release()
+                return false
+            }
+            track.play()
+            beepTrack = track
+            val ms = n.toLong() * 1000L / (rate.toLong() * channels) + 400L
+            Handler(Looper.getMainLooper()).postDelayed({
+                try {
+                    if (beepTrack === track) beepTrack = null
+                    track.release()
+                } catch (e: Throwable) {
+                }
+            }, ms)
+            return true
+        } catch (e: Throwable) {
+            return false
+        }
     }
 
     // 1.42.1: o aviso de "aparelho ligou" chegou com o app já aberto (alguns

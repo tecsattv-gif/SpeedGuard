@@ -962,10 +962,31 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   /// anterior é descartado) e o app confere se o som chegou ao fim; se não
   /// chegou, toca o bipe do próprio Android. Cada bipe fica anotado em
   /// Configurações → Diagnóstico.
+  ///
+  /// 1.42.6 — no Garmin o bipe saía baixo e feio (muitas vezes era o bipe
+  /// de reserva do Android). Agora, só no Garmin, o app toca o próprio bipe
+  /// (o mesmo som do Android 7+) direto pelo Android, no volume máximo e
+  /// reforçado; o caminho antigo fica só de reserva.
   AudioPlayer? _oldPlayer;
   int _beepSeq = 0;
+  final Map<String, Uint8List> _wavCache = {};
   Future<void> _beepOld(String file) async {
     final seq = ++_beepSeq;
+    if (BootStart.garmin) {
+      try {
+        final wav = _wavCache[file] ??= (await rootBundle
+                .load('assets/sounds/$file.wav'))
+            .buffer
+            .asUint8List();
+        if (await BootStart.beep(wav, _volume)) {
+          _plog('bipe $file (direto)');
+          return;
+        }
+        _plog('bipe $file: direto falhou, tocador');
+      } catch (e, st) {
+        _logError('bipe direto', e, st);
+      }
+    }
     final prev = _oldPlayer;
     _oldPlayer = null;
     if (prev != null) {

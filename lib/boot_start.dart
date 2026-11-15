@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/services.dart';
 
 /// 1.42.0: "Iniciar com o Android (minimizado)".
@@ -37,6 +39,18 @@ class BootStart {
     try {
       await _ch.invokeMethod('tone');
     } catch (_) {}
+  }
+
+  /// 1.42.6 (Garmin): toca um bipe do app (arquivo WAV) direto pelo
+  /// Android, no volume máximo e reforçado. false = não deu para tocar.
+  static Future<bool> beep(Uint8List wav, double volume) async {
+    try {
+      return await _ch.invokeMethod<bool>(
+              'beep', {'wav': wav, 'volume': volume}) ??
+          false;
+    } catch (_) {
+      return false;
+    }
   }
 
   /// Chamar uma vez no main(), antes do runApp.
