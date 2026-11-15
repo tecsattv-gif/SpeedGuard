@@ -1,6 +1,7 @@
 package com.tecsattv.speedguard
 
 import android.content.Intent
+import android.os.SystemClock
 import flutter.overlay.window.flutter_overlay_window.OverlayService
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -20,10 +21,13 @@ class MainActivity : FlutterActivity() {
         const val EXTRA_BOOT = "boot_minimized"
     }
 
+    private var bootChannel: MethodChannel? = null
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "speedguard/boot")
-            .setMethodCallHandler { call, result ->
+        val ch = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "speedguard/boot")
+        bootChannel = ch
+        ch.setMethodCallHandler { call, result ->
                 when (call.method) {
                     // true só uma vez: quando foi aberto ao ligar o aparelho.
                     "consumeBoot" -> {
@@ -31,11 +35,26 @@ class MainActivity : FlutterActivity() {
                         intent?.removeExtra(EXTRA_BOOT)
                         result.success(boot)
                     }
+                    // 1.42.1: segundos desde que o aparelho ligou.
+                    "sinceBoot" -> result.success(SystemClock.elapsedRealtime() / 1000)
                     // Minimiza o app (como apertar o botão Início).
                     "moveToBack" -> result.success(moveTaskToBack(true))
                     else -> result.notImplemented()
                 }
             }
+    }
+
+    // 1.42.1: o aviso de "aparelho ligou" chegou com o app já aberto (alguns
+    // aparelhos, como o Garmin, reabrem o app sozinhos antes): avisa o Dart.
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        try {
+            if (intent.getBooleanExtra(EXTRA_BOOT, false)) {
+                intent.removeExtra(EXTRA_BOOT)
+                bootChannel?.invokeMethod("boot", null)
+            }
+        } catch (e: Throwable) {
+        }
     }
 
     override fun onDestroy() {

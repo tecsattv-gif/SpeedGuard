@@ -453,11 +453,15 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     _country = p.getString('country');
     await _service.load();
     // 1.42.1: sem voz no aparelho (ex.: Garmin), o aviso falado vira bipe.
+    // A voz é preparada sem segurar a abertura do app: num aparelho sem
+    // motor de voz ela pode demorar ou nunca responder.
     _tts.onNoVoice = _beep;
-    await _tts.setLanguage(ttsLang);
-    await _tts.setSpeechRate(0.5);
-    await _tts.setVolume(_volume);
-    await _tts.awaitSpeakCompletion(false);
+    _tts.setSpeechRate(0.5);
+    _tts.setVolume(_volume);
+    _tts.awaitSpeakCompletion(false);
+    _tts.setLanguage(ttsLang).then((_) {
+      if (mounted) setState(() {});
+    });
     if (mounted) setState(() {});
     _presenceTick();
     _presenceTimer =
@@ -465,13 +469,45 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     // 1.42.0: aberto ao ligar o aparelho com "Iniciar com o Android" ligado:
     // liga o monitoramento e minimiza. A bolha (ou o pop-up dos avisos)
     // abre sozinha ao minimizar, como quando se aperta o botão Início.
-    if (BootStart.fromBoot && _bootMin) {
+    // 1.42.1: vale também quando o próprio aparelho reabre o app logo depois
+    // de ligar (Garmin): aí liga o monitoramento, sem minimizar.
+    if (_bootMin && (BootStart.fromBoot || BootStart.nearBoot)) {
+      final minimize = BootStart.fromBoot;
       BootStart.fromBoot = false;
+      BootStart.nearBoot = false;
+      _bootStart(minimize);
+    }
+    BootStart.onBoot = () {
+      if (_bootMin && mounted) _bootStart(true);
+    };
+  }
+
+  /// Aparelho acabou de ligar: liga o monitoramento e (se pedido) minimiza.
+  bool _bootStarting = false;
+  Future<void> _bootStart(bool minimize) async {
+    if (_bootStarting) return;
+    _bootStarting = true;
+    _plog('boot: ligar monitoramento (minimizar ${minimize ? 'sim' : 'não'})');
+    try {
+      // Logo depois de ligar, o GPS do aparelho pode ainda não estar pronto.
+      for (var i = 0; i < 10 && !_running; i++) {
+        var gps = false;
+        try {
+          gps = await Geolocator.isLocationServiceEnabled();
+        } catch (_) {}
+        if (gps) break;
+        await Future.delayed(const Duration(seconds: 3));
+      }
       if (!_running) await _start();
-      if (_running && mounted) {
+      _plog('boot: monitoramento ${_running ? 'ligado' : 'não ligou'}');
+      if (_running && minimize && mounted) {
         await Future.delayed(const Duration(milliseconds: 600));
         await BootStart.minimize();
       }
+    } catch (e) {
+      _plog('boot: erro $e');
+    } finally {
+      _bootStarting = false;
     }
   }
 

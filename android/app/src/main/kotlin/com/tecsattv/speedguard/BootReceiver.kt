@@ -3,6 +3,7 @@ package com.tecsattv.speedguard
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.provider.Settings
 
 /**
@@ -27,7 +28,8 @@ class BootReceiver : BroadcastReceiver() {
                 "FlutterSharedPreferences", Context.MODE_PRIVATE
             )
             if (!prefs.getBoolean("flutter.boot_min", false)) return
-            if (!Settings.canDrawOverlays(context)) return
+            // Só o Android 10+ exige a permissão para abrir a tela daqui.
+            if (Build.VERSION.SDK_INT >= 29 && !Settings.canDrawOverlays(context)) return
             val start = Intent(context, MainActivity::class.java)
             start.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             start.putExtra(MainActivity.EXTRA_BOOT, true)
