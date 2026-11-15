@@ -35,9 +35,19 @@ jobs:
       - name: Gerar projeto Android
         run: flutter create --platforms android --org com.tecsattv --project-name speedguard .
 
+      # O workmanager 0.10 pede Flutter 3.38; o "pub get" misturava peças da
+      # 0.9 com a interface da 0.10 e não compilava. Prende tudo na 0.9.
       - name: Dependências
         run: |
           set -o pipefail
+          cat >> pubspec.yaml <<'YAML'
+
+          dependency_overrides:
+            workmanager: '>=0.9.0 <0.10.0'
+            workmanager_android: '<0.10.0'
+            workmanager_apple: '<0.10.0'
+            workmanager_platform_interface: '<0.10.0'
+          YAML
           flutter pub get 2>&1 | tee /tmp/pub.log || {
             M=$(tail -n 40 /tmp/pub.log | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}')
             echo "::error title=pub get::$M"
