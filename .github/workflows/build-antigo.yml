@@ -43,16 +43,18 @@ jobs:
           cat >> pubspec.yaml <<'YAML'
 
           dependency_overrides:
-            workmanager: '>=0.9.0 <0.10.0'
-            workmanager_android: '<0.10.0'
-            workmanager_apple: '<0.10.0'
-            workmanager_platform_interface: '<0.10.0'
+            workmanager: '>=0.9.0 <0.9.4'
+            workmanager_android: '<0.9.4'
+            workmanager_apple: '<0.9.4'
+            workmanager_platform_interface: '<0.9.4'
           YAML
           flutter pub get 2>&1 | tee /tmp/pub.log || {
             M=$(tail -n 40 /tmp/pub.log | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}')
             echo "::error title=pub get::$M"
             exit 1
           }
+          V=$(grep -A8 -E "^  workmanager" pubspec.lock | grep -E "^  workmanager|version:" | tr -d '\n' | sed 's/  */ /g')
+          echo "::notice title=workmanager::$V"
 
       # Mesma chave do build normal (android/signing.enc + SPEEDGUARD_KEYSTORE).
       - name: Chave de assinatura fixa
