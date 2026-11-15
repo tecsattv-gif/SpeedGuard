@@ -44,7 +44,7 @@ jobs:
 
           dependency_overrides:
             workmanager: '>=0.9.0 <0.9.4'
-            workmanager_android: '<0.9.4'
+            workmanager_android: '<0.9.3'
             workmanager_apple: '<0.9.4'
             workmanager_platform_interface: '<0.9.4'
           YAML
