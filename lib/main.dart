@@ -50,6 +50,7 @@ import 'toll_service.dart';
 import 'track_nav.dart';
 import 'track_recorder.dart';
 import 'i18n.dart';
+import 'boot_start.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -62,6 +63,8 @@ Future<void> main() async {
     SG.palette.value = AppPalette.byName(p.getString('palette'));
   } catch (_) {}
   await loadLang();
+  // 1.42.0: aberto pelo Android ao ligar o aparelho?
+  await BootStart.init();
   runApp(const SpeedGuardApp());
 }
 
@@ -194,6 +197,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   final _player = AudioPlayer();
   bool _discreet = false;
   bool _bubble = false;
+  // 1.42.0: abrir com o Android (ao ligar o aparelho), já minimizado.
+  bool _bootMin = false;
   double _bubbleScale = 1.0; // tamanho do painel flutuante
   bool _bubbleLand = false; // formato horizontal (paisagem)
   bool _overlayShown = false;
@@ -428,6 +433,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     } catch (_) {}
     _discreet = p.getBool('discreet') ?? false;
     _bubble = p.getBool('bubble') ?? false;
+    _bootMin = p.getBool('boot_min') ?? false;
     _bubbleScale = p.getDouble('bubbleScale') ?? 1.0;
     _bubbleLand = p.getBool('bubbleLand') ?? false;
     _mapView = p.getBool('mapView') ?? true;
@@ -454,6 +460,17 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     _presenceTick();
     _presenceTimer =
         Timer.periodic(PresenceService.beat, (_) => _presenceTick());
+    // 1.42.0: aberto ao ligar o aparelho com "Iniciar com o Android" ligado:
+    // liga o monitoramento e minimiza. A bolha (ou o pop-up dos avisos)
+    // abre sozinha ao minimizar, como quando se aperta o botão Início.
+    if (BootStart.fromBoot && _bootMin) {
+      BootStart.fromBoot = false;
+      if (!_running) await _start();
+      if (_running && mounted) {
+        await Future.delayed(const Duration(milliseconds: 600));
+        await BootStart.minimize();
+      }
+    }
   }
 
   /// A cada minuto: avisa que está conectado (app aberto ou monitorando)
@@ -4589,6 +4606,31 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   setSheet(() => _bubble = v);
                 },
               ),
+              SwitchListTile(
+                title: Text(tr('Iniciar com o Android (minimizado)')),
+                subtitle: Text(tr(
+                    'Ao ligar o tablet ou o telefone, o SpeedGuard abre sozinho, liga o monitoramento e fica minimizado')),
+                value: _bootMin,
+                onChanged: (v) async {
+                  // O Android só deixa abrir sozinho com esta permissão.
+                  if (v && !await FlutterOverlayWindow.isPermissionGranted()) {
+                    final ok = await FlutterOverlayWindow.requestPermission();
+                    if (ok != true) return;
+                  }
+                  final p = await SharedPreferences.getInstance();
+                  await p.setBool('boot_min', v);
+                  setSheet(() => _bootMin = v);
+                },
+              ),
+              if (_bootMin)
+                ListTile(
+                  dense: true,
+                  leading: const Icon(Icons.settings_outlined),
+                  title: Text(tr('Abrir as permissões do app')),
+                  subtitle: Text(tr(
+                      'Em Xiaomi, Redmi e POCO ative também "Início automático"; em outros aparelhos deixe a bateria "Sem restrições"')),
+                  onTap: () => Geolocator.openAppSettings(),
+                ),
               if (!_bubble)
                 ListTile(
                   leading: Icon(Icons.timer_outlined, color: SG.red),

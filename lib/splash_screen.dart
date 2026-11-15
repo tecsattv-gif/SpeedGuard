@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'boot_start.dart';
 import 'i18n.dart';
 
 /// Tela de abertura: arte do SpeedGuard + créditos, por 2,5 segundos.
@@ -18,7 +19,9 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    _timer = Timer(const Duration(milliseconds: 2500), _go);
+    // 1.42.0: aberto ao ligar o aparelho: passa rápido (vai minimizar).
+    _timer = Timer(
+        Duration(milliseconds: BootStart.fromBoot ? 300 : 2500), _go);
   }
 
   void _go() {

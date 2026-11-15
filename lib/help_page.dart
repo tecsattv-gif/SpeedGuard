@@ -92,6 +92,8 @@ const _groups = <_Group>[
         'Sim. Com a Bolha flutuante desligada e o monitoramento ligado, quando chega um radar aparece por cima do app que estiver aberto (Google Maps, YouTube…) só o card do aviso: distância, tipo do radar e limite. Ele some depois que você passa o radar. Para testar: Configurações → Testar pop-up do radar e da contagem.'),
   ]),
   _Group('Painel flutuante e navegação', Icons.picture_in_picture_alt, [
+    _Faq('Como faço o SpeedGuard abrir sozinho quando ligo o aparelho?',
+        'Em Configurações ligue "Iniciar com o Android (minimizado)" e aceite a permissão "Sobrepor a outros apps". Ao ligar o tablet ou o telefone (depois de desbloquear a tela), o SpeedGuard abre, liga o monitoramento e se minimiza sozinho. Em Xiaomi, Redmi e POCO ative também "Início automático" nas permissões do app, senão o sistema não deixa. Para desligar, é o mesmo botão.'),
     _Faq('Como ligo o painel flutuante por cima do Google Maps?',
         'Em Configurações ligue Bolha flutuante e aceite a permissão "Sobrepor a outros apps". Logo abaixo escolha o Tamanho e o Formato (vertical ou horizontal). O painel pode ser arrastado e some ao tocar em PARAR.'),
     _Faq('Como navego até um destino?',

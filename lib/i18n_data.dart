@@ -3,6 +3,12 @@
 
 const Map<String, Map<String, String>> kTr = {
   'en': {
+    'Iniciar com o Android (minimizado)': 'Start with Android (minimised)',
+    'Ao ligar o tablet ou o telefone, o SpeedGuard abre sozinho, liga o monitoramento e fica minimizado': 'When the tablet or phone is switched on, SpeedGuard opens by itself, starts monitoring and stays minimised',
+    'Abrir as permissões do app': 'Open the app permissions',
+    'Em Xiaomi, Redmi e POCO ative também "Início automático"; em outros aparelhos deixe a bateria "Sem restrições"': 'On Xiaomi, Redmi and POCO also turn on “Autostart”; on other devices set the battery to “No restrictions”',
+    'Como faço o SpeedGuard abrir sozinho quando ligo o aparelho?': 'How do I make SpeedGuard open by itself when I switch the device on?',
+    'Em Configurações ligue "Iniciar com o Android (minimizado)" e aceite a permissão "Sobrepor a outros apps". Ao ligar o tablet ou o telefone (depois de desbloquear a tela), o SpeedGuard abre, liga o monitoramento e se minimiza sozinho. Em Xiaomi, Redmi e POCO ative também "Início automático" nas permissões do app, senão o sistema não deixa. Para desligar, é o mesmo botão.': 'In Settings turn on “Start with Android (minimised)” and accept the “Display over other apps” permission. When the tablet or phone is switched on (after you unlock the screen), SpeedGuard opens, starts monitoring and minimises itself. On Xiaomi, Redmi and POCO also turn on “Autostart” in the app permissions, otherwise the system will not allow it. To turn it off, use the same switch.',
     'Satélite': 'Satellite',
     'Mapa padrão': 'Standard map',
     'O aviso do radar aparece com o app minimizado?': 'Does the camera alert appear with the app minimised?',
@@ -615,6 +621,12 @@ const Map<String, Map<String, String>> kTr = {
     'Mensagens dos colegas do grupo': 'Messages from group members',
   },
   'es': {
+    'Iniciar com o Android (minimizado)': 'Iniciar con Android (minimizado)',
+    'Ao ligar o tablet ou o telefone, o SpeedGuard abre sozinho, liga o monitoramento e fica minimizado': 'Al encender la tablet o el teléfono, SpeedGuard se abre solo, activa la vigilancia y queda minimizado',
+    'Abrir as permissões do app': 'Abrir los permisos de la app',
+    'Em Xiaomi, Redmi e POCO ative também "Início automático"; em outros aparelhos deixe a bateria "Sem restrições"': 'En Xiaomi, Redmi y POCO active también “Inicio automático”; en otros equipos deje la batería “Sin restricciones”',
+    'Como faço o SpeedGuard abrir sozinho quando ligo o aparelho?': '¿Cómo hago que SpeedGuard se abra solo al encender el equipo?',
+    'Em Configurações ligue "Iniciar com o Android (minimizado)" e aceite a permissão "Sobrepor a outros apps". Ao ligar o tablet ou o telefone (depois de desbloquear a tela), o SpeedGuard abre, liga o monitoramento e se minimiza sozinho. Em Xiaomi, Redmi e POCO ative também "Início automático" nas permissões do app, senão o sistema não deixa. Para desligar, é o mesmo botão.': 'En Ajustes active “Iniciar con Android (minimizado)” y acepte el permiso “Mostrar sobre otras apps”. Al encender la tablet o el teléfono (después de desbloquear la pantalla), SpeedGuard se abre, activa la vigilancia y se minimiza solo. En Xiaomi, Redmi y POCO active también “Inicio automático” en los permisos de la app; si no, el sistema no lo permite. Para desactivarlo, use el mismo interruptor.',
     'Satélite': 'Satélite',
     'Mapa padrão': 'Mapa estándar',
     'O aviso do radar aparece com o app minimizado?': '¿El aviso del radar aparece con la app minimizada?',
@@ -1227,6 +1239,12 @@ const Map<String, Map<String, String>> kTr = {
     'Mensagens dos colegas do grupo': 'Mensajes de los compañeros del grupo',
   },
   'fr': {
+    'Iniciar com o Android (minimizado)': 'Démarrer avec Android (réduit)',
+    'Ao ligar o tablet ou o telefone, o SpeedGuard abre sozinho, liga o monitoramento e fica minimizado': 'À l’allumage de la tablette ou du téléphone, SpeedGuard s’ouvre tout seul, lance la surveillance et reste réduit',
+    'Abrir as permissões do app': 'Ouvrir les autorisations de l’appli',
+    'Em Xiaomi, Redmi e POCO ative também "Início automático"; em outros aparelhos deixe a bateria "Sem restrições"': 'Sur Xiaomi, Redmi et POCO, activez aussi « Démarrage automatique » ; sur les autres appareils, mettez la batterie sur « Sans restriction »',
+    'Como faço o SpeedGuard abrir sozinho quando ligo o aparelho?': 'Comment faire pour que SpeedGuard s’ouvre tout seul à l’allumage de l’appareil ?',
+    'Em Configurações ligue "Iniciar com o Android (minimizado)" e aceite a permissão "Sobrepor a outros apps". Ao ligar o tablet ou o telefone (depois de desbloquear a tela), o SpeedGuard abre, liga o monitoramento e se minimiza sozinho. Em Xiaomi, Redmi e POCO ative também "Início automático" nas permissões do app, senão o sistema não deixa. Para desligar, é o mesmo botão.': 'Dans Paramètres, activez « Démarrer avec Android (réduit) » et acceptez l’autorisation « Superposition sur d’autres applis ». À l’allumage de la tablette ou du téléphone (après le déverrouillage de l’écran), SpeedGuard s’ouvre, lance la surveillance et se réduit tout seul. Sur Xiaomi, Redmi et POCO, activez aussi « Démarrage automatique » dans les autorisations de l’appli, sinon le système ne le permet pas. Pour désactiver, utilisez le même bouton.',
     'Satélite': 'Satellite',
     'Mapa padrão': 'Carte standard',
     'O aviso do radar aparece com o app minimizado?': 'L’alerte radar s’affiche-t-elle avec l’appli réduite ?',
