@@ -472,6 +472,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     // A voz é preparada sem segurar a abertura do app: num aparelho sem
     // motor de voz ela pode demorar ou nunca responder.
     _tts.onNoVoice = _beep;
+    // 1.42.7: essa conferência da voz vale só para o Android 6/Garmin; no
+    // Android 7 em diante a voz funciona como na 1.42.0.
+    _tts.check = BootStart.oldAndroid || BootStart.garmin;
     // 1.42.3: em Android antigo confere se a voz fala mesmo (ver Voice).
     _tts.verify = BootStart.oldAndroid;
     // 1.42.5: no Garmin todo aviso sai em bipe, sem depender da voz.
@@ -941,19 +944,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   Future<void> _beep(int n) async {
     final file = n >= AlertEngine.overBeep ? 'beep_fast' : 'step$n';
     if (BootStart.oldAndroid || BootStart.garmin) return _beepOld(file);
+    // 1.42.7: Android 7 em diante toca exatamente como na 1.42.0 (sem o
+    // bipe de reserva do Android, que é só para o Android 6/Garmin).
     try {
       await _player.stop();
+      await _player.play(AssetSource('sounds/$file.wav'), volume: _volume);
     } catch (_) {}
-    try {
-      await _player
-          .play(AssetSource('sounds/$file.wav'), volume: _volume)
-          .timeout(const Duration(seconds: 3));
-    } catch (e, st) {
-      // 1.42.3: o tocador falhou (visto em Android antigo): fica registrado
-      // no Diagnóstico e toca o bipe do próprio Android.
-      _logError('bipe', e, st);
-      BootStart.tone();
-    }
   }
 
   /// 1.42.5 — bipe em Android antigo (ex.: Garmin, Android 6). Lá o bipe

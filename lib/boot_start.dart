@@ -21,8 +21,10 @@ class BootStart {
   /// 1.42.3: versão do Android (API). 0 = não deu para saber.
   static int sdk = 0;
 
-  /// Android 7 ou mais antigo (ex.: GPS Garmin, Android 6).
-  static bool get oldAndroid => sdk > 0 && sdk < 26;
+  /// Android 6 ou mais antigo (ex.: GPS Garmin dēzlCam).
+  /// 1.42.7: antes pegava também o Android 7 (API 24/25) e mudava o bipe e
+  /// a voz dele sem querer; o Android 7 em diante fica como sempre foi.
+  static bool get oldAndroid => sdk > 0 && sdk < 24;
 
   /// 1.42.4: fabricante, marca e modelo do aparelho (minúsculas).
   static String maker = '';
@@ -32,7 +34,7 @@ class BootStart {
   static bool get garmin =>
       maker.contains('garmin') ||
       maker.contains('dezl') ||
-      const bool.fromEnvironment('SG_LEGACY');
+      (const bool.fromEnvironment('SG_LEGACY') && sdk < 24);
 
   /// Bipe do próprio Android, para quando o tocador de som falha.
   static Future<void> tone() async {

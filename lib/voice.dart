@@ -21,6 +21,11 @@ class Voice {
   /// Chamado no lugar da fala quando não há voz (número do bipe).
   void Function(int beep)? onNoVoice;
 
+  /// 1.42.7: conferir se o aparelho tem voz (só Android 6/Garmin). Com
+  /// false (Android 7 em diante) a voz funciona como antes da 1.42.1:
+  /// escolhe o idioma e fala, sem trocar a fala por bipe.
+  bool check = false;
+
   static const _wait = Duration(seconds: 4);
 
   /// 1.42.3: confere se cada fala começa mesmo. Em Android antigo (ex.:
@@ -62,6 +67,14 @@ class Voice {
     final base = lang.split('-').first;
     final tries = <String>{lang, ...?_alt[base]};
     if (_silent || _beepOnly) return;
+    if (!check) {
+      ok = true;
+      reason = null;
+      try {
+        await _tts.setLanguage(lang);
+      } catch (_) {}
+      return;
+    }
     try {
       final engines = await _tts.getEngines.timeout(_wait);
       if (engines is List && engines.isEmpty) {
