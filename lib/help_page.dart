@@ -77,7 +77,9 @@ const _groups = <_Group>[
   ]),
   _Group('Velocidade e limitador', Icons.speed, [
     _Faq('Como funciona o aviso de velocidade excedida?',
-        'Acima do limite o velocímetro fica vermelho e começa a contagem de 30 s, sem falar nada. Aos 20 s fala "Atenção." e aos 30 s "Velocidade excedida. Tempo excedido." Voltando ao limite, a contagem zera.'),
+        'Acima do limite o velocímetro fica vermelho e começa a contagem (30 s no padrão do app), sem falar nada. Faltando 10 s fala "Atenção." e no fim "Velocidade excedida. Tempo excedido." Voltando ao limite, a contagem zera.'),
+    _Faq('Posso mudar o tempo da contagem?',
+        'Sim: em Configurações → Tempo da contagem escolha de 30 a 60 s (de 5 em 5). O padrão do app é 30 s. Pela regra europeia, o tacógrafo só grava o excesso de velocidade depois de mais de 60 s seguidos acima do limite; o limitador ou a empresa podem usar um tempo menor.'),
     _Faq('Como mudo o valor do limitador do caminhão?',
         'Com Caminhão escolhido, vá em Configurações → Limitador do caminhão e escolha o valor (de 80 a 95 km/h, ou 100, 110, 120 e 130).'),
     _Faq('Quero só o aviso na tela, sem som. Dá?',

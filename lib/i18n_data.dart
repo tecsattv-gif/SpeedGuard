@@ -3,6 +3,13 @@
 
 const Map<String, Map<String, String>> kTr = {
   'en': {
+    'Caminhão: passou de {0}, o velocímetro fica vermelho com a contagem de {1} s; faltando 10 s "Atenção" e no fim "Velocidade excedida. Tempo excedido". Mostra o limite da via': 'Truck: above {0}, the speedometer turns red with the {1} s countdown; 10 s before the end “Warning” and at the end “Speed exceeded. Time exceeded”. Shows the road limit',
+    'Passou do limite da via: velocímetro vermelho com a contagem de {0} s; faltando 10 s "Atenção" e no fim "Velocidade excedida"': 'Above the road limit: red speedometer with the {0} s countdown; 10 s before the end “Warning” and at the end “Speed exceeded”',
+    'Limitador do caminhão\nComeça a contagem acima de': 'Truck limiter\nStarts the countdown above',
+    'Tempo da contagem\n(padrão do app: 30 s)': 'Countdown time\n(app default: 30 s)',
+    'Acima do limite o velocímetro fica vermelho e começa a contagem (30 s no padrão do app), sem falar nada. Faltando 10 s fala "Atenção." e no fim "Velocidade excedida. Tempo excedido." Voltando ao limite, a contagem zera.': 'Above the limit the speedometer turns red and the countdown starts (30 s by default), silently. 10 s before the end it says “Warning.” and at the end “Speed exceeded. Time exceeded.” Back under the limit, the countdown resets.',
+    'Posso mudar o tempo da contagem?': 'Can I change the countdown time?',
+    'Sim: em Configurações → Tempo da contagem escolha de 30 a 60 s (de 5 em 5). O padrão do app é 30 s. Pela regra europeia, o tacógrafo só grava o excesso de velocidade depois de mais de 60 s seguidos acima do limite; o limitador ou a empresa podem usar um tempo menor.': 'Yes: in Settings → Countdown time choose from 30 to 60 s (in steps of 5). The app default is 30 s. Under EU rules the tachograph only records overspeeding after more than 60 s in a row above the limit; the limiter or the company may use a shorter time.',
     'Iniciar com o Android (minimizado)': 'Start with Android (minimised)',
     'Ao ligar o tablet ou o telefone, o SpeedGuard abre sozinho, liga o monitoramento e fica minimizado': 'When the tablet or phone is switched on, SpeedGuard opens by itself, starts monitoring and stays minimised',
     'Abrir as permissões do app': 'Open the app permissions',
@@ -626,6 +633,13 @@ const Map<String, Map<String, String>> kTr = {
     'Abrir': 'Open',
   },
   'es': {
+    'Caminhão: passou de {0}, o velocímetro fica vermelho com a contagem de {1} s; faltando 10 s "Atenção" e no fim "Velocidade excedida. Tempo excedido". Mostra o limite da via': 'Camión: por encima de {0}, el velocímetro se pone rojo con la cuenta de {1} s; a falta de 10 s “Atención” y al final “Velocidad excedida. Tiempo excedido”. Muestra el límite de la vía',
+    'Passou do limite da via: velocímetro vermelho com a contagem de {0} s; faltando 10 s "Atenção" e no fim "Velocidade excedida"': 'Por encima del límite de la vía: velocímetro rojo con la cuenta de {0} s; a falta de 10 s “Atención” y al final “Velocidad excedida”',
+    'Limitador do caminhão\nComeça a contagem acima de': 'Limitador del camión\nEmpieza la cuenta por encima de',
+    'Tempo da contagem\n(padrão do app: 30 s)': 'Tiempo de la cuenta\n(por defecto: 30 s)',
+    'Acima do limite o velocímetro fica vermelho e começa a contagem (30 s no padrão do app), sem falar nada. Faltando 10 s fala "Atenção." e no fim "Velocidade excedida. Tempo excedido." Voltando ao limite, a contagem zera.': 'Por encima del límite el velocímetro se pone rojo y empieza la cuenta (30 s por defecto), sin hablar. A falta de 10 s dice “Atención.” y al final “Velocidad excedida. Tiempo excedido.” Al volver al límite, la cuenta se reinicia.',
+    'Posso mudar o tempo da contagem?': '¿Puedo cambiar el tiempo de la cuenta?',
+    'Sim: em Configurações → Tempo da contagem escolha de 30 a 60 s (de 5 em 5). O padrão do app é 30 s. Pela regra europeia, o tacógrafo só grava o excesso de velocidade depois de mais de 60 s seguidos acima do limite; o limitador ou a empresa podem usar um tempo menor.': 'Sí: en Ajustes → Tiempo de la cuenta elija de 30 a 60 s (de 5 en 5). Por defecto son 30 s. Según la norma europea, el tacógrafo solo registra el exceso de velocidad tras más de 60 s seguidos por encima del límite; el limitador o la empresa pueden usar un tiempo menor.',
     'Iniciar com o Android (minimizado)': 'Iniciar con Android (minimizado)',
     'Ao ligar o tablet ou o telefone, o SpeedGuard abre sozinho, liga o monitoramento e fica minimizado': 'Al encender la tablet o el teléfono, SpeedGuard se abre solo, activa la vigilancia y queda minimizado',
     'Abrir as permissões do app': 'Abrir los permisos de la app',
@@ -1249,6 +1263,13 @@ const Map<String, Map<String, String>> kTr = {
     'Abrir': 'Abrir',
   },
   'fr': {
+    'Caminhão: passou de {0}, o velocímetro fica vermelho com a contagem de {1} s; faltando 10 s "Atenção" e no fim "Velocidade excedida. Tempo excedido". Mostra o limite da via': 'Camion : au-dessus de {0}, le compteur devient rouge avec le compte à rebours de {1} s ; 10 s avant la fin « Attention » et à la fin « Vitesse dépassée. Temps dépassé ». Affiche la limitation de la route',
+    'Passou do limite da via: velocímetro vermelho com a contagem de {0} s; faltando 10 s "Atenção" e no fim "Velocidade excedida"': 'Au-dessus de la limitation : compteur rouge avec le compte à rebours de {0} s ; 10 s avant la fin « Attention » et à la fin « Vitesse dépassée »',
+    'Limitador do caminhão\nComeça a contagem acima de': 'Limiteur du camion\nCommence le compte au-dessus de',
+    'Tempo da contagem\n(padrão do app: 30 s)': 'Durée du compte à rebours\n(par défaut : 30 s)',
+    'Acima do limite o velocímetro fica vermelho e começa a contagem (30 s no padrão do app), sem falar nada. Faltando 10 s fala "Atenção." e no fim "Velocidade excedida. Tempo excedido." Voltando ao limite, a contagem zera.': 'Au-dessus de la limite, le compteur devient rouge et le compte à rebours commence (30 s par défaut), en silence. 10 s avant la fin, l’appli dit « Attention. » et à la fin « Vitesse dépassée. Temps dépassé. » En revenant sous la limite, le compte repart à zéro.',
+    'Posso mudar o tempo da contagem?': 'Puis-je changer la durée du compte à rebours ?',
+    'Sim: em Configurações → Tempo da contagem escolha de 30 a 60 s (de 5 em 5). O padrão do app é 30 s. Pela regra europeia, o tacógrafo só grava o excesso de velocidade depois de mais de 60 s seguidos acima do limite; o limitador ou a empresa podem usar um tempo menor.': 'Oui : dans Réglages → Durée du compte à rebours, choisissez de 30 à 60 s (par pas de 5). Par défaut : 30 s. Selon la règle européenne, le tachygraphe n’enregistre l’excès de vitesse qu’après plus de 60 s d’affilée au-dessus de la limite ; le limiteur ou l’entreprise peuvent utiliser un temps plus court.',
     'Iniciar com o Android (minimizado)': 'Démarrer avec Android (réduit)',
     'Ao ligar o tablet ou o telefone, o SpeedGuard abre sozinho, liga o monitoramento e fica minimizado': 'À l’allumage de la tablette ou du téléphone, SpeedGuard s’ouvre tout seul, lance la surveillance et reste réduit',
     'Abrir as permissões do app': 'Ouvrir les autorisations de l’appli',

@@ -75,6 +75,10 @@ const List<int> kTruckLimits = [
   100, 110, 120, 130,
 ];
 
+/// Valores do seletor "Tempo da contagem" (1.43.0): de 30 a 60 s, de 5 em
+/// 5; o padrão do app é 30 s.
+const List<int> kCountTotals = [30, 35, 40, 45, 50, 55, 60];
+
 /// Ponto de entrada da bolha flutuante (roda separado do app).
 /// ATENÇÃO: o @pragma tem de ficar colado no overlayMain — na 1.29.19 uma
 /// constante entrou no meio, o compilador removeu o overlayMain e a bolha
@@ -159,6 +163,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   bool _speedWarn = true;
   /// Velocidade máxima do caminhão (limitador), em km/h.
   int _truckMax = 90;
+
+  /// Duração da contagem de velocidade excedida (1.43.0): 30 a 60 s,
+  /// padrão 30 s.
+  int _countTotal = 30;
   /// Limite da via atual, se conhecido.
   int? _roadLimit;
   /// Limite da via já avisado ao caminhão (para não repetir).
@@ -245,7 +253,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     _plog('teste: contagem começou');
     _testTimer = Timer.periodic(const Duration(seconds: 1), (t) {
       final s = (_testSecs ?? 0) + 1;
-      _testSecs = s > 35 ? null : s;
+      _testSecs = s > _countTotal + 5 ? null : s;
       if (_testSecs == null) t.cancel();
       _syncRingPopup();
       _sendBubble();
@@ -421,6 +429,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     _tolls.enabled = p.getBool('toll_warn') ?? true;
     _parks.truckOnly = p.getBool('parks_truck_only') ?? true;
     _truckMax = p.getInt('truck_max') ?? 90;
+    _countTotal = p.getInt('count_total') ?? 30;
+    if (!kCountTotals.contains(_countTotal)) _countTotal = 30;
+    _watch.total = _countTotal;
     if (!kTruckLimits.contains(_truckMax)) _truckMax = 90;
     _sound = p.getString('sound') ?? 'voice';
     _speedSound = p.getString('speed_sound') ?? 'voice';
@@ -835,6 +846,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       'over': a.overLimit || _watch.seconds != null,
       // Segundos acima do limite (contagem dos 30 s e pop-up na bolha).
       'overSecs': _countSecs,
+      'overTotal': _countTotal,
       'road': _running && _speedWarn ? _shownLimit : null,
       'park': _running && _showParks && _parksAhead.isNotEmpty
           ? _km(_parksAhead.first.distance)
@@ -4608,8 +4620,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               SwitchListTile(
                 title: Text(tr('Aviso de velocidade excedida')),
                 subtitle: Text(_isTruck
-                    ? tr('Caminhão: passou de {0}, o velocímetro fica vermelho com a contagem; aos 20 s "Atenção" e aos 30 s "Velocidade excedida. Tempo excedido". Mostra o limite da via', [_truckMax])
-                    : tr('Passou do limite da via: velocímetro vermelho com a contagem; aos 20 s "Atenção" e aos 30 s "Velocidade excedida"')),
+                    ? tr('Caminhão: passou de {0}, o velocímetro fica vermelho com a contagem de {1} s; faltando 10 s "Atenção" e no fim "Velocidade excedida. Tempo excedido". Mostra o limite da via', [_truckMax, _countTotal])
+                    : tr('Passou do limite da via: velocímetro vermelho com a contagem de {0} s; faltando 10 s "Atenção" e no fim "Velocidade excedida"', [_countTotal])),
                 value: _speedWarn,
                 onChanged: (v) async {
                   final p = await SharedPreferences.getInstance();
@@ -4658,12 +4670,40 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                     ),
                   ]),
                 ),
+              // 1.43.0: duração da contagem (30 a 60 s; padrão 30 s).
+              if (_speedWarn)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                  child: Row(children: [
+                    Expanded(
+                        child: Text(tr('Tempo da contagem\n(padrão do app: 30 s)'),
+                            style: TextStyle(height: 1.3))),
+                    DropdownButton<int>(
+                      value: _countTotal,
+                      menuMaxHeight: 360,
+                      items: kCountTotals
+                          .map((v) => DropdownMenuItem(
+                              value: v, child: Text('$v s')))
+                          .toList(),
+                      onChanged: (v) async {
+                        if (v == null) return;
+                        final p = await SharedPreferences.getInstance();
+                        await p.setInt('count_total', v);
+                        _watch.reset();
+                        _watch.total = v;
+                        setSheet(() => _countTotal = v);
+                        setState(() {});
+                        _sendBubble();
+                      },
+                    ),
+                  ]),
+                ),
               if (_speedWarn && _isTruck)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
                   child: Row(children: [
                     Expanded(
-                        child: Text(tr('Limitador do caminhão\nComeça a contar os 30 s acima de'),
+                        child: Text(tr('Limitador do caminhão\nComeça a contagem acima de'),
                             style: TextStyle(height: 1.3))),
                     DropdownButton<int>(
                       value: _truckMax,
@@ -5548,13 +5588,13 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                                 border:
                                     Border.all(color: Colors.white, width: 2)),
                             child: Text(
-                                overSecs >= 30
+                                overSecs >= _countTotal
                                     ? tr('VELOCIDADE\nEXCEDIDA')
-                                    : '${30 - overSecs} s',
+                                    : '${_countTotal - overSecs} s',
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
                                     color: Colors.white,
-                                    fontSize: overSecs >= 30 ? 22 : 44,
+                                    fontSize: overSecs >= _countTotal ? 22 : 44,
                                     height: 1.05,
                                     fontWeight: FontWeight.w900)),
                           ),

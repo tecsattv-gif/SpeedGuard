@@ -80,6 +80,7 @@ class _OverlayBubbleState extends State<OverlayBubble> {
   bool _over = false;
   int? _road; // limite da via
   int? _overSecs; // segundos acima do limite (null = dentro)
+  int _overTotal = 30; // duração da contagem (1.43.0: 30 a 60 s)
   bool _excPopup = false; // pop-up "VELOCIDADE EXCEDIDA" aberto
   bool _excShown = false; // já mostrou neste excesso
   bool _ringOn = false; // janela com o círculo da contagem
@@ -140,6 +141,9 @@ class _OverlayBubbleState extends State<OverlayBubble> {
           _over = m['over'] == true;
           _road = (m['road'] as num?)?.toInt();
           _overSecs = (m['overSecs'] as num?)?.toInt();
+          if (m['overTotal'] is num) {
+            _overTotal = (m['overTotal'] as num).toInt().clamp(30, 60);
+          }
           _park = m['park'] as String?;
           _radarSub = m['sub'] as String?;
           _ask = m['ask'] == true;
@@ -200,7 +204,7 @@ class _OverlayBubbleState extends State<OverlayBubble> {
         if (secs == null) {
           _excShown = false;
           if (_excPopup) _closeExc();
-        } else if (secs >= 30 && !_excShown && !_picker) {
+        } else if (secs >= _overTotal && !_excShown && !_picker) {
           _excShown = true;
           _openExc();
         }
@@ -627,7 +631,7 @@ class _OverlayBubbleState extends State<OverlayBubble> {
   /// esvaziando e o número mostra os segundos que faltam; depois dos 30 s
   /// mostra "EXCEDIDA" até voltar ao limite.
   Widget _ring(int secs, [double d = kRingD]) {
-    final left = (30 - secs).clamp(0, 30);
+    final left = (_overTotal - secs).clamp(0, _overTotal);
     final k = d / kRingD; // escala (pop-up sem a bolha: 1,5×)
     const shadow = [Shadow(color: Colors.black, blurRadius: 4)];
     return SizedBox(
@@ -641,7 +645,7 @@ class _OverlayBubbleState extends State<OverlayBubble> {
                 BoxDecoration(color: SG.bg, shape: BoxShape.circle)),
         SizedBox.expand(
           child: CircularProgressIndicator(
-            value: left / 30,
+            value: left / _overTotal,
             strokeWidth: 8 * k,
             color: SG.red,
             backgroundColor: SG.red.withValues(alpha: 0.25),
@@ -699,7 +703,7 @@ class _OverlayBubbleState extends State<OverlayBubble> {
                 decoration: BoxDecoration(
                     color: SG.red, borderRadius: BorderRadius.circular(8)),
                 child: Text(
-                    _overSecs! >= 30 ? tr('EXCEDIDA') : '${30 - _overSecs!} s',
+                    _overSecs! >= _overTotal ? tr('EXCEDIDA') : '${_overTotal - _overSecs!} s',
                     style: const TextStyle(
                         color: Colors.white,
                         fontSize: 12,

@@ -8,14 +8,18 @@ import 'i18n.dart';
 /// vermelho com "VELOCIDADE EXCEDIDA" até voltar ao limite.
 class SpeedWatch {
   DateTime? _since; // desde quando está acima
-  int _step = 0; // 0 nada, 1 avisou ao passar, 2 aos 20 s, 3 aos 30 s
+  int _step = 0; // 0 nada, 1 avisou ao passar, 2 faltando 10 s, 3 no fim
+
+  /// Duração da contagem em segundos (1.43.0: escolhida nas Configurações,
+  /// de 30 a 60; o padrão do app é 30).
+  int total = 30;
 
   /// Segundos acima do limite (null se está dentro do limite).
   int? get seconds =>
       _since == null ? null : DateTime.now().difference(_since!).inSeconds;
 
-  /// Passou dos 30 s acima do limite.
-  bool get exceeded => (seconds ?? 0) >= 30;
+  /// Acabou a contagem acima do limite.
+  bool get exceeded => (seconds ?? 0) >= total;
 
   void reset() {
     _since = null;
@@ -38,12 +42,12 @@ class SpeedWatch {
       // 1.28.7: ao passar não fala nada (só o aviso na tela).
       return const SpeedEvent(1, null);
     }
-    if (_step == 1 && s >= 20) {
+    if (_step == 1 && s >= total - 10) {
       _step = 2;
       // 1.28.6: aos 20 s fala só "Atenção." (antes a frase dos 10 segundos).
       return SpeedEvent(2, tr('Atenção.'));
     }
-    if (_step == 2 && s >= 30) {
+    if (_step == 2 && s >= total) {
       _step = 3;
       return SpeedEvent(3, tr('Velocidade excedida. Tempo excedido.'));
     }
