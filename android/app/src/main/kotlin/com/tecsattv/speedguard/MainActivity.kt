@@ -125,13 +125,12 @@ class MainActivity : FlutterActivity() {
                 val a = Math.abs(v.toInt())
                 if (a > peak) peak = a
             }
-            // Volume máximo + reforço de 1,8x com limite suave (tanh).
-            val drive = 1.8
-            val top = Math.tanh(drive)
+            // Volume máximo, sem distorcer (1.42.8: o reforço de 1,8x da
+            // 1.42.6 deixava o som áspero; os bipes do Garmin já vêm cheios).
             val vol = Math.max(0.1, Math.min(1.0, volume))
             for (i in 0 until n) {
-                val x = pcm[i].toDouble() / peak * drive
-                pcm[i] = (Math.tanh(x) / top * 32767.0 * vol).toInt().toShort()
+                val x = pcm[i].toDouble() / peak
+                pcm[i] = (x * 32767.0 * vol).toInt().toShort()
             }
 
             try {

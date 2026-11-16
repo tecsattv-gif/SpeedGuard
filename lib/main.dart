@@ -968,6 +968,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   final Map<String, Uint8List> _wavCache = {};
   Future<void> _beepOld(String file) async {
     final seq = ++_beepSeq;
+    // 1.42.8: o Garmin tem bipes próprios (assets/sounds/garmin): mais
+    // agudos, para o alto-falante pequeno dele, sem estalo e no volume
+    // máximo; "long" é o bipe longo do fim da contagem dos 30 s.
+    if (BootStart.garmin) file = 'garmin/$file';
     if (BootStart.garmin) {
       try {
         final wav = _wavCache[file] ??= (await rootBundle
@@ -1013,8 +1017,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       BootStart.tone();
       return;
     }
-    // O som mais longo tem menos de 1 s: se em 2,5 s não terminou, não tocou.
-    Timer(const Duration(milliseconds: 2500), () {
+    // O som mais longo tem 1,3 s: se em 3,5 s não terminou, não tocou.
+    Timer(const Duration(milliseconds: 3500), () {
       if (done || seq != _beepSeq) return;
       _plog('bipe $file: não tocou, bipe do Android');
       BootStart.tone();
@@ -3886,8 +3890,15 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         // 1.42.4 (só no Garmin): a contagem avisa sempre por bipe — no
         // início da contagem, faltando 10 s e no fim ("velocidade
         // excedida") —, sem depender da voz do aparelho. Mudo continua mudo.
+        // 1.42.8: no fim da contagem toca um bipe longo.
         if (_voice && _speedSound != 'mute') {
-          _beep(ev.step == 1 ? 1 : (ev.step == 2 ? 3 : AlertEngine.overBeep));
+          if (ev.step == 1) {
+            _beep(1);
+          } else if (ev.step == 2) {
+            _beep(3);
+          } else {
+            _beepOld('long');
+          }
         }
       } else if (_voice && say != null && _speedSound != 'mute') {
         if (_speedSound == 'beep' || !_tts.ok) {
