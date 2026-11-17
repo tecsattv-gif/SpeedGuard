@@ -24,6 +24,11 @@ class AlertView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 1.45.0: deitado (paisagem) a tela de alerta fica lado a lado: placa e
+    // distância à esquerda, setas à direita; no tablet tudo fica maior.
+    final size = MediaQuery.sizeOf(context);
+    final land = size.width > size.height;
+    final k = size.shortestSide >= 600 ? 1.45 : 1.0;
     return Container(
       decoration: BoxDecoration(
         gradient: LinearGradient(
@@ -36,38 +41,57 @@ class AlertView extends StatelessWidget {
       ),
       child: SafeArea(
         child: Padding(
-          // Espaço para o painel de velocidade que fica por cima.
-          padding: const EdgeInsets.fromLTRB(24, 110, 24, 24),
-          child: Center(child: _content()),
+          // Espaço para o painel de velocidade que fica por cima (em pé:
+          // em cima; deitado: à esquerda).
+          padding: land
+              ? EdgeInsets.fromLTRB(160 * k, 12, 24, 12)
+              : EdgeInsets.fromLTRB(24, 110 * k, 24, 24),
+          child: Center(child: _content(land, k)),
         ),
       ),
     );
   }
 
-  Widget _content() {
+  Widget _content(bool land, double k) {
+    final bands = 300 * k;
     if (!running) {
+      final t = Text(status,
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 18 * k, color: SG.accent));
+      if (land) {
+        return Row(mainAxisSize: MainAxisSize.min, children: [
+          Flexible(
+              child: RadarBands(
+                  green: SG.accent.withValues(alpha: 0.4), max: bands)),
+          const SizedBox(width: 24),
+          Flexible(child: t),
+        ]);
+      }
       return Column(mainAxisSize: MainAxisSize.min, children: [
-        RadarBands(green: SG.accent.withValues(alpha: 0.4)),
+        Flexible(
+            child: RadarBands(
+                green: SG.accent.withValues(alpha: 0.4), max: bands)),
         const SizedBox(height: 24),
-        Text(status,
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 18, color: SG.accent)),
+        t,
       ]);
     }
     final r = alert.radar;
     if (r == null) {
-      return RadarBands(green: _green);
+      return RadarBands(green: _green, max: bands);
     }
     final color = alert.overLimit ? SG.red : SG.orange;
     if (mode == RadarMode.dangerZone) {
-      return Column(mainAxisSize: MainAxisSize.min, children: [
-        Icon(Icons.warning_amber_rounded, color: color, size: 160),
-        Text(tr('ZONA DE PERIGO'),
-            style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 8),
-        Text(tr('Respeite o limite de velocidade'),
-            style: TextStyle(fontSize: 18)),
-      ]);
+      return FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Icon(Icons.warning_amber_rounded, color: color, size: 160 * k),
+          Text(tr('ZONA DE PERIGO'),
+              style: TextStyle(fontSize: 32 * k, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          Text(tr('Respeite o limite de velocidade'),
+              style: TextStyle(fontSize: 18 * k)),
+        ]),
+      );
     }
     final d = alert.distance ?? 0;
     final dist = d >= 1000
@@ -75,57 +99,74 @@ class AlertView extends StatelessWidget {
         : '${(d / 10).round() * 10} m';
     // Uma faixa fica vermelha a cada aviso: 1000 m = 1 … 100 m = 6.
     final red = RadarBands.redFor(d);
-    return Column(mainAxisSize: MainAxisSize.min, children: [
-      FittedBox(
-        fit: BoxFit.scaleDown,
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
-          r.isEvent
-              ? Container(
-                  width: 96,
-                  height: 96,
-                  decoration: BoxDecoration(
-                    color: Layer.of(r).color,
-                    shape: BoxShape.circle,
-                    boxShadow: SG.glow(Layer.of(r).color, 24),
-                  ),
-                  child: Icon(Layer.of(r).icon, color: Colors.white, size: 56),
-                )
-              : _LimitSign(limit: r.maxSpeed, glow: color, size: 96),
-          const SizedBox(width: 18),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(dist,
+    final head = FittedBox(
+      fit: BoxFit.scaleDown,
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        r.isEvent
+            ? Container(
+                width: 96 * k,
+                height: 96 * k,
+                decoration: BoxDecoration(
+                  color: Layer.of(r).color,
+                  shape: BoxShape.circle,
+                  boxShadow: SG.glow(Layer.of(r).color, 24),
+                ),
+                child: Icon(Layer.of(r).icon, color: Colors.white, size: 56 * k),
+              )
+            : _LimitSign(limit: r.maxSpeed, glow: color, size: 96 * k),
+        SizedBox(width: 18 * k),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(dist,
+                style: TextStyle(
+                    fontSize: 56 * k,
+                    fontWeight: FontWeight.bold,
+                    color: color,
+                    height: 1,
+                    shadows: [Shadow(color: color, blurRadius: 18)])),
+            const SizedBox(height: 6),
+            Text(r.typeLabel,
+                style: TextStyle(
+                    fontSize: 20 * k, fontWeight: FontWeight.w600)),
+          ],
+        ),
+      ]),
+    );
+    final reduce = alert.overLimit
+        ? FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+              decoration: BoxDecoration(
+                color: SG.red,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: SG.glow(SG.red, 16),
+              ),
+              child: Text(tr('REDUZA A VELOCIDADE'),
                   style: TextStyle(
-                      fontSize: 56,
-                      fontWeight: FontWeight.bold,
-                      color: color,
-                      height: 1,
-                      shadows: [Shadow(color: color, blurRadius: 18)])),
-              const SizedBox(height: 6),
-              Text(r.typeLabel,
-                  style: const TextStyle(
-                      fontSize: 20, fontWeight: FontWeight.w600)),
-            ],
-          ),
-        ]),
-      ),
-      const SizedBox(height: 20),
-      Flexible(child: RadarBands(green: _green, red: red)),
-      if (alert.overLimit) ...[
-          const SizedBox(height: 14),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-            decoration: BoxDecoration(
-              color: SG.red,
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: SG.glow(SG.red, 16),
+                      fontSize: 22 * k, fontWeight: FontWeight.bold)),
             ),
-            child: Text(tr('REDUZA A VELOCIDADE'),
-                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-          ),
-        ],
+          )
+        : null;
+    if (land) {
+      return Row(mainAxisSize: MainAxisSize.min, children: [
+        Flexible(
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            head,
+            if (reduce != null) ...[const SizedBox(height: 14), reduce],
+          ]),
+        ),
+        const SizedBox(width: 24),
+        Flexible(child: RadarBands(green: _green, red: red, max: bands)),
+      ]);
+    }
+    return Column(mainAxisSize: MainAxisSize.min, children: [
+      head,
+      const SizedBox(height: 20),
+      Flexible(child: RadarBands(green: _green, red: red, max: bands)),
+      if (reduce != null) ...[const SizedBox(height: 14), reduce],
     ]);
   }
 
@@ -172,7 +213,13 @@ class RadarBands extends StatelessWidget {
 
   /// Tamanho fixo (painel flutuante); sem ele ocupa até 300 px.
   final double? size;
-  const RadarBands({super.key, required this.green, this.red = 0, this.size});
+  final double max; // 1.45.0: lado máximo (maior no tablet)
+  const RadarBands(
+      {super.key,
+      required this.green,
+      this.red = 0,
+      this.size,
+      this.max = 300});
 
   /// Quantas faixas ficam vermelhas a esta distância do radar:
   /// 1000 m = 1, 800 m = 2, 500 m = 3, 400 m = 4, 300 m = 5, 100 m = 6.
@@ -188,7 +235,7 @@ class RadarBands extends StatelessWidget {
       );
     }
     return ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 300, maxHeight: 300),
+      constraints: BoxConstraints(maxWidth: max, maxHeight: max),
       child: AspectRatio(
         aspectRatio: 1,
         child: CustomPaint(painter: _ChevronPainter(green, red)),

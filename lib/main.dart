@@ -5291,6 +5291,14 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     );
   }
 
+  /// 1.45.0: margem lateral dos cards por cima do mapa. Em tela larga
+  /// (tablet ou telefone deitado) os cards ficam com no máximo 560 de
+  /// largura, centrados, para não cobrir o mapa de ponta a ponta.
+  double get _inset {
+    final w = MediaQuery.sizeOf(context).width;
+    return w > 640 ? (w - 560) / 2 : 12;
+  }
+
   @override
   Widget build(BuildContext context) {
     // Reconstrói a tela quando o tema (claro/escuro) muda.
@@ -5644,8 +5652,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               ),
             ),
             Positioned(
-              left: 12,
-              right: 12,
+              left: _inset,
+              right: _inset,
               bottom: 12,
               child: Material(
                 color: SG.card,
@@ -5693,8 +5701,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           // Navegação pela rota gravada (1.29.38): painel no alto.
           if (_placing == null && _nav != null)
             Positioned(
-              left: 12,
-              right: 12,
+              left: _inset,
+              right: _inset,
               // Acima do card do park (quando ele aparece) e dos botões.
               bottom: _running && _showParks && _parksAhead.isNotEmpty
                   ? 166
@@ -5758,8 +5766,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           // Aviso de pedágio (15 s), acima do card do park e dos botões.
           if (_tollBanner != null && _placing == null)
             Positioned(
-              left: 12,
-              right: 12,
+              left: _inset,
+              right: _inset,
               bottom: (_running && _showParks && _parksAhead.isNotEmpty
                       ? 166.0
                       : 72.0) +
@@ -5796,7 +5804,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               _running &&
               _showParks &&
               _parksAhead.isNotEmpty)
-            Positioned(left: 12, right: 12, bottom: 72, child: _parkCard()),
+            Positioned(left: _inset, right: _inset, bottom: 72, child: _parkCard()),
 
           // Colega sendo localizado (1.32.0): card com Google Maps.
           if (_placing == null &&
@@ -5804,8 +5812,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               _trackId != null &&
               _live.members[_trackId] != null)
             Positioned(
-              left: 12,
-              right: 12,
+              left: _inset,
+              right: _inset,
               bottom: _running && _showParks && _parksAhead.isNotEmpty
                   ? 166
                   : 72,
