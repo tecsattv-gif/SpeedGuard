@@ -46,6 +46,14 @@ class MainActivity : FlutterActivity() {
                     "sinceBoot" -> result.success(SystemClock.elapsedRealtime() / 1000)
                     // 1.42.3: versão do Android (API).
                     "sdk" -> result.success(Build.VERSION.SDK_INT)
+                    // 1.45.1: pastas do app (no lugar do plugin path_provider).
+                    "dirs" -> result.success(
+                        mapOf(
+                            "docs" to getDir("flutter", MODE_PRIVATE).path,
+                            "support" to filesDir.path,
+                            "temp" to cacheDir.path
+                        )
+                    )
                     // 1.42.4: fabricante/marca/modelo (para reconhecer o Garmin).
                     "maker" -> result.success(
                         "${Build.MANUFACTURER} ${Build.BRAND} ${Build.MODEL}")

@@ -2,7 +2,8 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:geolocator/geolocator.dart';
-import 'package:path_provider/path_provider.dart';
+
+import 'app_dirs.dart';
 
 /// Rota gravada (1.29.35): o caminho feito numa viagem, guardado só no
 /// aparelho como arquivo GPX (abre também no OsmAnd, Sygic, My Maps…).
@@ -54,7 +55,7 @@ class TrackRecorder {
 
   Future<Directory> _folder() async {
     if (_dir != null) return _dir!;
-    final base = await getApplicationDocumentsDirectory();
+    final base = await AppDirs.docs();
     final d = Directory('${base.path}/tracks');
     if (!await d.exists()) await d.create(recursive: true);
     return _dir = d;

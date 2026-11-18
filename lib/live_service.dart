@@ -5,9 +5,9 @@ import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:http/http.dart' as http;
-import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'app_dirs.dart';
 import 'firebase_config.dart';
 import 'i18n.dart';
 
@@ -521,7 +521,7 @@ class LiveService {
         final b64 = (f['audio'] as Map?)?['bytesValue']?.toString();
         if (b64 != null && b64.isNotEmpty) {
           try {
-            final dir = Directory('${(await getApplicationDocumentsDirectory()).path}/voice');
+            final dir = Directory('${(await AppDirs.docs()).path}/voice');
             await dir.create(recursive: true);
             final file = File('${dir.path}/$docId.m4a');
             await file.writeAsBytes(base64Decode(b64));
@@ -571,7 +571,7 @@ class LiveService {
   /// Apaga áudios recebidos/enviados com mais de 7 dias.
   static Future<void> cleanVoice() async {
     try {
-      final dir = Directory('${(await getApplicationDocumentsDirectory()).path}/voice');
+      final dir = Directory('${(await AppDirs.docs()).path}/voice');
       if (!await dir.exists()) return;
       final old = DateTime.now().subtract(const Duration(days: 7));
       await for (final e in dir.list()) {

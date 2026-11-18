@@ -1,3 +1,4 @@
+import 'app_dirs.dart';
 import 'update_service.dart';
 import 'dart:async';
 import 'dart:convert';
@@ -14,7 +15,6 @@ import 'package:flutter_overlay_window/flutter_overlay_window.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -1992,7 +1992,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               return;
             }
             final dir = Directory(
-                '${(await getApplicationDocumentsDirectory()).path}/voice');
+                '${(await AppDirs.docs()).path}/voice');
             await dir.create(recursive: true);
             final path =
                 '${dir.path}/me_${DateTime.now().millisecondsSinceEpoch}.m4a';

@@ -3,7 +3,8 @@ import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:http/http.dart' as http;
-import 'package:path_provider/path_provider.dart';
+
+import 'app_dirs.dart';
 
 /// Base própria de parks e radares (gerada toda semana pelo GitHub a partir
 /// dos mapas do Geofabrik — veja tools/build_data.py). Fica em pedaços de
@@ -54,7 +55,7 @@ class TileStore {
   }
 
   static Future<String?> _loadStamp() async {
-    _dir ??= await getApplicationSupportDirectory();
+    _dir ??= await AppDirs.support();
     final f = File('${_dir!.path}/tiles/meta.stamp');
     try {
       final r = await http
@@ -118,7 +119,7 @@ class TileStore {
 
   static Future<List<dynamic>?> _load(String kind, String key) async {
     final id = '$kind/$key';
-    _dir ??= await getApplicationSupportDirectory();
+    _dir ??= await AppDirs.support();
     final f = File('${_dir!.path}/tiles/$kind/$key.json');
     final v = File('${_dir!.path}/tiles/$kind/$key.v');
     final stamp = await _currentStamp();
