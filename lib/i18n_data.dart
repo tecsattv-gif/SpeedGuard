@@ -3,6 +3,9 @@
 
 const Map<String, Map<String, String>> kTr = {
   'en': {
+    'App fechou (Android):': 'App closed (Android):',
+    'Erro do app:': 'App error:',
+    'Pouca memória:': 'Low memory:',
     'Caminhão: passou de {0}, o velocímetro fica vermelho com a contagem de {1} s; faltando 10 s "Atenção" e no fim "Velocidade excedida. Tempo excedido". Mostra o limite da via': 'Truck: above {0}, the speedometer turns red with the {1} s countdown; 10 s before the end “Warning” and at the end “Speed exceeded. Time exceeded”. Shows the road limit',
     'Passou do limite da via: velocímetro vermelho com a contagem de {0} s; faltando 10 s "Atenção" e no fim "Velocidade excedida"': 'Above the road limit: red speedometer with the {0} s countdown; 10 s before the end “Warning” and at the end “Speed exceeded”',
     'Limitador do caminhão\nComeça a contagem acima de': 'Truck limiter\nStarts the countdown above',
@@ -633,6 +636,9 @@ const Map<String, Map<String, String>> kTr = {
     'Abrir': 'Open',
   },
   'es': {
+    'App fechou (Android):': 'La app se cerró (Android):',
+    'Erro do app:': 'Error de la app:',
+    'Pouca memória:': 'Poca memoria:',
     'Caminhão: passou de {0}, o velocímetro fica vermelho com a contagem de {1} s; faltando 10 s "Atenção" e no fim "Velocidade excedida. Tempo excedido". Mostra o limite da via': 'Camión: por encima de {0}, el velocímetro se pone rojo con la cuenta de {1} s; a falta de 10 s “Atención” y al final “Velocidad excedida. Tiempo excedido”. Muestra el límite de la vía',
     'Passou do limite da via: velocímetro vermelho com a contagem de {0} s; faltando 10 s "Atenção" e no fim "Velocidade excedida"': 'Por encima del límite de la vía: velocímetro rojo con la cuenta de {0} s; a falta de 10 s “Atención” y al final “Velocidad excedida”',
     'Limitador do caminhão\nComeça a contagem acima de': 'Limitador del camión\nEmpieza la cuenta por encima de',
@@ -1263,6 +1269,9 @@ const Map<String, Map<String, String>> kTr = {
     'Abrir': 'Abrir',
   },
   'fr': {
+    'App fechou (Android):': 'Appli fermée (Android) :',
+    'Erro do app:': 'Erreur de l\'appli :',
+    'Pouca memória:': 'Mémoire faible :',
     'Caminhão: passou de {0}, o velocímetro fica vermelho com a contagem de {1} s; faltando 10 s "Atenção" e no fim "Velocidade excedida. Tempo excedido". Mostra o limite da via': 'Camion : au-dessus de {0}, le compteur devient rouge avec le compte à rebours de {1} s ; 10 s avant la fin « Attention » et à la fin « Vitesse dépassée. Temps dépassé ». Affiche la limitation de la route',
     'Passou do limite da via: velocímetro vermelho com a contagem de {0} s; faltando 10 s "Atenção" e no fim "Velocidade excedida"': 'Au-dessus de la limitation : compteur rouge avec le compte à rebours de {0} s ; 10 s avant la fin « Attention » et à la fin « Vitesse dépassée »',
     'Limitador do caminhão\nComeça a contagem acima de': 'Limiteur du camion\nCommence le compte au-dessus de',

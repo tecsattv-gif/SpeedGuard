@@ -1,5 +1,6 @@
 package com.tecsattv.speedguard
 
+import android.content.Context
 import android.content.Intent
 import android.media.AudioFormat
 import android.media.AudioManager
@@ -26,12 +27,60 @@ import io.flutter.plugin.common.MethodChannel
 class MainActivity : FlutterActivity() {
     companion object {
         const val EXTRA_BOOT = "boot_minimized"
+        private var crashLogOn = false
     }
 
     private var bootChannel: MethodChannel? = null
 
+    /// 1.45.2: guarda o erro que fez o app "parar de funcionar" (o Android
+    /// só mostra a mensagem, sem o motivo). Aparece em Configurações →
+    /// Diagnóstico na próxima vez que o app abrir.
+    private fun installCrashLog() {
+        if (crashLogOn) return
+        crashLogOn = true
+        val app = applicationContext
+        val prev = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler { t, e ->
+            try {
+                val sw = java.io.StringWriter()
+                e.printStackTrace(java.io.PrintWriter(sw))
+                val stack = sw.toString().lines().take(30).joinToString("\n")
+                val now = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US)
+                    .format(java.util.Date())
+                val rt = Runtime.getRuntime()
+                val mem = "memória Java ${(rt.totalMemory() - rt.freeMemory()) / 1048576}/" +
+                    "${rt.maxMemory() / 1048576} MB"
+                app.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
+                    .edit()
+                    .putString("flutter.crash_native", "$now (${t.name}) $mem\n$stack")
+                    .commit()
+            } catch (x: Throwable) {
+            }
+            prev?.uncaughtException(t, e)
+        }
+    }
+
+    /// 1.45.2: o Android avisa quando a memória está acabando: anota (as 10
+    /// últimas), para ver se o "parou de funcionar" é falta de memória.
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        if (level < 10) return // só os níveis de pouca memória
+        try {
+            val prefs = applicationContext.getSharedPreferences(
+                "FlutterSharedPreferences", Context.MODE_PRIVATE)
+            val now = java.text.SimpleDateFormat("dd/MM HH:mm", java.util.Locale.US)
+                .format(java.util.Date())
+            val old = prefs.getString("flutter.mem_log", "") ?: ""
+            val lines = (old.lines().filter { it.isNotBlank() } + "$now nível $level")
+                .takeLast(10)
+            prefs.edit().putString("flutter.mem_log", lines.joinToString("\n")).apply()
+        } catch (x: Throwable) {
+        }
+    }
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        installCrashLog()
         val ch = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "speedguard/boot")
         bootChannel = ch
         ch.setMethodCallHandler { call, result ->

@@ -65,7 +65,33 @@ Future<void> main() async {
   await loadLang();
   // 1.42.0: aberto pelo Android ao ligar o aparelho?
   await BootStart.init();
+  // 1.45.2: erros que não foram tratados ficam anotados (Diagnóstico).
+  FlutterError.onError = (d) {
+    FlutterError.presentError(d);
+    _saveCrash('Flutter', d.exception, d.stack);
+  };
+  WidgetsBinding.instance.platformDispatcher.onError = (e, st) {
+    _saveCrash('Dart', e, st);
+    return true;
+  };
+  // 1.45.2 (Android 6 / Garmin): menos memória para as imagens do mapa.
+  // Com o padrão (100 MB), depois de 3 a 4 horas o Garmin ficava sem
+  // memória e o Android fechava o app ("o SpeedGuard parou").
+  if (BootStart.oldAndroid) {
+    PaintingBinding.instance.imageCache.maximumSizeBytes = 30 << 20;
+    PaintingBinding.instance.imageCache.maximumSize = 150;
+  }
   runApp(const SpeedGuardApp());
+}
+
+/// 1.45.2: guarda o último erro não tratado (Configurações → Diagnóstico).
+Future<void> _saveCrash(String kind, Object e, StackTrace? st) async {
+  try {
+    final lines = (st?.toString() ?? '').split('\n').take(8).join('\n');
+    final p = await SharedPreferences.getInstance();
+    await p.setString('crash_dart',
+        '${DateTime.now().toIso8601String().substring(0, 19)} $kind: $e\n$lines');
+  } catch (_) {}
 }
 
 /// Valores do seletor "Limitador do caminhão" (1.29.19): de 80 a 95 de 1
@@ -5150,8 +5176,20 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 title: Text(tr('Diagnóstico (último erro)')),
                 onTap: () async {
                   final p = await SharedPreferences.getInstance();
-                  final err = _lastError ?? p.getString('last_error');
                   await p.reload();
+                  // 1.45.2: também o erro que fechou o app e os avisos de
+                  // pouca memória do Android.
+                  final parts = <String>[
+                    if ((_lastError ?? p.getString('last_error')) != null)
+                      _lastError ?? p.getString('last_error')!,
+                    if (p.getString('crash_native') != null)
+                      '${tr('App fechou (Android):')}\n${p.getString('crash_native')}',
+                    if (p.getString('crash_dart') != null)
+                      '${tr('Erro do app:')}\n${p.getString('crash_dart')}',
+                    if (p.getString('mem_log') != null)
+                      '${tr('Pouca memória:')}\n${p.getString('mem_log')}',
+                  ];
+                  final err = parts.isEmpty ? null : parts.join('\n\n');
                   final log = [
                     ...(_popLog.isNotEmpty
                         ? _popLog
@@ -5173,6 +5211,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                           TextButton(
                               onPressed: () async {
                                 await p.remove('last_error');
+                                await p.remove('crash_native');
+                                await p.remove('crash_dart');
+                                await p.remove('mem_log');
                                 _lastError = null;
                                 if (d.mounted) Navigator.pop(d);
                               },
