@@ -22,7 +22,10 @@ class GpsFilter {
   DateTime? _lastAt; // quando ela chegou (relógio do celular)
   int _rejected = 0; // rejeitadas em sequência
 
+  int _staleRej = 0; // rejeitadas por hora repetida/velha, em sequência
+
   void reset() {
+    _staleRej = 0;
     _hist.clear();
     _last = null;
     _lastAt = null;
@@ -76,7 +79,16 @@ class GpsFilter {
     final prev = _last, at = _lastAt;
     // 1.41.1: leitura velha (o provedor "fused" às vezes repete uma posição
     // guardada de segundos atrás) — jogava o veículo para trás e com 0 km/h.
-    if (prev != null && !p.timestamp.isAfter(prev.timestamp)) return null;
+    // 1.45.3: mas no máximo 5 seguidas — se a leitura anterior trouxe uma
+    // hora adiantada (relógio do GPS), todas as seguintes eram jogadas fora
+    // e o app ficava sem GPS com o GPS a funcionar.
+    if (prev != null && !p.timestamp.isAfter(prev.timestamp)) {
+      if (_staleRej < 5) {
+        _staleRej++;
+        return null;
+      }
+    }
+    _staleRej = 0;
     if (prev != null && at != null && _rejected < 5) {
       final age = DateTime.now().difference(at).inMilliseconds / 1000;
       if (age < 10) {

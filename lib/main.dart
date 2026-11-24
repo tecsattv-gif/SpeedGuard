@@ -1080,9 +1080,21 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     });
   }
 
+  DateTime _lastAccepted = DateTime.now();
   void _onRawPosition(Position raw) {
-    final pos = _gps.accept(raw);
-    if (pos != null) _onPosition(pos);
+    var pos = _gps.accept(raw);
+    // 1.45.3: leituras boas a chegar mas o filtro a rejeitar tudo há 15 s:
+    // recomeça o filtro e aceita esta.
+    if (pos == null &&
+        raw.accuracy <= 50 &&
+        DateTime.now().difference(_lastAccepted).inSeconds > 15) {
+      _gps.reset();
+      pos = _gps.accept(raw);
+    }
+    if (pos != null) {
+      _lastAccepted = DateTime.now();
+      _onPosition(pos);
+    }
   }
 
   /// Último erro de cálculo (Configurações → Diagnóstico). Um erro numa

@@ -1,7 +1,7 @@
 name: speedguard
 description: SpeedGuard - alerta de radares para o mundo todo.
 publish_to: 'none'
-version: 1.45.2+147
+version: 1.45.3+148
 
 environment:
   sdk: '>=3.4.0 <4.0.0'
